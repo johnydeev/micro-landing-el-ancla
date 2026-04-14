@@ -1,41 +1,35 @@
 import { Producto } from '@/types'
 
 export async function getProductos(): Promise<Producto[]> {
-  const sheetId = process.env.GOOGLE_SHEET_ID
-  const apiKey = process.env.GOOGLE_SHEETS_API_KEY
+  const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
 
-  if (!sheetId || !apiKey) {
-    console.error('Faltan variables de entorno GOOGLE_SHEET_ID o GOOGLE_SHEETS_API_KEY')
+  if (!csvUrl) {
+    console.error('Falta la variable de entorno GOOGLE_SHEETS_CSV_URL')
     return []
   }
 
-  const range = encodeURIComponent('Productos!A2:F100')
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`
-
   try {
-    const res = await fetch(url, {
+    const res = await fetch(csvUrl, {
       next: { revalidate: 60 },
     })
 
     if (!res.ok) {
-      console.error('Error fetching Google Sheets:', res.status, res.statusText)
+      console.error('Error fetching CSV:', res.status, res.statusText)
       return []
     }
 
-    const data = await res.json()
-    const rows: string[][] = data.values || []
+    const text = await res.text()
+    const lines = text.split('\n').filter((line) => line.trim() !== '')
 
-    const productos: Producto[] = rows
-      .filter((row) => row[5]?.toUpperCase() === 'TRUE')
-      .map((row) => ({
-        nombre: row[0] || '',
-        detalle: row[1] || '',
-        precio: row[2] || '',
-        unidad: row[3] || '',
-        etiqueta: row[4] || '',
-        activo: true,
-      }))
-      .slice(0, 4)
+    const productos: Producto[] = lines.map((line) => {
+      const cols = line.split(',')
+      return {
+        categoria: cols[0]?.trim() || '',
+        nombre: cols[1]?.trim() || '',
+        precio: cols[2]?.trim() || '',
+        unidad: cols[3]?.trim() || '',
+      }
+    })
 
     return productos
   } catch (error) {

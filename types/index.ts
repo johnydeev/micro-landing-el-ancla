@@ -1,8 +1,6 @@
 export interface Producto {
+  categoria: string
   nombre: string
-  detalle: string
   precio: string
   unidad: string
-  etiqueta: string
-  activo: boolean
 }
