@@ -29,14 +29,14 @@ export default function Home() {
 
   useEffect(() => {
     fetchProductos()
-    const interval = setInterval(fetchProductos, 60000)
-    return () => clearInterval(interval)
-  }, [])
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      window.location.reload()
-    }, 60000)
+    const interval = setInterval(async () => {
+      await fetchProductos()
+      setTimeout(() => {
+        window.location.reload()
+      }, 3000)
+    }, 300000)
+
     return () => clearInterval(interval)
   }, [])
 
