@@ -9,7 +9,7 @@ export default function Header() {
 
   return (
     <header
-      className="flex items-center justify-between px-[3.5vw] py-[1.4vh]"
+      className="flex items-center justify-center px-10 py-[0.7vh]"
       style={{ height: '16%', backgroundColor: '#E31E24' }}
     >
       {/* Izquierda: Logo + texto */}
@@ -40,8 +40,8 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Derecha: Ofertas */}
-      <div className="flex flex-col items-end text-white">
+      {/* Derecha: Ofertas
+      <div className="flex flex-col items-end text-white pr-10">
         <span
           className="tracking-wide"
           style={{ fontSize: 'clamp(8px, 1.2vw, 20px)' }}
@@ -54,7 +54,7 @@ export default function Header() {
         >
           {negocioConfig.titulo}
         </span>
-      </div>
+      </div> */}
     </header>
   )
 }
