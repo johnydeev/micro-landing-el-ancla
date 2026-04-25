@@ -9,7 +9,7 @@ export default function Header() {
 
   return (
     <header
-      className="flex items-center justify-between px-[2vw]"
+      className="flex items-center justify-between px-[3.5vw] py-[1.4vh]"
       style={{ height: '16%', backgroundColor: '#E31E24' }}
     >
       {/* Izquierda: Logo + texto */}
