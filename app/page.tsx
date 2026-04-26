@@ -38,8 +38,10 @@ export default async function Home() {
                   <tr key={`${producto.categoria}-${producto.nombre}-${i}`} className={i % 2 === 0 ? styles.rowEven : styles.rowOdd}>
                     <td className={`${styles.cellBase} ${styles.descriptionCell}`}>{producto.nombre}</td>
                     <td className={`${styles.cellBase} ${styles.priceCell}`}>
-                      <span className={styles.priceValue}>{formatPrecio(producto.precio)}</span>
-                      {producto.unidad && <span className={styles.unitValue}>por {producto.unidad}</span>}
+                      <div className={styles.priceInline}>
+                        <span className={styles.priceValue}>{formatPrecio(producto.precio)}</span>
+                        {producto.unidad && <span className={styles.unitValue}>por {producto.unidad}</span>}
+                      </div>
                     </td>
                   </tr>
                 ))

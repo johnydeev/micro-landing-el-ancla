@@ -48,7 +48,8 @@
 
 .priceHead {
   width: 25%;
-  text-align: right;
+  padding-left: 64px;
+  text-align: left;
 }
 
 .rowEven {
@@ -76,12 +77,20 @@
 }
 
 .priceCell {
-  text-align: right;
+  padding-left: 64px;
+  text-align: left;
   vertical-align: middle;
 }
 
+.priceInline {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0.45em;
+}
+
 .priceValue {
-  display: block;
   color: #e31e24;
   font-size: clamp(
     calc(14px * var(--table-font-scale, 1)),
@@ -92,7 +101,6 @@
 }
 
 .unitValue {
-  display: block;
   color: #6b7280;
   font-size: clamp(
     calc(8px * var(--table-font-scale, 1)),

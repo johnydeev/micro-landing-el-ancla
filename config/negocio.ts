@@ -9,8 +9,8 @@ export const negocioConfig = {
   // Tipografia
   // 100 = tamano normal, 115 = 15% mas grande
   tipografia: {
-    tabla: 115,
-    footer: 115,
+    tabla: 150,
+    footer: 135,
   },
 
   // Footer
