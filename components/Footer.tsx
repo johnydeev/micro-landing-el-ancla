@@ -1,19 +1,14 @@
 import { negocioConfig } from '@/config/negocio'
+import styles from './Footer.module.css'
 
 export default function Footer() {
   return (
-    <footer
-      className="flex items-center justify-center text-white"
-      style={{ height: '10%', backgroundColor: '#E31E24' }}
-    >
-      <div
-        className="flex items-center gap-[1.5vw] text-center"
-        style={{ fontSize: 'clamp(8px, 1.3vw, 22px)' }}
-      >
+    <footer className={styles.footer}>
+      <div className={styles.content}>
         <span>📞 {negocioConfig.telefono}</span>
-        <span className="opacity-60">|</span>
+        <span className={styles.divider}>|</span>
         <span>📍 {negocioConfig.direccion}</span>
-        <span className="opacity-60">|</span>
+        <span className={styles.divider}>|</span>
         <span>🕐 {negocioConfig.horarios}</span>
       </div>
     </footer>

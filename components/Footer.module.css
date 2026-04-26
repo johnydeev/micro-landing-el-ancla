@@ -1,0 +1,20 @@
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 10%;
+  background: #e31e24;
+  color: #fff;
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 1.5vw;
+  font-size: clamp(8px, 1.3vw, 22px);
+  text-align: center;
+}
+
+.divider {
+  opacity: 0.6;
+}

@@ -16,5 +16,3 @@ html, body {
   overflow: hidden;
   background: #000;
 }
-
-@source inline("px-10 py-3 py-4 text-left text-right text-white text-xl text-2xl font-bold font-semibold uppercase bg-white border-b border-gray-200 text-[#1E3A8A] text-[#E31E24] text-gray-400 bg-[#FFF0F0] align-middle block leading-tight w-3/4 w-1/4");
