@@ -11,7 +11,11 @@
   display: flex;
   align-items: center;
   gap: 1.5vw;
-  font-size: clamp(8px, 1.3vw, 22px);
+  font-size: clamp(
+    calc(8px * var(--footer-font-scale, 1)),
+    calc(1.3vw * var(--footer-font-scale, 1)),
+    calc(22px * var(--footer-font-scale, 1))
+  );
   text-align: center;
 }
 

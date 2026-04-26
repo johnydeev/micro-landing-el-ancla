@@ -36,7 +36,11 @@
   width: 75%;
   padding: 1.5vh 40px;
   color: #fff;
-  font-size: clamp(14px, 1.8vw, 28px);
+  font-size: clamp(
+    calc(14px * var(--table-font-scale, 1)),
+    calc(1.8vw * var(--table-font-scale, 1)),
+    calc(28px * var(--table-font-scale, 1))
+  );
   font-weight: 700;
   text-align: left;
   text-transform: uppercase;
@@ -62,7 +66,11 @@
 
 .descriptionCell {
   color: #1e3a8a;
-  font-size: clamp(12px, 1.6vw, 26px);
+  font-size: clamp(
+    calc(12px * var(--table-font-scale, 1)),
+    calc(1.6vw * var(--table-font-scale, 1)),
+    calc(26px * var(--table-font-scale, 1))
+  );
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -75,18 +83,30 @@
 .priceValue {
   display: block;
   color: #e31e24;
-  font-size: clamp(14px, 1.8vw, 28px);
+  font-size: clamp(
+    calc(14px * var(--table-font-scale, 1)),
+    calc(1.8vw * var(--table-font-scale, 1)),
+    calc(28px * var(--table-font-scale, 1))
+  );
   font-weight: 700;
 }
 
 .unitValue {
   display: block;
   color: #6b7280;
-  font-size: clamp(8px, 0.9vw, 14px);
+  font-size: clamp(
+    calc(8px * var(--table-font-scale, 1)),
+    calc(0.9vw * var(--table-font-scale, 1)),
+    calc(14px * var(--table-font-scale, 1))
+  );
 }
 
 .emptyState {
   color: #9ca3af;
-  font-size: clamp(12px, 1.6vw, 26px);
+  font-size: clamp(
+    calc(12px * var(--table-font-scale, 1)),
+    calc(1.6vw * var(--table-font-scale, 1)),
+    calc(26px * var(--table-font-scale, 1))
+  );
   text-align: center;
 }

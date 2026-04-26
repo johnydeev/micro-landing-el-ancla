@@ -1,6 +1,9 @@
+import type { CSSProperties } from 'react'
+
 import AutoRefresh from '@/components/AutoRefresh'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
+import { negocioConfig } from '@/config/negocio'
 import { getProductos } from '@/lib/sheets'
 import styles from './page.module.css'
 
@@ -12,11 +15,14 @@ function formatPrecio(precio: string): string {
 
 export default async function Home() {
   const productos = await getProductos()
+  const tableFontVars = {
+    '--table-font-scale': `${negocioConfig.tipografia.tabla / 100}`,
+  } as CSSProperties
 
   return (
     <main className={styles.pageShell}>
       <AutoRefresh />
-      <div className={styles.screen}>
+      <div className={styles.screen} style={tableFontVars}>
         <Header />
         <div className={styles.tableWrap}>
           <table className={styles.table}>

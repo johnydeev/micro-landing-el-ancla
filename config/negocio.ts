@@ -6,6 +6,13 @@ export const negocioConfig = {
   titulo: 'SUPER OFERTAS',
   logo: '/logo.png',
 
+  // Tipografia
+  // 100 = tamano normal, 115 = 15% mas grande
+  tipografia: {
+    tabla: 115,
+    footer: 115,
+  },
+
   // Footer
   telefono: '11 6000 7394',
   direccion: 'Av. San Martín 3153, Florencio Varela',
