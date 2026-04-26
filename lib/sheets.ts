@@ -1,3 +1,5 @@
+import 'server-only'
+
 import { Producto } from '@/types'
 
 export async function getProductos(): Promise<Producto[]> {
