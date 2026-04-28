@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 16%;
+  height: 14%;
   padding: 0.7vh 40px;
   background: #e31e24;
 }
@@ -15,7 +15,8 @@
 
 .logo {
   width: auto;
-  height: 10vh;
+  height: 16vh;
+  object-fit: contain;
 }
 
 .brandCopy {
@@ -25,7 +26,7 @@
 
 .brandName {
   color: #fff;
-  font-size: clamp(14px, 2.2vw, 36px);
+  font-size: clamp(18px, 2.8vw, 44px);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -33,6 +34,6 @@
 
 .brandTagline {
   color: rgb(255 255 255 / 0.9);
-  font-size: clamp(8px, 1vw, 18px);
+  font-size: clamp(11px, 1.4vw, 22px);
   font-style: italic;
 }

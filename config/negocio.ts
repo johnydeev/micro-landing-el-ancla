@@ -15,6 +15,6 @@ export const negocioConfig = {
 
   // Footer
   telefono: '11 6000 7394',
-  direccion: 'Av. San Martín 3153, Florencio Varela',
+  instagram: '@granja_elancla',
   horarios: 'Lun a Sáb: 8 a 13hs y 17 a 20hs',
 }

@@ -34,7 +34,7 @@
 
 .headCell {
   width: 75%;
-  padding: 1.5vh 40px;
+  padding: 1.5vh 40px 1.5vh 70px;
   color: #fff;
   font-size: clamp(
     calc(14px * var(--table-font-scale, 1)),
@@ -61,7 +61,7 @@
 }
 
 .cellBase {
-  padding: 1vh 40px;
+  padding: 1vh 40px 1vh 70px;
   border-bottom: 1px solid #e5e7eb;
 }
 

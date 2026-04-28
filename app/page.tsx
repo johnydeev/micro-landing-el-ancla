@@ -292,7 +292,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
         }}
       >
         <span>{negocioConfig.telefono}</span>
-        <span>{negocioConfig.direccion}</span>
+        <span>{negocioConfig.instagram}</span>
       </div>
     </div>
   )
