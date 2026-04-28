@@ -156,9 +156,9 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           left: 0,
           top: 0,
           height: '100%',
-          width: '38%',
+          width: '22%',
           background: '#E31E24',
-          clipPath: 'polygon(0 0, 100% 0, 72% 100%, 0% 100%)',
+          clipPath: 'polygon(0 0, 100% 0, 55% 100%, 0% 100%)',
         }}
       />
 
@@ -170,8 +170,8 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           background: '#1E3A8A',
           color: '#fff',
           borderRadius: 16,
-          padding: '20px 30px',
-          fontSize: 'clamp(20px, 2.5vw, 38px)',
+          padding: '24px 40px',
+          fontSize: 'clamp(28px, 4vw, 60px)',
           fontWeight: 'bold',
           textAlign: 'center',
           lineHeight: 1.2,
