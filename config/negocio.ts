@@ -17,4 +17,9 @@ export const negocioConfig = {
   telefono: '11 6000 7394',
   instagram: '@granja_elancla',
   horarios: 'Lun a Sáb: 8 a 13hs y 17 a 20hs',
+
+  // Slides
+  segundosCartel: 3,
+  segundosTabla: 3,
+  minutosActualizacion: 5,
 }

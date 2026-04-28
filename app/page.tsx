@@ -12,9 +12,9 @@ import { negocioConfig } from '@/config/negocio'
 import type { Oferta, Producto } from '@/types'
 import styles from './page.module.css'
 
-const CARTEL_DURACION_MS = 3000
-const TABLA_DURACION_MS = 20000
-const REFETCH_INTERVAL_MS = 5 * 60 * 1000
+const CARTEL_DURACION_MS = negocioConfig.segundosCartel * 1000
+const TABLA_DURACION_MS = negocioConfig.segundosTabla * 1000
+const REFETCH_INTERVAL_MS = negocioConfig.minutosActualizacion * 60 * 1000
 
 function formatPrecio(precio: string): string {
   const num = Number(precio)
@@ -63,10 +63,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (ofertas.length === 0) {
-      if (modo !== 'tabla') setModo('tabla')
-      return
-    }
+    if (ofertas.length === 0) return
 
     let timeoutId: number
 
@@ -250,50 +247,6 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
         )}
       </div>
 
-      <div
-        style={{
-          position: 'absolute',
-          left: '3%',
-          bottom: '8%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-        }}
-      >
-        <img
-          src="/logo.png"
-          alt={negocioConfig.nombre}
-          style={{ height: 'clamp(60px, 8vh, 100px)', width: 'auto' }}
-        />
-        <div
-          style={{
-            color: '#1E3A8A',
-            fontWeight: 'bold',
-            fontSize: 'clamp(16px, 2vw, 30px)',
-          }}
-        >
-          GRANJA EL ANCLA
-        </div>
-      </div>
-
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          width: '100%',
-          background: '#E31E24',
-          color: '#fff',
-          padding: '1.5vh 40px',
-          fontSize: 'clamp(12px, 1.5vw, 24px)',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 60,
-          boxSizing: 'border-box',
-        }}
-      >
-        <span>{negocioConfig.telefono}</span>
-        <span>{negocioConfig.instagram}</span>
-      </div>
     </div>
   )
 }

@@ -155,112 +155,32 @@ export async function getProductos(): Promise<Producto[]> {
   }
 }
 
-interface SheetMetadataEntry {
-  name?: string
-  title?: string
-  sheetId?: number | string
-  gid?: number | string
-}
-
-function extractGidFromMetadata(metadata: unknown, sheetName: string): string | null {
-  if (!metadata || typeof metadata !== 'object') return null
-
-  const candidates: SheetMetadataEntry[] = []
-  const root = metadata as Record<string, unknown>
-
-  const collect = (value: unknown) => {
-    if (!value) return
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item && typeof item === 'object') {
-          candidates.push(item as SheetMetadataEntry)
-        }
-      }
-    }
-  }
-
-  collect(root.sheets)
-  collect(root.feed)
-  if (root.feed && typeof root.feed === 'object') {
-    collect((root.feed as Record<string, unknown>).entry)
-  }
-
-  for (const entry of candidates) {
-    const name = (entry.name ?? entry.title ?? '') as string | { $t?: string }
-    const resolvedName = typeof name === 'string' ? name : name?.$t ?? ''
-    if (resolvedName.trim().toLowerCase() === sheetName.toLowerCase()) {
-      const gid = entry.gid ?? entry.sheetId
-      if (gid !== undefined && gid !== null) return String(gid)
-    }
-  }
-
-  return null
-}
-
 export async function getOfertas(): Promise<Oferta[]> {
   const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
+  const gidOfertas = process.env.GOOGLE_SHEETS_GID_OFERTAS
 
   if (!csvUrl) {
-    console.error('Falta la variable de entorno GOOGLE_SHEETS_CSV_URL')
+    console.error('Falta GOOGLE_SHEETS_CSV_URL')
+    return []
+  }
+  if (!gidOfertas) {
+    console.error('Falta GOOGLE_SHEETS_GID_OFERTAS')
     return []
   }
 
-  const match = csvUrl.match(/spreadsheets\/d\/e\/([^/]+)/)
-  if (!match) {
-    console.error('No se pudo extraer el ID publicado desde GOOGLE_SHEETS_CSV_URL')
-    return []
-  }
-
-  const publishedId = match[1]
-  const metadataUrl = `https://docs.google.com/spreadsheets/d/e/${publishedId}/pub?output=json`
+  const ofertasUrl = csvUrl.replace(/gid=\d+/, `gid=${gidOfertas}`)
 
   try {
-    const metadataRes = await fetch(metadataUrl, {
-      next: { revalidate: 60 },
-    })
-
-    if (!metadataRes.ok) {
-      console.error('Error fetching metadatos de hojas:', metadataRes.status, metadataRes.statusText)
-      return []
-    }
-
-    const metadataText = await metadataRes.text()
-    let metadata: unknown
-    try {
-      metadata = JSON.parse(metadataText)
-    } catch {
-      const jsonMatch = metadataText.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        console.error('No se pudo parsear los metadatos de hojas como JSON')
-        return []
-      }
-      metadata = JSON.parse(jsonMatch[0])
-    }
-
-    const gid = extractGidFromMetadata(metadata, 'Ofertas')
-    if (!gid) {
-      console.error('No se encontró la hoja "Ofertas" en los metadatos')
-      return []
-    }
-
-    const ofertasUrl = csvUrl.replace(/gid=\d+/, `gid=${gid}`)
-
-    const res = await fetch(ofertasUrl, {
-      next: { revalidate: 60 },
-    })
-
+    const res = await fetch(ofertasUrl, { next: { revalidate: 60 } })
     if (!res.ok) {
-      console.error('Error fetching CSV de ofertas:', res.status, res.statusText)
+      console.error('Error fetching CSV de ofertas:', res.status)
       return []
     }
-
     const text = await res.text()
     const rows = parseCsvRows(text)
-    const ofertas = rows
-      .map((columns, rowIndex) => mapRowToOferta(columns, rowIndex))
-      .filter((oferta): oferta is Oferta => oferta !== null)
-
-    return ofertas
+    return rows
+      .map((columns, i) => mapRowToOferta(columns, i))
+      .filter((o): o is Oferta => o !== null)
   } catch (error) {
     console.error('Error en getOfertas:', error)
     return []
