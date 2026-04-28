@@ -19,7 +19,7 @@ export const negocioConfig = {
   horarios: 'Lun a Sáb: 8 a 13hs y 17 a 20hs',
 
   // Slides
-  segundosCartel: 3,
+  segundosCartel: 10,
   segundosTabla: 3,
   minutosActualizacion: 5,
 }
