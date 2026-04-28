@@ -4,3 +4,9 @@ export interface Producto {
   precio: string
   unidad: string
 }
+
+export interface Oferta {
+  nombre: string
+  precio: string
+  unidad: string
+}
