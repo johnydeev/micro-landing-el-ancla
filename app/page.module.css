@@ -29,13 +29,11 @@
 }
 
 .headRow {
-  background: #1e3a8a;
 }
 
 .headCell {
   width: 75%;
   padding: 1.5vh 40px 1.5vh 70px;
-  color: #fff;
   font-size: clamp(
     calc(14px * var(--table-font-scale, 1)),
     calc(1.8vw * var(--table-font-scale, 1)),
@@ -53,20 +51,16 @@
 }
 
 .rowEven {
-  background: #fff;
 }
 
 .rowOdd {
-  background: #fff0f0;
 }
 
 .cellBase {
   padding: 1vh 40px 1vh 70px;
-  border-bottom: 1px solid #e5e7eb;
 }
 
 .descriptionCell {
-  color: #1e3a8a;
   font-size: clamp(
     calc(12px * var(--table-font-scale, 1)),
     calc(1.6vw * var(--table-font-scale, 1)),
@@ -91,7 +85,6 @@
 }
 
 .priceValue {
-  color: #e31e24;
   font-size: clamp(
     calc(14px * var(--table-font-scale, 1)),
     calc(1.8vw * var(--table-font-scale, 1)),
@@ -101,7 +94,6 @@
 }
 
 .unitValue {
-  color: #6b7280;
   font-size: clamp(
     calc(8px * var(--table-font-scale, 1)),
     calc(0.9vw * var(--table-font-scale, 1)),

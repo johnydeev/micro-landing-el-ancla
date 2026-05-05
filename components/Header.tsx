@@ -8,7 +8,7 @@ export default function Header() {
   const [imgError, setImgError] = useState(false)
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} style={{ background: negocioConfig.colores.primario }}>
       <div className={styles.brandRow}>
         <div
           style={{

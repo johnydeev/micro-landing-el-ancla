@@ -22,4 +22,13 @@ export const negocioConfig = {
   segundosCartel: 10,
   segundosTabla: 3,
   minutosActualizacion: 5,
+
+  colores: {
+    primario: '#E31E24',    // rojo
+    secundario: '#1E3A8A',  // azul marino
+    fondo: '#FFFFFF',       // blanco
+    textoPrimario: '#1E3A8A',
+    textoSecundario: '#6b7280',
+    filaImpar: '#FFF0F0',
+  },
 }

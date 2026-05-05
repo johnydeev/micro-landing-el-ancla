@@ -102,27 +102,31 @@ export default function Home() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr className={styles.headRow}>
-                  <th className={styles.headCell}>Descripción</th>
-                  <th className={`${styles.headCell} ${styles.priceHead}`}>Precio</th>
+                <tr className={styles.headRow} style={{ background: negocioConfig.colores.secundario }}>
+                  <th className={styles.headCell} style={{ color: negocioConfig.colores.fondo }}>Descripción</th>
+                  <th className={`${styles.headCell} ${styles.priceHead}`} style={{ color: negocioConfig.colores.fondo }}>Precio</th>
                 </tr>
               </thead>
               <tbody>
                 {productos.length > 0 ? (
                   productos.map((producto, i) => (
-                    <tr key={`${producto.categoria}-${producto.nombre}-${i}`} className={i % 2 === 0 ? styles.rowEven : styles.rowOdd}>
-                      <td className={`${styles.cellBase} ${styles.descriptionCell}`}>{producto.nombre}</td>
-                      <td className={`${styles.cellBase} ${styles.priceCell}`}>
+                    <tr
+                      key={`${producto.categoria}-${producto.nombre}-${i}`}
+                      className={i % 2 === 0 ? styles.rowEven : styles.rowOdd}
+                      style={{ background: i % 2 === 0 ? negocioConfig.colores.fondo : negocioConfig.colores.filaImpar }}
+                    >
+                      <td className={`${styles.cellBase} ${styles.descriptionCell}`} style={{ color: negocioConfig.colores.textoPrimario, borderBottom: '1px solid #e5e7eb' }}>{producto.nombre}</td>
+                      <td className={`${styles.cellBase} ${styles.priceCell}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
                         <div className={styles.priceInline}>
-                          <span className={styles.priceValue}>{formatPrecio(producto.precio)}</span>
-                          {producto.unidad && <span className={styles.unitValue}>por {producto.unidad}</span>}
+                          <span className={styles.priceValue} style={{ color: negocioConfig.colores.primario }}>{formatPrecio(producto.precio)}</span>
+                          {producto.unidad && <span className={styles.unitValue} style={{ color: negocioConfig.colores.textoSecundario }}>por {producto.unidad}</span>}
                         </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={2} className={`${styles.cellBase} ${styles.emptyState}`}>
+                    <td colSpan={2} className={`${styles.cellBase} ${styles.emptyState}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
                       Sin productos disponibles
                     </td>
                   </tr>
@@ -157,7 +161,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           top: 0,
           height: '100%',
           width: '22%',
-          background: '#E31E24',
+          background: negocioConfig.colores.secundario,
           clipPath: 'polygon(0 0, 100% 0, 55% 100%, 0% 100%)',
         }}
       />
@@ -167,7 +171,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           position: 'absolute',
           top: '8%',
           left: '3%',
-          background: '#1E3A8A',
+          background: negocioConfig.colores.primario,
           color: '#fff',
           borderRadius: 16,
           padding: '24px 40px',
@@ -212,7 +216,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           left: '36%',
           top: '20%',
           fontSize: 'clamp(36px, 6vw, 90px)',
-          color: '#1E3A8A',
+          color: negocioConfig.colores.secundario,
           fontWeight: 'bold',
           maxWidth: '40%',
           lineHeight: 1.1,
@@ -228,7 +232,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           bottom: '5%',
           width: 'clamp(160px, 18vw, 280px)',
           aspectRatio: '1',
-          background: '#1E3A8A',
+          background: negocioConfig.colores.secundario,
           borderRadius: '50%',
           display: 'flex',
           flexDirection: 'column',

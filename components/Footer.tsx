@@ -21,7 +21,7 @@ export default function Footer() {
   } as CSSProperties
 
   return (
-    <footer className={styles.footer}>
+    <footer className={styles.footer} style={{ background: negocioConfig.colores.primario }}>
       <div className={styles.content} style={footerFontVars}>
         <span style={itemStyle}>
           <svg viewBox="0 0 24 24" fill="#25D366" style={iconStyle}>
