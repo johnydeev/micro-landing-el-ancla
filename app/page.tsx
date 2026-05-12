@@ -215,7 +215,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-          }}
+          }} 
         >
           <img
             src={`/ofertas/${slug}.png`}
