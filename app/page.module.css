@@ -110,3 +110,31 @@
   );
   text-align: center;
 }
+
+@keyframes pulseScale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.pulseImage {
+  animation: pulseScale 1.2s ease-in-out 1 both;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.pulsePrice {
+  animation: pulseScale 1.2s ease-in-out 1.2s 1 both;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.pulseSuperOferta {
+  animation: pulseScale 1.2s ease-in-out 2.4s 1 both;
+  transform-origin: center;
+  will-change: transform;
+}

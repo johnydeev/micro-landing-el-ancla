@@ -167,10 +167,11 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
       />
 
       <div
+        className={styles.pulseSuperOferta}
         style={{
           position: 'absolute',
-          top: '8%',
-          left: '3%',
+          top: '3%',
+          left: '8%',
           background: negocioConfig.colores.primario,
           color: '#fff',
           borderRadius: 16,
@@ -179,58 +180,65 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           fontWeight: 'bold',
           textAlign: 'center',
           lineHeight: 1.2,
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
-        SUPER OFERTA
+        SUPER
+        <br />
+        OFERTA
       </div>
-
-      {imgError ? (
-        <div
-          style={{
-            position: 'absolute',
-            right: '5%',
-            top: '10%',
-            height: '70%',
-            width: 'auto',
-          }}
-        />
-      ) : (
-        <img
-          src={`/ofertas/${slug}.png`}
-          alt={oferta.nombre}
-          onError={() => setImgError(true)}
-          style={{
-            position: 'absolute',
-            right: '5%',
-            top: '10%',
-            height: '70%',
-            width: 'auto',
-            objectFit: 'contain',
-          }}
-        />
-      )}
 
       <div
         style={{
           position: 'absolute',
-          left: '36%',
-          top: '20%',
+          left: '46%',
+          top: '3%', //TAMAÑO Y POSICION DEL NOMBRE DE LA OFERTA
           fontSize: 'clamp(36px, 6vw, 90px)',
           color: negocioConfig.colores.secundario,
           fontWeight: 'bold',
-          maxWidth: '40%',
+          maxWidth: '50%',
           lineHeight: 1.1,
         }}
       >
         {oferta.nombre}
       </div>
 
+      {!imgError && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '10%',
+            right: '18%',
+            top: '16%',
+            bottom: '0%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <img
+            src={`/ofertas/${slug}.png`}
+            alt={oferta.nombre}
+            onError={() => setImgError(true)}
+            className={styles.pulseImage}
+            style={{
+              height: '80%',
+              width: '80%',
+              objectFit: 'contain',
+            }}
+          />
+        </div>
+      )}
+
       <div
+        className={styles.pulsePrice}
         style={{
           position: 'absolute',
           right: '5%',
           bottom: '5%',
-          width: 'clamp(160px, 18vw, 280px)',
+          ['--circle-size' as string]: 'clamp(180px, 20vw, 320px)',
+          width: 'var(--circle-size)',
           aspectRatio: '1',
           background: negocioConfig.colores.secundario,
           borderRadius: '50%',
@@ -241,14 +249,12 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           color: '#fff',
           textAlign: 'center',
           padding: '0 8%',
+          fontSize: 'calc(var(--circle-size) * 0.25)', //TAMAÑO DEL PRECIO EN EL CIRCULO, 25% del tamaño del circulo
         }}
       >
-        <span style={{ fontSize: 'clamp(22px, 3vw, 48px)', fontWeight: 'bold' }}>
+        <span style={{ fontWeight: 'bold' }}>
           {formatPrecio(oferta.precio)}
         </span>
-        {oferta.unidad && (
-          <span style={{ fontSize: 'clamp(12px, 1.5vw, 24px)' }}>{oferta.unidad}</span>
-        )}
       </div>
 
     </div>
