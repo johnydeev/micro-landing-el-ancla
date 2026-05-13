@@ -23,7 +23,7 @@ function formatPrecio(precio: string): string {
 }
 
 function slugifyNombre(nombre: string): string {
-  return nombre.toLowerCase().split(' ').join('-')
+  return nombre.toLowerCase().replace(/\s+/g, '-')
 }
 
 export default function Home() {
