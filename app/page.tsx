@@ -202,7 +202,10 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           left: '46%',
           top: '3%', //TAMAÑO Y POSICION DEL NOMBRE DE LA OFERTA
           fontSize: 'clamp(36px, 6vw, 90px)',
-          color: negocioConfig.colores.secundario,
+          background: negocioConfig.colores.secundario,
+          color: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '16px 28px',
           fontWeight: 'bold',
           maxWidth: '50%',
           lineHeight: 1.1,
