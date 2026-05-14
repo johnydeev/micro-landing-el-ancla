@@ -23,7 +23,11 @@ function formatPrecio(precio: string): string {
 }
 
 function slugifyNombre(nombre: string): string {
-  return nombre.toLowerCase().replace(/\s+/g, '-')
+  return nombre
+    .toLowerCase()
+    .replace(/\s+(x|por)\s+.*/i, '')
+    .trim()
+    .replace(/\s+/g, '-')
 }
 
 export default function Home() {
@@ -143,7 +147,10 @@ export default function Home() {
 
 function CartelOferta({ oferta }: { oferta: Oferta }) {
   const [imgError, setImgError] = useState(false)
-  const slug = slugifyNombre(oferta.nombre)
+  const slug = oferta.imagen
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
 
   return (
     <div

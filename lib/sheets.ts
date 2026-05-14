@@ -110,7 +110,7 @@ function mapRowToOferta(columns: string[], rowIndex: number): Oferta | null {
     return null
   }
 
-  const [nombre = '', precio = '', unidad = ''] = columns.map((column) => column.trim())
+  const [nombre = '', precio = '', imagen = ''] = columns.map((column) => column.trim())
 
   if (!nombre || !precio) {
     console.warn(`Fila CSV de ofertas ignorada por no tener nombre o precio: ${rowIndex + 1}`)
@@ -120,7 +120,7 @@ function mapRowToOferta(columns: string[], rowIndex: number): Oferta | null {
   return {
     nombre,
     precio,
-    unidad,
+    imagen,
   }
 }
 

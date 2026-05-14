@@ -8,5 +8,5 @@ export interface Producto {
 export interface Oferta {
   nombre: string
   precio: string
-  unidad: string
+  imagen: string
 }
