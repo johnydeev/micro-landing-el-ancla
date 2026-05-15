@@ -9,4 +9,5 @@ export interface Oferta {
   nombre: string
   precio: string
   imagen: string
+  estado: 'ACTIVO' | 'INACTIVO'
 }

@@ -19,9 +19,9 @@ export const negocioConfig = {
   horarios: 'MAR a SAB: 8:15 a 13hs y 16:30 a 20:15hs | DOM: 8:15 a 13hs',
 
   // Slides
-  segundosCartel: 10,
+  segundosCartel: 6,
   segundosTabla: 3,
-  minutosActualizacion: 5,
+  minutosActualizacion: 3,
 
   colores: {
     primario: '#E31E24',    // rojo

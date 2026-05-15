@@ -104,23 +104,41 @@ function mapRowToProducto(columns: string[], rowIndex: number): Producto | null 
   }
 }
 
+function isOfertasHeaderRow(columns: string[]): boolean {
+  const normalizedColumns = columns.map((column) => column.trim().toLowerCase())
+
+  return (
+    normalizedColumns[0] === 'titulo' &&
+    normalizedColumns[1] === 'precio' &&
+    normalizedColumns[2] === 'slug imagen' &&
+    normalizedColumns[3] === 'estado'
+  )
+}
+
 function mapRowToOferta(columns: string[], rowIndex: number): Oferta | null {
+  if (isOfertasHeaderRow(columns)) {
+    return null
+  }
+
   if (columns.length < 2) {
     console.warn(`Fila CSV de ofertas ignorada por tener menos de 2 columnas: ${rowIndex + 1}`)
     return null
   }
 
-  const [nombre = '', precio = '', imagen = ''] = columns.map((column) => column.trim())
+  const [nombre = '', precio = '', imagen = '', estado = ''] = columns.map((column) => column.trim())
 
   if (!nombre || !precio) {
     console.warn(`Fila CSV de ofertas ignorada por no tener nombre o precio: ${rowIndex + 1}`)
     return null
   }
 
+  const estadoNormalizado = estado.toUpperCase() === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
+
   return {
     nombre,
     precio,
     imagen,
+    estado: estadoNormalizado,
   }
 }
 
@@ -181,6 +199,7 @@ export async function getOfertas(): Promise<Oferta[]> {
     return rows
       .map((columns, i) => mapRowToOferta(columns, i))
       .filter((o): o is Oferta => o !== null)
+      .filter((o) => o.estado === 'ACTIVO')
   } catch (error) {
     console.error('Error en getOfertas:', error)
     return []
