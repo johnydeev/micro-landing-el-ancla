@@ -104,42 +104,36 @@ function mapRowToProducto(columns: string[], rowIndex: number): Producto | null 
   }
 }
 
-function isOfertasHeaderRow(columns: string[]): boolean {
-  const normalizedColumns = columns.map((column) => column.trim().toLowerCase())
+const OFERTAS_TABLE_OFFSETS = [0, 6, 12]
 
-  return (
-    normalizedColumns[0] === 'titulo' &&
-    normalizedColumns[1] === 'precio' &&
-    normalizedColumns[2] === 'slug imagen' &&
-    normalizedColumns[3] === 'estado'
-  )
+function isOfertasColumnHeaderRow(columns: string[]): boolean {
+  return OFERTAS_TABLE_OFFSETS.some((offset) => {
+    const slice = columns.slice(offset, offset + 4).map((column) => (column ?? '').trim().toLowerCase())
+    return (
+      slice[0] === 'titulo' &&
+      slice[1] === 'precio' &&
+      slice[2] === 'slug imagen' &&
+      slice[3] === 'estado'
+    )
+  })
 }
 
-function mapRowToOferta(columns: string[], rowIndex: number): Oferta | null {
-  if (isOfertasHeaderRow(columns)) {
-    return null
+function mapRowToOfertas(columns: string[]): Oferta[] {
+  const ofertas: Oferta[] = []
+
+  for (const offset of OFERTAS_TABLE_OFFSETS) {
+    const [nombre = '', precio = '', imagen = '', estado = ''] = columns
+      .slice(offset, offset + 4)
+      .map((column) => (column ?? '').trim())
+
+    if (!nombre || !precio) continue
+
+    const estadoNormalizado = estado.toUpperCase() === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
+
+    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado })
   }
 
-  if (columns.length < 2) {
-    console.warn(`Fila CSV de ofertas ignorada por tener menos de 2 columnas: ${rowIndex + 1}`)
-    return null
-  }
-
-  const [nombre = '', precio = '', imagen = '', estado = ''] = columns.map((column) => column.trim())
-
-  if (!nombre || !precio) {
-    console.warn(`Fila CSV de ofertas ignorada por no tener nombre o precio: ${rowIndex + 1}`)
-    return null
-  }
-
-  const estadoNormalizado = estado.toUpperCase() === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
-
-  return {
-    nombre,
-    precio,
-    imagen,
-    estado: estadoNormalizado,
-  }
+  return ofertas
 }
 
 export async function getProductos(): Promise<Producto[]> {
@@ -196,9 +190,16 @@ export async function getOfertas(): Promise<Oferta[]> {
     }
     const text = await res.text()
     const rows = parseCsvRows(text)
+    const headerRowIndex = rows.findIndex((columns) => isOfertasColumnHeaderRow(columns))
+
+    if (headerRowIndex === -1) {
+      console.error('No se encontró la fila de encabezados en el CSV de ofertas')
+      return []
+    }
+
     return rows
-      .map((columns, i) => mapRowToOferta(columns, i))
-      .filter((o): o is Oferta => o !== null)
+      .slice(headerRowIndex + 1)
+      .flatMap((columns) => mapRowToOfertas(columns))
       .filter((o) => o.estado === 'ACTIVO')
   } catch (error) {
     console.error('Error en getOfertas:', error)
