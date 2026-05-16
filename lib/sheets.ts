@@ -104,24 +104,28 @@ function mapRowToProducto(columns: string[], rowIndex: number): Producto | null 
   }
 }
 
-const OFERTAS_TABLE_OFFSETS = [0, 6, 12]
+function findOfertasTableOffsets(headerRow: string[]): number[] {
+  const offsets: number[] = []
 
-function isOfertasColumnHeaderRow(columns: string[]): boolean {
-  return OFERTAS_TABLE_OFFSETS.some((offset) => {
-    const slice = columns.slice(offset, offset + 4).map((column) => (column ?? '').trim().toLowerCase())
-    return (
+  for (let i = 0; i <= headerRow.length - 4; i += 1) {
+    const slice = headerRow.slice(i, i + 4).map((column) => (column ?? '').trim().toLowerCase())
+    if (
       slice[0] === 'titulo' &&
       slice[1] === 'precio' &&
       slice[2] === 'slug imagen' &&
       slice[3] === 'estado'
-    )
-  })
+    ) {
+      offsets.push(i)
+    }
+  }
+
+  return offsets
 }
 
-function mapRowToOfertas(columns: string[]): Oferta[] {
+function mapRowToOfertas(columns: string[], offsets: number[]): Oferta[] {
   const ofertas: Oferta[] = []
 
-  for (const offset of OFERTAS_TABLE_OFFSETS) {
+  for (const offset of offsets) {
     const [nombre = '', precio = '', imagen = '', estado = ''] = columns
       .slice(offset, offset + 4)
       .map((column) => (column ?? '').trim())
@@ -190,16 +194,28 @@ export async function getOfertas(): Promise<Oferta[]> {
     }
     const text = await res.text()
     const rows = parseCsvRows(text)
-    const headerRowIndex = rows.findIndex((columns) => isOfertasColumnHeaderRow(columns))
+
+    let offsets: number[] = []
+    let headerRowIndex = -1
+    for (let i = 0; i < rows.length; i += 1) {
+      const found = findOfertasTableOffsets(rows[i])
+      if (found.length > 0) {
+        offsets = found
+        headerRowIndex = i
+        break
+      }
+    }
 
     if (headerRowIndex === -1) {
       console.error('No se encontró la fila de encabezados en el CSV de ofertas')
       return []
     }
 
+    console.log(`Ofertas: ${offsets.length} tabla(s) detectada(s) en columnas`, offsets)
+
     return rows
       .slice(headerRowIndex + 1)
-      .flatMap((columns) => mapRowToOfertas(columns))
+      .flatMap((columns) => mapRowToOfertas(columns, offsets))
       .filter((o) => o.estado === 'ACTIVO')
   } catch (error) {
     console.error('Error en getOfertas:', error)
