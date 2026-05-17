@@ -9,7 +9,7 @@ import AutoRefresh from '@/components/AutoRefresh'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
 import { negocioConfig } from '@/config/negocio'
-import type { Oferta, Producto } from '@/types'
+import type { ListaPrecios, Oferta } from '@/types'
 import styles from './page.module.css'
 
 const CARTEL_DURACION_MS = negocioConfig.segundosCartel * 1000
@@ -31,10 +31,11 @@ function slugifyNombre(nombre: string): string {
 }
 
 export default function Home() {
-  const [productos, setProductos] = useState<Producto[]>([])
+  const [listas, setListas] = useState<ListaPrecios[]>([])
   const [ofertas, setOfertas] = useState<Oferta[]>([])
   const [modo, setModo] = useState<'cartel' | 'tabla'>('tabla')
   const [cartelIndex, setCartelIndex] = useState(0)
+  const [listaIndex, setListaIndex] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -47,7 +48,7 @@ export default function Home() {
         ])
         if (cancelled) return
         if (resProductos.ok) {
-          setProductos(await resProductos.json())
+          setListas(await resProductos.json())
         }
         if (resOfertas.ok) {
           setOfertas(await resOfertas.json())
@@ -67,33 +68,42 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (ofertas.length === 0) return
+    if (listas.length === 0 && ofertas.length === 0) return
 
     let timeoutId: number
 
     if (modo === 'tabla') {
       timeoutId = window.setTimeout(() => {
-        setCartelIndex(0)
-        setModo('cartel')
+        if (listaIndex < listas.length - 1) {
+          setListaIndex(listaIndex + 1)
+        } else if (ofertas.length > 0) {
+          setCartelIndex(0)
+          setModo('cartel')
+        } else {
+          setListaIndex(0)
+        }
       }, TABLA_DURACION_MS)
     } else {
       timeoutId = window.setTimeout(() => {
         if (cartelIndex < ofertas.length - 1) {
           setCartelIndex(cartelIndex + 1)
         } else {
+          setListaIndex(0)
           setModo('tabla')
         }
       }, CARTEL_DURACION_MS)
     }
 
     return () => window.clearTimeout(timeoutId)
-  }, [modo, cartelIndex, ofertas])
+  }, [modo, cartelIndex, listaIndex, listas, ofertas])
 
   const tableFontVars = {
     '--table-font-scale': `${negocioConfig.tipografia.tabla / 100}`,
   } as CSSProperties
 
   const ofertaActual = modo === 'cartel' ? ofertas[cartelIndex] : null
+  const listaActual = listas[listaIndex] ?? null
+  const productosActuales = listaActual?.productos ?? []
 
   return (
     <main className={styles.pageShell}>
@@ -106,16 +116,25 @@ export default function Home() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
+                <tr className={styles.headRow} style={{ background: '#000' }}>
+                  <th
+                    className={styles.superHeadCell}
+                    style={{ color: negocioConfig.colores.fondo, background: '#000' }}
+                    colSpan={2}
+                  >
+                    {listaActual?.titulo ?? 'Lista de Precios'}
+                  </th>
+                </tr>
                 <tr className={styles.headRow} style={{ background: negocioConfig.colores.secundario }}>
                   <th className={styles.headCell} style={{ color: negocioConfig.colores.fondo }}>Descripción</th>
                   <th className={`${styles.headCell} ${styles.priceHead}`} style={{ color: negocioConfig.colores.fondo }}>Precio</th>
                 </tr>
               </thead>
               <tbody>
-                {productos.length > 0 ? (
-                  productos.map((producto, i) => (
+                {productosActuales.length > 0 ? (
+                  productosActuales.map((producto, i) => (
                     <tr
-                      key={`${producto.categoria}-${producto.nombre}-${i}`}
+                      key={`${producto.nombre}-${i}`}
                       className={i % 2 === 0 ? styles.rowEven : styles.rowOdd}
                       style={{ background: i % 2 === 0 ? negocioConfig.colores.fondo : negocioConfig.colores.filaImpar }}
                     >
@@ -199,19 +218,29 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
       <div
         style={{
           position: 'absolute',
-          left: '46%',
-          top: '3%', //TAMAÑO Y POSICION DEL NOMBRE DE LA OFERTA
-          fontSize: 'clamp(36px, 6vw, 90px)',
-          background: negocioConfig.colores.secundario,
-          color: '#FFFFFF',
-          borderRadius: '16px',
-          padding: '16px 28px',
-          fontWeight: 'bold',
-          maxWidth: '50%',
-          lineHeight: 1.1,
+          left: '33%', //LIMITE IZQUIERDO DE LA ZONA DE CENTRADO (borde derecho del cartel SUPER OFERTA)
+          right: '5%', //LIMITE DERECHO DE LA ZONA DE CENTRADO
+          top: '3%',
+          display: 'flex',
+          justifyContent: 'center',
         }}
       >
-        {oferta.nombre}
+        <div
+          style={{
+            fontSize: 'clamp(36px, 6vw, 90px)', //TAMAÑO DEL NOMBRE DE LA OFERTA
+            background: negocioConfig.colores.secundario,
+            color: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '16px 28px',
+            fontWeight: 'bold',
+            maxWidth: '100%',
+            textAlign: 'center',
+            boxSizing: 'border-box',
+            lineHeight: 1.1,
+          }}
+        >
+          {oferta.nombre}
+        </div>
       </div>
 
       {!imgError && (

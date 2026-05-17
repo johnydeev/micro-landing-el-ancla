@@ -1,6 +1,6 @@
-import { getProductos } from '@/lib/sheets'
+import { getListasPrecios } from '@/lib/sheets'
 
 export async function GET() {
-  const productos = await getProductos()
-  return Response.json(productos)
+  const listas = await getListasPrecios()
+  return Response.json(listas)
 }

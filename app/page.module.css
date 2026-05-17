@@ -33,15 +33,28 @@
 
 .headCell {
   width: 75%;
-  padding: 1.5vh 40px 1.5vh 70px;
+  padding: 0.4vh 40px 0.4vh 70px;
   font-size: clamp(
-    calc(14px * var(--table-font-scale, 1)),
-    calc(1.8vw * var(--table-font-scale, 1)),
-    calc(28px * var(--table-font-scale, 1))
+    calc(11px * var(--table-font-scale, 1)),
+    calc(1.35vw * var(--table-font-scale, 1)),
+    calc(22px * var(--table-font-scale, 1))
   );
   font-weight: 700;
   text-align: left;
   text-transform: uppercase;
+}
+
+.superHeadCell {
+  padding: 0.3vh 40px;
+  font-size: clamp(
+    calc(13px * var(--table-font-scale, 1)),
+    calc(1.55vw * var(--table-font-scale, 1)),
+    calc(26px * var(--table-font-scale, 1))
+  );
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .priceHead {
@@ -57,14 +70,14 @@
 }
 
 .cellBase {
-  padding: 1vh 40px 1vh 70px;
+  padding: 0.55vh 40px 0.55vh 70px;
 }
 
 .descriptionCell {
   font-size: clamp(
-    calc(12px * var(--table-font-scale, 1)),
-    calc(1.6vw * var(--table-font-scale, 1)),
-    calc(26px * var(--table-font-scale, 1))
+    calc(10px * var(--table-font-scale, 1)),
+    calc(1.25vw * var(--table-font-scale, 1)),
+    calc(20px * var(--table-font-scale, 1))
   );
   font-weight: 600;
   text-transform: uppercase;
@@ -86,9 +99,9 @@
 
 .priceValue {
   font-size: clamp(
-    calc(14px * var(--table-font-scale, 1)),
-    calc(1.8vw * var(--table-font-scale, 1)),
-    calc(28px * var(--table-font-scale, 1))
+    calc(11px * var(--table-font-scale, 1)),
+    calc(1.4vw * var(--table-font-scale, 1)),
+    calc(22px * var(--table-font-scale, 1))
   );
   font-weight: 700;
 }

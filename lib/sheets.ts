@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { Oferta, Producto } from '@/types'
+import { ListaPrecios, Oferta } from '@/types'
 
 function parseCsvRows(text: string): string[][] {
   const sanitizedText = text.replace(/^\uFEFF/, '')
@@ -69,39 +69,21 @@ function parseCsvRows(text: string): string[][] {
   return rows
 }
 
-function isHeaderRow(columns: string[]): boolean {
-  const normalizedColumns = columns.map((column) => column.trim().toLowerCase())
+function findProductosTableOffsets(headerRow: string[]): number[] {
+  const offsets: number[] = []
 
-  return (
-    normalizedColumns[0] === 'categoria' &&
-    normalizedColumns[1] === 'nombre' &&
-    normalizedColumns[2] === 'precio'
-  )
-}
-
-function mapRowToProducto(columns: string[], rowIndex: number): Producto | null {
-  if (isHeaderRow(columns)) {
-    return null
+  for (let i = 0; i <= headerRow.length - 3; i += 1) {
+    const slice = headerRow.slice(i, i + 3).map((column) => (column ?? '').trim().toLowerCase())
+    if (
+      slice[0] === 'nombre' &&
+      slice[1] === 'precio' &&
+      slice[2] === 'unidad'
+    ) {
+      offsets.push(i)
+    }
   }
 
-  if (columns.length < 3) {
-    console.warn(`Fila CSV ignorada por tener menos de 3 columnas: ${rowIndex + 1}`)
-    return null
-  }
-
-  const [categoria = '', nombre = '', precio = '', unidad = ''] = columns.map((column) => column.trim())
-
-  if (!nombre || !precio) {
-    console.warn(`Fila CSV ignorada por no tener nombre o precio: ${rowIndex + 1}`)
-    return null
-  }
-
-  return {
-    categoria,
-    nombre,
-    precio,
-    unidad,
-  }
+  return offsets
 }
 
 function findOfertasTableOffsets(headerRow: string[]): number[] {
@@ -140,7 +122,7 @@ function mapRowToOfertas(columns: string[], offsets: number[]): Oferta[] {
   return ofertas
 }
 
-export async function getProductos(): Promise<Producto[]> {
+export async function getListasPrecios(): Promise<ListaPrecios[]> {
   const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
 
   if (!csvUrl) {
@@ -160,13 +142,81 @@ export async function getProductos(): Promise<Producto[]> {
 
     const text = await res.text()
     const rows = parseCsvRows(text)
-    const productos = rows
-      .map((columns, rowIndex) => mapRowToProducto(columns, rowIndex))
-      .filter((producto): producto is Producto => producto !== null)
 
-    return productos
+    const headerBlocks: { headerRowIndex: number; offsets: number[] }[] = []
+    for (let i = 0; i < rows.length; i += 1) {
+      const found = findProductosTableOffsets(rows[i])
+      if (found.length > 0) {
+        headerBlocks.push({ headerRowIndex: i, offsets: found })
+      }
+    }
+
+    if (headerBlocks.length === 0) {
+      console.error('No se encontró ninguna fila de encabezados en el CSV de productos')
+      return []
+    }
+
+    console.log('--- DEBUG getListasPrecios ---')
+    console.log(`Total filas no vacías en CSV: ${rows.length}`)
+    headerBlocks.forEach((block, idx) => {
+      const filaArriba = block.headerRowIndex > 0 ? rows[block.headerRowIndex - 1] : null
+      console.log(
+        `Bloque ${idx + 1}: headerRowIndex=${block.headerRowIndex}, offsets=${JSON.stringify(block.offsets)}`,
+      )
+      console.log(`  Fila header:`, rows[block.headerRowIndex])
+      console.log(`  Fila arriba (super-encabezado):`, filaArriba)
+    })
+    console.log('--- END DEBUG ---')
+
+    const listas: ListaPrecios[] = []
+
+    for (let b = 0; b < headerBlocks.length; b += 1) {
+      const { headerRowIndex, offsets } = headerBlocks[b]
+      const superHeaderRow = headerRowIndex > 0 ? rows[headerRowIndex - 1] : []
+      const dataEnd =
+        b + 1 < headerBlocks.length
+          ? headerBlocks[b + 1].headerRowIndex - 1
+          : rows.length
+
+      const blockListas: ListaPrecios[] = offsets.map((offset, idx) => {
+        const prevOffset = idx > 0 ? offsets[idx - 1] : -1
+        let titulo = ''
+        for (let c = offset; c > prevOffset; c -= 1) {
+          const val = (superHeaderRow[c] ?? '').trim()
+          if (val) {
+            titulo = val
+            break
+          }
+        }
+        return {
+          titulo: titulo || `Lista ${listas.length + idx + 1}`,
+          productos: [],
+        }
+      })
+
+      for (let r = headerRowIndex + 1; r < dataEnd; r += 1) {
+        const dataRow = rows[r]
+        offsets.forEach((offset, listaIdx) => {
+          const [nombre = '', precio = '', unidad = ''] = dataRow
+            .slice(offset, offset + 3)
+            .map((column) => (column ?? '').trim())
+          if (!nombre || !precio) return
+          blockListas[listaIdx].productos.push({ nombre, precio, unidad })
+        })
+      }
+
+      listas.push(...blockListas)
+    }
+
+    const conContenido = listas.filter((l) => l.productos.length > 0)
+    console.log(
+      `Productos: ${conContenido.length} lista(s) en ${headerBlocks.length} bloque(s) — títulos:`,
+      conContenido.map((l) => l.titulo),
+    )
+
+    return conContenido
   } catch (error) {
-    console.error('Error en getProductos:', error)
+    console.error('Error en getListasPrecios:', error)
     return []
   }
 }

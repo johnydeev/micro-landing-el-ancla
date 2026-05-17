@@ -9,7 +9,7 @@ export const negocioConfig = {
   // Tipografia
   // 100 = tamano normal, 115 = 15% mas grande
   tipografia: {
-    tabla: 150,
+    tabla: 208  ,
     footer: 135,
   },
 
@@ -27,8 +27,8 @@ export const negocioConfig = {
     primario: '#E31E24',    // rojo
     secundario: '#1E3A8A',  // azul marino
     fondo: '#FFFFFF',       // blanco
-    textoPrimario: '#1E3A8A',
-    textoSecundario: '#6b7280',
-    filaImpar: '#FFF0F0',
+    textoPrimario: '#1E3A8A', // azul marino
+    textoSecundario: '#6b7280', // gris oscuro
+    filaImpar: '#FFF0F0', // rojo muy claro
   },
 }
