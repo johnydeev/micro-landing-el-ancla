@@ -13,8 +13,8 @@ export default function Header() {
         <div
           style={{
             background: 'white',
-            borderRadius: '12px',
-            padding: '6px',
+            borderRadius: '8px',
+            padding: '2px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
