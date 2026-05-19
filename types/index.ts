@@ -15,3 +15,12 @@ export interface Oferta {
   imagen: string
   estado: 'ACTIVO' | 'INACTIVO'
 }
+
+export interface ConfigNegocio {
+  segundosCartel?: number
+  segundosTabla?: number
+  minutosActualizacion?: number
+  horarios?: string
+  whatsapp?: string
+  instagram?: string
+}

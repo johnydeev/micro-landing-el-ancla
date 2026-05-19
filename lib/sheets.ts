@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { ListaPrecios, Oferta } from '@/types'
+import { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
 
 function parseCsvRows(text: string): string[][] {
   const sanitizedText = text.replace(/^\uFEFF/, '')
@@ -200,6 +200,81 @@ export async function getListasPrecios(): Promise<ListaPrecios[]> {
   } catch (error) {
     console.error('Error en getListasPrecios:', error)
     return []
+  }
+}
+
+const CONFIG_KEYS_NUMERICOS = new Set([
+  'segundosCartel',
+  'segundosTabla',
+  'minutosActualizacion',
+])
+
+const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
+  'segundoscartel': 'segundosCartel',
+  'segundos cartel': 'segundosCartel',
+  'frecuencia cartel': 'segundosCartel',
+  'frecuencia ofertas': 'segundosCartel',
+  'segundostabla': 'segundosTabla',
+  'segundos tabla': 'segundosTabla',
+  'frecuencia tabla': 'segundosTabla',
+  'frecuencia tablas': 'segundosTabla',
+  'minutosactualizacion': 'minutosActualizacion',
+  'minutos actualizacion': 'minutosActualizacion',
+  'minutos de actualizacion': 'minutosActualizacion',
+  'horarios': 'horarios',
+  'horario': 'horarios',
+  'horarios de atencion': 'horarios',
+  'whatsapp': 'whatsapp',
+  'telefono': 'whatsapp',
+  'instagram': 'instagram',
+}
+
+function normalizarClave(raw: string): keyof ConfigNegocio | null {
+  const key = raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+  return CONFIG_ALIASES[key] ?? null
+}
+
+export async function getConfig(): Promise<ConfigNegocio> {
+  const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
+  const gidConfig = process.env.GOOGLE_SHEETS_GID_CONFIG
+
+  if (!csvUrl || !gidConfig) {
+    return {}
+  }
+
+  const configUrl = csvUrl.replace(/gid=\d+/, `gid=${gidConfig}`)
+
+  try {
+    const res = await fetch(configUrl, { next: { revalidate: 60 } })
+    if (!res.ok) {
+      console.error('Error fetching CSV de configuracion:', res.status)
+      return {}
+    }
+    const text = await res.text()
+    const rows = parseCsvRows(text)
+
+    const config: ConfigNegocio = {}
+    for (const row of rows) {
+      const [rawClave = '', rawValor = ''] = row
+      const clave = normalizarClave(rawClave)
+      const valor = rawValor.trim()
+      if (!clave || !valor) continue
+      if (CONFIG_KEYS_NUMERICOS.has(clave)) {
+        const num = Number(valor)
+        if (!Number.isFinite(num)) continue
+        ;(config[clave] as number) = num
+      } else {
+        ;(config[clave] as string) = valor
+      }
+    }
+    return config
+  } catch (error) {
+    console.error('Error en getConfig:', error)
+    return {}
   }
 }
 

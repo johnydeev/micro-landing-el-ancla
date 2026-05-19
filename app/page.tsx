@@ -9,12 +9,8 @@ import AutoRefresh from '@/components/AutoRefresh'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
 import { negocioConfig } from '@/config/negocio'
-import type { ListaPrecios, Oferta } from '@/types'
+import type { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
 import styles from './page.module.css'
-
-const CARTEL_DURACION_MS = negocioConfig.segundosCartel * 1000
-const TABLA_DURACION_MS = negocioConfig.segundosTabla * 1000
-const REFETCH_INTERVAL_MS = negocioConfig.minutosActualizacion * 60 * 1000
 
 function formatPrecio(precio: string): string {
   const num = Number(precio)
@@ -33,18 +29,24 @@ function slugifyNombre(nombre: string): string {
 export default function Home() {
   const [listas, setListas] = useState<ListaPrecios[]>([])
   const [ofertas, setOfertas] = useState<Oferta[]>([])
+  const [configRemota, setConfigRemota] = useState<ConfigNegocio>({})
   const [modo, setModo] = useState<'cartel' | 'tabla'>('tabla')
   const [cartelIndex, setCartelIndex] = useState(0)
   const [listaIndex, setListaIndex] = useState(0)
+
+  const segundosCartel = configRemota.segundosCartel ?? negocioConfig.segundosCartel
+  const segundosTabla = configRemota.segundosTabla ?? negocioConfig.segundosTabla
+  const minutosActualizacion = configRemota.minutosActualizacion ?? negocioConfig.minutosActualizacion
 
   useEffect(() => {
     let cancelled = false
 
     const cargar = async () => {
       try {
-        const [resProductos, resOfertas] = await Promise.all([
+        const [resProductos, resOfertas, resConfig] = await Promise.all([
           fetch('/api/productos', { cache: 'no-store' }),
           fetch('/api/ofertas', { cache: 'no-store' }),
+          fetch('/api/config', { cache: 'no-store' }),
         ])
         if (cancelled) return
         if (resProductos.ok) {
@@ -53,19 +55,22 @@ export default function Home() {
         if (resOfertas.ok) {
           setOfertas(await resOfertas.json())
         }
+        if (resConfig.ok) {
+          setConfigRemota(await resConfig.json())
+        }
       } catch (error) {
         console.error('Error cargando datos:', error)
       }
     }
 
     cargar()
-    const intervalId = window.setInterval(cargar, REFETCH_INTERVAL_MS)
+    const intervalId = window.setInterval(cargar, minutosActualizacion * 60 * 1000)
 
     return () => {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [])
+  }, [minutosActualizacion])
 
   useEffect(() => {
     if (listas.length === 0 && ofertas.length === 0) return
@@ -82,7 +87,7 @@ export default function Home() {
         } else {
           setListaIndex(0)
         }
-      }, TABLA_DURACION_MS)
+      }, segundosTabla * 1000)
     } else {
       timeoutId = window.setTimeout(() => {
         if (cartelIndex < ofertas.length - 1) {
@@ -91,11 +96,11 @@ export default function Home() {
           setListaIndex(0)
           setModo('tabla')
         }
-      }, CARTEL_DURACION_MS)
+      }, segundosCartel * 1000)
     }
 
     return () => window.clearTimeout(timeoutId)
-  }, [modo, cartelIndex, listaIndex, listas, ofertas])
+  }, [modo, cartelIndex, listaIndex, listas, ofertas, segundosCartel, segundosTabla])
 
   const tableFontVars = {
     '--table-font-scale': `${negocioConfig.tipografia.tabla / 100}`,
@@ -116,18 +121,14 @@ export default function Home() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr className={styles.headRow} style={{ background: '#000' }}>
+                <tr className={styles.headRow} style={{ background: negocioConfig.colores.secundario }}>
                   <th
                     className={styles.superHeadCell}
-                    style={{ color: negocioConfig.colores.fondo, background: '#000' }}
+                    style={{ color: negocioConfig.colores.fondo, background: negocioConfig.colores.secundario }}
                     colSpan={2}
                   >
                     {listaActual?.titulo ?? 'Lista de Precios'}
                   </th>
-                </tr>
-                <tr className={styles.headRow} style={{ background: negocioConfig.colores.secundario }}>
-                  <th className={styles.headCell} style={{ color: negocioConfig.colores.fondo }}>Descripción</th>
-                  <th className={`${styles.headCell} ${styles.priceHead}`} style={{ color: negocioConfig.colores.fondo }}>Precio</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +159,7 @@ export default function Home() {
             </table>
           </div>
         )}
-        <Footer />
+        <Footer config={configRemota} />
       </div>
     </main>
   )

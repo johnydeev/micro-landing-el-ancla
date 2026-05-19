@@ -9,12 +9,13 @@ export const negocioConfig = {
   // Tipografia
   // 100 = tamano normal, 115 = 15% mas grande
   tipografia: {
-    tabla: 208  ,
+    tabla: 230  ,
     footer: 135,
   },
 
   // Footer
   telefono: '11 6000 7394',
+  whatsapp: '11 6000 7394',
   instagram: '@granja_elancla',
   horarios: 'MAR a SAB: 8:15 a 13hs y 16:30 a 20:15hs | DOM: 8:15 a 13hs',
 
