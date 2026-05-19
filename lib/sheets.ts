@@ -156,18 +156,6 @@ export async function getListasPrecios(): Promise<ListaPrecios[]> {
       return []
     }
 
-    console.log('--- DEBUG getListasPrecios ---')
-    console.log(`Total filas no vacías en CSV: ${rows.length}`)
-    headerBlocks.forEach((block, idx) => {
-      const filaArriba = block.headerRowIndex > 0 ? rows[block.headerRowIndex - 1] : null
-      console.log(
-        `Bloque ${idx + 1}: headerRowIndex=${block.headerRowIndex}, offsets=${JSON.stringify(block.offsets)}`,
-      )
-      console.log(`  Fila header:`, rows[block.headerRowIndex])
-      console.log(`  Fila arriba (super-encabezado):`, filaArriba)
-    })
-    console.log('--- END DEBUG ---')
-
     const listas: ListaPrecios[] = []
 
     for (let b = 0; b < headerBlocks.length; b += 1) {
@@ -208,13 +196,7 @@ export async function getListasPrecios(): Promise<ListaPrecios[]> {
       listas.push(...blockListas)
     }
 
-    const conContenido = listas.filter((l) => l.productos.length > 0)
-    console.log(
-      `Productos: ${conContenido.length} lista(s) en ${headerBlocks.length} bloque(s) — títulos:`,
-      conContenido.map((l) => l.titulo),
-    )
-
-    return conContenido
+    return listas.filter((l) => l.productos.length > 0)
   } catch (error) {
     console.error('Error en getListasPrecios:', error)
     return []
@@ -260,8 +242,6 @@ export async function getOfertas(): Promise<Oferta[]> {
       console.error('No se encontró la fila de encabezados en el CSV de ofertas')
       return []
     }
-
-    console.log(`Ofertas: ${offsets.length} tabla(s) detectada(s) en columnas`, offsets)
 
     return rows
       .slice(headerRowIndex + 1)
