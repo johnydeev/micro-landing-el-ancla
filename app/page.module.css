@@ -61,8 +61,8 @@
 
 .priceHead {
   width: 25%;
-  padding-left: 64px;
-  text-align: left;
+  padding-left: 40px;
+  text-align: center;
 }
 
 .rowEven {
@@ -74,7 +74,8 @@
 }
 
 .cellBase {
-  padding: 0.55vh 40px 0.55vh 70px;
+  padding: 0.55vh 40px;
+  text-align: center;
 }
 
 .descriptionCell {
@@ -85,11 +86,13 @@
   );
   font-weight: 600;
   text-transform: uppercase;
+  text-align: left;
+  padding-left: 70px;
 }
 
 .priceCell {
-  padding-left: 64px;
-  text-align: left;
+  padding-left: 40px;
+  text-align: center;
   vertical-align: middle;
 }
 
@@ -97,7 +100,7 @@
   display: flex;
   width: 100%;
   align-items: baseline;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 0.45em;
 }
 
