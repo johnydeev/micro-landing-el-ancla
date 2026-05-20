@@ -69,6 +69,14 @@ function parseCsvRows(text: string): string[][] {
   return rows
 }
 
+function urlConGid(baseUrl: string, gid: string): string {
+  if (/[?&]gid=\d+/.test(baseUrl)) {
+    return baseUrl.replace(/([?&])gid=\d+/, `$1gid=${gid}`)
+  }
+  const sep = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${sep}gid=${gid}`
+}
+
 function findProductosTableOffsets(headerRow: string[]): number[] {
   const offsets: number[] = []
 
@@ -246,7 +254,7 @@ export async function getConfig(): Promise<ConfigNegocio> {
     return {}
   }
 
-  const configUrl = csvUrl.replace(/gid=\d+/, `gid=${gidConfig}`)
+  const configUrl = urlConGid(csvUrl, gidConfig)
 
   try {
     const res = await fetch(configUrl, { next: { revalidate: 60 } })
@@ -291,7 +299,7 @@ export async function getOfertas(): Promise<Oferta[]> {
     return []
   }
 
-  const ofertasUrl = csvUrl.replace(/gid=\d+/, `gid=${gidOfertas}`)
+  const ofertasUrl = urlConGid(csvUrl, gidOfertas)
 
   try {
     const res = await fetch(ofertasUrl, { next: { revalidate: 60 } })
