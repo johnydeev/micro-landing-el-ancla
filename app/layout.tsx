@@ -19,7 +19,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${geistSans.variable}`}>
-      <body className="m-0 p-0 overflow-hidden" style={{ fontFamily: 'var(--font-geist-sans), Arial, sans-serif' }}>
+      {/* Reset (margin/padding/overflow) vive en app/globals.css para no
+          depender de utilidades de Tailwind v4 que podrian cambiar de API. */}
+      <body style={{ fontFamily: 'var(--font-geist-sans), Arial, sans-serif' }}>
         {children}
       </body>
     </html>

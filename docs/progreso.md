@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 25/05/2026 (sesión 1).
+Actualizado al 25/05/2026 (sesión 2).
 
 ---
 
@@ -26,10 +26,18 @@ app/
                             listas/ofertas/config y pasa todo por props.
                             export const revalidate = 60.
   layout.tsx                Root layout, fuente Geist, metadata.
+                            Sin clases Tailwind en <body>: el reset vive
+                            en globals.css.
+  loading.tsx               Pantalla de carga con branding del local
+                            (Server Component).
+  error.tsx                 Boundary de errores con datos de contacto
+                            fijos + boton "Reintentar" (Client
+                            Component, por contrato de Next).
   api/
-    productos/route.ts      GET listas de precios (opcional, externo).
-    ofertas/route.ts        GET ofertas (opcional, externo).
-    config/route.ts         GET config remota (opcional, externo).
+    productos/route.ts      GET listas de precios (API publica). Ver
+                            docs/api.md.
+    ofertas/route.ts        GET ofertas activas (API publica).
+    config/route.ts         GET config remota (API publica).
 components/
   PantallaRotativa.tsx      Client Component. Recibe data por props.
                             Maneja rotación tabla<->cartel con
@@ -71,7 +79,36 @@ types/
 
 ## Completado ✅
 
-- **Refactor sesión 1 (25/05/2026) — Server Component + cleanup**:
+- **Sesión 2 (25/05/2026) — UX de borde + tolerancia de formato + decisiones documentadas**:
+  - **`app/loading.tsx`** creado: pantalla de carga con branding (logo
+    en color primario + "Cargando ofertas…" + spinner). Mismo layout
+    16:9 que el resto, transición visualmente continua.
+  - **`app/error.tsx`** creado (Client Component, por contrato de
+    Next): muestra nombre del local + mensaje al público + datos de
+    contacto desde `config/negocio.ts` (WhatsApp, Instagram, horarios)
+    + botón "Reintentar" cableado al `reset()` del boundary. Loguea el
+    error a consola (Vercel lo recoge en producción).
+  - **`formatPrecio` ahora tolera formato AR**: si el cliente carga
+    `"1.500,50"` en Sheets, lo normaliza a `"1500.50"` antes de
+    `Number()`. Antes daba `$1,5` (`Number("1.500") === 1.5`). Tabla
+    de comportamiento documentada en `docs/decisiones.md`.
+  - **`app/layout.tsx`**: removidas clases Tailwind (`m-0 p-0
+    overflow-hidden`) del `<body>`. Eran redundantes con el reset de
+    `app/globals.css` y dependían de la API de Tailwind v4 (puede
+    cambiar). El reset queda centralizado en CSS.
+  - **`eslint.config.mjs`**: desactivada la regla
+    `@next/next/no-img-element` con comentario explicativo. El
+    proyecto **no usa `next/image`** por costo en capa gratuita de
+    Vercel — decisión documentada en `docs/decisiones.md`.
+  - **`docs/api.md`** creado: documentación de los tres endpoints
+    `/api/*` (shape de respuesta, errores, casos de uso esperados).
+    Quedan vivos como API pública del proyecto (no los consume la
+    pantalla principal, pero pueden reusarse desde otra pantalla o
+    widget externo).
+  - Validación: `tsc --noEmit` y `next lint` sin errores ni warnings.
+    `next build` correcto, ruta `/` sigue prerenderizada estática.
+
+- **Sesión 1 (25/05/2026) — Server Component + cleanup**:
   - Convertido `app/page.tsx` de `'use client'` a Server Component
     asíncrono. Ahora consume `lib/sheets.ts` directamente y elimina
     una capa de fetch (cliente -> /api/* -> Sheets).
@@ -98,38 +135,41 @@ types/
 
 ## Pendientes 📋
 
-Priorizados a partir del análisis inicial. El bloque "alto impacto"
-ya está cubierto por el refactor de la sesión 1; quedan los
-siguientes:
+Priorizadas según el orden acordado: bloque actual está cerrado
+(sesión 2 cubrió 7+4+9); siguen 1+2+3 y por último 5+6+8.
 
-### Calidad / mantenibilidad
+### Próximo bloque (Sesión 3 propuesta) — Estilos
 - **Estilos inline en `CartelOferta`**: decenas de `style={{...}}` que
-  pertenecen al `.module.css`. Mover a clases CSS.
+  pertenecen al `.module.css`. Mover a clases CSS. Pasar colores de
+  `negocioConfig` como CSS variables desde el contenedor padre. Ver
+  `components/PantallaRotativa.tsx` líneas ~150-280.
 - **CSS muerto en `page.module.css`**: `.headCell`, `.priceHead`,
   `.rowEven`/`.rowOdd` casi vacíos. Limpiar.
-- **`<img>` → `next/image`** en `Header.tsx` y `PantallaRotativa.tsx`
-  (logo y ofertas). Optimiza LCP/bandwidth. Lint lo marca como
-  warning.
-- **`formatPrecio` y formato AR**: si el CSV trae `"1.500"` (formato
-  argentino con punto de miles), `Number("1.500")` da `1.5`. Normalizar
-  puntos/comas antes de parsear.
-- **Tipado en `getConfig`**: el cast `(config[clave] as number) = num`
-  esconde el tipo; un mapper explícito por clave sería más seguro.
-- **Re-slugify de `oferta.imagen`**: la columna ya se llama "slug
-  imagen", el `.replace(/\s+/g, '-')` extra sobra.
+- _(El item #3 de "imágenes con `next/image`" se descartó como
+  decisión de proyecto. Ver `docs/decisiones.md` — "Mantener `<img>`
+  en vez de `next/image`")_.
 
-### UX / robustez
-- Falta `app/loading.tsx` y `app/error.tsx`.
-- Estado de carga inicial: actualmente muestra "Sin productos
-  disponibles" hasta que llega el primer fetch.
-- Validar que `--font-geist-sans` realmente se aplique a los hijos
-  (hoy `body` cae directo a Arial como fallback).
+### Bloque de cierre (Sesión 4 propuesta) — Tipos y contrato
+- **Tipado en `getConfig`** (`lib/sheets.ts:281-285`): el cast
+  `(config[clave] as number) = num` esconde el tipo. Reemplazar por un
+  mapper `Record<keyof ConfigNegocio, parser>` con `satisfies` para
+  que TS exija un parser por clave nueva.
+- **Re-slugify de `oferta.imagen`** (`components/PantallaRotativa.tsx`
+  líneas ~178-181): la columna ya se llama "slug imagen". Decidir
+  contrato: confiar en lo cargado, o dejarlo y loguear `console.warn`
+  cuando difiere del slugificado, para detectar cargas mal hechas.
+- **Estado de carga visible distinguible del "vacío legítimo"**: hoy
+  si los fetch devuelven `[]` la pantalla muestra "Sin productos
+  disponibles" sin contexto. Con `loading.tsx` + `error.tsx` ya
+  cubrimos los bordes; queda decidir qué mostrar si Sheets devuelve
+  arrays vacíos genuinos (planilla en mantenimiento, por ejemplo).
 
-### Limpieza opcional
-- Decidir si mantener los handlers `/api/productos`, `/api/ofertas`,
-  `/api/config`: ya no los usa la página. Quedan disponibles por si el
-  cliente quiere consumirlos desde fuera. Si no, borrar para reducir
-  superficie.
+### Resuelto (referencia)
+- ✅ `loading.tsx` + `error.tsx` (sesión 2)
+- ✅ `formatPrecio` formato AR (sesión 2)
+- ✅ Tailwind v4 en `layout.tsx` — reset centralizado en `globals.css` (sesión 2)
+- ✅ Endpoints `/api/*` documentados en `docs/api.md` (sesión 2)
+- ❌ `next/image` — **descartado** por costo en capa gratuita (sesión 2)
 
 ---
 
