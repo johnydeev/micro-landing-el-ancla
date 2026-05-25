@@ -242,12 +242,19 @@ const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
   'instagram': 'instagram',
 }
 
+// Rango U+0300-U+036F: "Combining Diacritical Marks" (acentos, tildes).
+// Tras normalize('NFD') los caracteres acentuados quedan como letra + marca combinatoria;
+// quitamos las marcas para comparar sin acentos. Se escriben con escapes
+// Unicode para no depender del encoding del archivo (los caracteres literales
+// son invisibles en muchos editores).
+const COMBINING_DIACRITICS = new RegExp('[\\u0300-\\u036f]', 'g')
+
 function normalizarClave(raw: string): keyof ConfigNegocio | null {
   const key = raw
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(COMBINING_DIACRITICS, '')
   return CONFIG_ALIASES[key] ?? null
 }
 
