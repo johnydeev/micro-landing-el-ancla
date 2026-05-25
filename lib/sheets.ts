@@ -211,11 +211,34 @@ export async function getListasPrecios(): Promise<ListaPrecios[]> {
   }
 }
 
-const CONFIG_KEYS_NUMERICOS = new Set([
-  'segundosCartel',
-  'segundosTabla',
-  'minutosActualizacion',
-])
+/*
+ * Parsers tipados por clave de ConfigNegocio.
+ *
+ * `satisfies` garantiza dos invariantes en tiempo de compilacion:
+ *   1. Cada clave del tipo ConfigNegocio tiene su parser asociado.
+ *   2. El parser devuelve el tipo correcto para esa clave (number o string).
+ *
+ * Si manana se agrega una clave nueva a ConfigNegocio (ej. `mostrarHorarios?:
+ * boolean`) y no se actualiza CONFIG_PARSERS, TS rompe el build aca. Eso
+ * elimina el riesgo del `as number` / `as string` que habia antes.
+ */
+type ConfigParser<K extends keyof ConfigNegocio> = (raw: string) => ConfigNegocio[K] | undefined
+
+const parseNum = (raw: string): number | undefined => {
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : undefined
+}
+
+const parseStr = (raw: string): string | undefined => (raw === '' ? undefined : raw)
+
+const CONFIG_PARSERS = {
+  segundosCartel: parseNum,
+  segundosTabla: parseNum,
+  minutosActualizacion: parseNum,
+  horarios: parseStr,
+  whatsapp: parseStr,
+  instagram: parseStr,
+} satisfies { [K in keyof Required<ConfigNegocio>]: ConfigParser<K> }
 
 const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
   'segundoscartel': 'segundosCartel',
@@ -258,6 +281,25 @@ function normalizarClave(raw: string): keyof ConfigNegocio | null {
   return CONFIG_ALIASES[key] ?? null
 }
 
+/*
+ * Aplica el parser correspondiente y asigna el resultado a `config` con tipo
+ * preservado. TS no puede estrechar el generico K en runtime — el cast interno
+ * a `never` es el patron estandar para este caso (asignar a una union de
+ * setters discriminada por clave). El `satisfies` en CONFIG_PARSERS garantiza
+ * que cualquier nueva clave necesita su parser, asi que el cast no oculta
+ * agujeros de tipos: solo le hace saber a TS lo que el `satisfies` ya valido.
+ */
+function asignarConfig<K extends keyof ConfigNegocio>(
+  config: ConfigNegocio,
+  clave: K,
+  valor: string,
+): void {
+  const parser = CONFIG_PARSERS[clave] as ConfigParser<K>
+  const parsed = parser(valor)
+  if (parsed === undefined) return
+  config[clave] = parsed as ConfigNegocio[K]
+}
+
 export async function getConfig(): Promise<ConfigNegocio> {
   const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
   const gidConfig = process.env.GOOGLE_SHEETS_GID_CONFIG
@@ -283,13 +325,9 @@ export async function getConfig(): Promise<ConfigNegocio> {
       const clave = normalizarClave(rawClave)
       const valor = rawValor.trim()
       if (!clave || !valor) continue
-      if (CONFIG_KEYS_NUMERICOS.has(clave)) {
-        const num = Number(valor)
-        if (!Number.isFinite(num)) continue
-        ;(config[clave] as number) = num
-      } else {
-        ;(config[clave] as string) = valor
-      }
+      // El parser conoce el tipo correcto para `clave`; asignamos via helper
+      // generico para no perder el estrechamiento que `satisfies` ya garantizo.
+      asignarConfig(config, clave, valor)
     }
     return config
   } catch (error) {

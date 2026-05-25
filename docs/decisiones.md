@@ -85,6 +85,300 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-05-25 — Mapper tipado en `getConfig` (parsers por clave con `satisfies`)
+
+### Problema
+
+`getConfig` en `lib/sheets.ts` usaba dos estructuras paralelas para
+parsear el CSV de configuración:
+
+1. `CONFIG_KEYS_NUMERICOS: Set<string>` — qué claves son números.
+2. `CONFIG_ALIASES: Record<string, keyof ConfigNegocio>` — qué alias
+   mapean a qué clave canónica.
+
+Y el loop asignaba con casts:
+
+```ts
+if (CONFIG_KEYS_NUMERICOS.has(clave)) {
+  ;(config[clave] as number) = num
+} else {
+  ;(config[clave] as string) = valor
+}
+```
+
+Los `as number` / `as string` desactivaban el chequeo de TypeScript.
+Si mañana alguien agregaba una clave booleana a `ConfigNegocio` (ej.
+`modoMantenimiento?: boolean`), TS no avisaba que faltaba el parser:
+la clave quedaba ignorada silenciosamente, o peor, se le asignaba el
+string crudo del CSV.
+
+### Decisión
+
+Reemplazar el `Set` + casts por un **mapper tipado por clave** validado
+con `satisfies`:
+
+```ts
+type ConfigParser<K extends keyof ConfigNegocio> = (raw: string) => ConfigNegocio[K] | undefined
+
+const parseNum = (raw: string): number | undefined => {
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : undefined
+}
+const parseStr = (raw: string): string | undefined => (raw === '' ? undefined : raw)
+
+const CONFIG_PARSERS = {
+  segundosCartel: parseNum,
+  segundosTabla: parseNum,
+  minutosActualizacion: parseNum,
+  horarios: parseStr,
+  whatsapp: parseStr,
+  instagram: parseStr,
+} satisfies { [K in keyof Required<ConfigNegocio>]: ConfigParser<K> }
+```
+
+Y un helper genérico `asignarConfig<K>(...)` que aplica el parser
+correcto y asigna con el tipo preservado.
+
+### Por qué `satisfies` y no anotación de tipo
+
+- Con `: Record<keyof ConfigNegocio, ConfigParser<keyof ConfigNegocio>>`
+  perderíamos el estrechamiento por clave: TS asumiría que cualquier
+  parser puede recibir cualquier clave, y la asignación
+  `config[clave] = parser(valor)` requeriría casts de vuelta.
+- Con `satisfies`, TS conserva el tipo literal por clave (TS sabe que
+  `CONFIG_PARSERS.segundosCartel` devuelve `number | undefined`,
+  no `number | string | undefined`).
+
+### Validación de que funciona
+
+Antes de cerrar la sesión, probé agregar `modoMantenimiento?: boolean`
+a `ConfigNegocio` y reverificar:
+
+```
+lib/sheets.ts(241,3): error TS1360: Type '{ ... }' does not satisfy
+the expected type '{ ..., modoMantenimiento: ConfigParser<...>; }'.
+Property 'modoMantenimiento' is missing.
+```
+
+Build rompe en compilación. Exactamente lo que queríamos. Revertí el
+cambio en `types/index.ts` después de confirmar.
+
+### Trade-offs
+
+- El cast interno en `asignarConfig` (`parser as ConfigParser<K>`) es
+  necesario porque TS no puede estrechar el genérico `K` en runtime.
+  Es seguro porque el `satisfies` en `CONFIG_PARSERS` ya validó que
+  cada clave tiene su parser del tipo correcto.
+- `parseStr` ahora retorna `undefined` para strings vacíos (antes
+  asignaba el string crudo). Mejora: claves vacías ya no contaminan
+  el objeto config. Mismo efecto que el `if (!valor) continue` que ya
+  existía afuera, redundancia defensiva.
+
+---
+
+## 2026-05-25 — Re-slugify de `oferta.imagen` con warning en dev
+
+### Problema
+
+`CartelOferta` re-slugificaba el campo `oferta.imagen` antes de
+construir el path al PNG:
+
+```ts
+const slug = oferta.imagen.toLowerCase().trim().replace(/\s+/g, '-')
+```
+
+Pero la columna del CSV ya se llama **"slug imagen"** — el contrato
+con el cliente es cargar un slug, no un nombre con espacios. El
+re-slugify era defensivo: si el cliente cargaba `"Asado Especial"`,
+lo convertía a `"asado-especial"` y la pantalla seguía funcionando.
+
+El problema era que **el cliente nunca se enteraba** de que estaba
+cargando mal. Y si en algún momento queremos cambiar el uso del campo
+(ej. usar el string completo como descripción, o como URL), el
+silencio juega en contra.
+
+### Decisión
+
+**Mantener el re-slugify como red de seguridad** + **loguear en
+desarrollo** cuando el original difiere del slugificado:
+
+```ts
+if (process.env.NODE_ENV !== 'production' && slug !== oferta.imagen) {
+  console.warn(
+    `[ofertas] "${oferta.imagen}" se re-slugify como "${slug}". ` +
+      `Cargar el slug correcto en la planilla (columna "slug imagen").`,
+  )
+}
+```
+
+Tres comportamientos posibles según el contexto:
+
+| Contexto | Comportamiento |
+|---|---|
+| Cliente carga slug correcto | Sin warning, todo igual |
+| Cliente carga mal en producción | Pantalla funciona, sin warning visible |
+| Desarrollador prueba localmente | Warning en consola al detectar el patrón |
+
+### Alternativas descartadas
+
+- **Opción A — Confiar en el contrato.** Usar `oferta.imagen` tal
+  cual, sin slugificar. Si el cliente carga mal, no se ve la imagen
+  (cae al `onError`). Más simple, pero hostil al cliente real que
+  carga la planilla a mano.
+- **Opción C — Validar en `lib/sheets.ts`** y filtrar las ofertas
+  con slug inválido. Más estricto: la oferta no aparecería hasta
+  cargarla bien. Descartado porque "no se ve la oferta" es peor que
+  "se ve la oferta pero el nombre del archivo no es perfecto".
+
+### Notas para mantener
+
+- El warning vive en `NODE_ENV !== 'production'`. Vercel lo desactiva
+  en builds productivos automáticamente (`process.env.NODE_ENV ===
+  'production'` está hardcoded en `next build`).
+- Si más adelante se quiere ver el warning en producción para detectar
+  cargas mal hechas a distancia, conectar a un logger remoto (Sentry,
+  LogTail). Hoy sería over-engineering.
+
+---
+
+## 2026-05-25 — Empty state con texto amable y datos de contacto
+
+### Problema
+
+Cuando los fetch a Sheets devolvían `[]` (planilla vacía, CSV
+malformado, columna renombrada), la pantalla mostraba `Sin productos
+disponibles` en gris pelado. El público que pasaba por la vidriera
+veía un mensaje técnico y sin acción posible.
+
+Los bordes ya estaban cubiertos:
+- HTTP error → `error.tsx` (sesión 2)
+- Mientras los fetch resuelven → `loading.tsx` (sesión 2)
+
+Pero el caso "200 OK con array vacío" caía en la tabla y mostraba el
+texto seco.
+
+### Decisión
+
+Reemplazar el `Sin productos disponibles` por un mensaje en dos líneas
+con tono al público y datos de contacto del local:
+
+```
+Estamos actualizando la lista de precios.
+Consultá por 11 6000 7394
+```
+
+El WhatsApp se toma del config remoto con fallback al local:
+`configRemota.whatsapp ?? negocioConfig.whatsapp ?? negocioConfig.telefono`.
+
+### Alternativas descartadas
+
+- **Opción B — Throwear desde el Server Component cuando todo está
+  vacío.** Llevaría al usuario al `error.tsx`. Trade-off: pasa a un
+  mensaje más alarmista ("Estamos actualizando los precios. Volvé en
+  unos minutos."). Descartado porque empty state ≠ error: la planilla
+  puede estar vacía a propósito.
+- **Opción C — Clave de mantenimiento explícita en CONFIG.**
+  Agregar `modoMantenimiento?: boolean` a `ConfigNegocio` y mostrar
+  una pantalla dedicada. Descartado por YAGNI: no hay caso de uso
+  real todavía. Si en el futuro aparece, el mapper tipado de
+  `getConfig` ya está preparado (la decisión de mapper de esta misma
+  sesión hizo que agregar una clave booleana sea seguro).
+
+### Notas para mantener
+
+- El texto está hardcoded en español neutro AR. Si se vende el
+  proyecto a otro local con copy distinto, mover a `negocioConfig` o
+  a la pestaña CONFIG remota como clave `mensajeMantenimiento`.
+
+---
+
+## 2026-05-25 — Colores de marca via CSS variables inyectadas en `.screen`
+
+### Problema
+
+`CartelOferta` y la tabla de precios tenían los colores (`primario`,
+`secundario`, `textoPrimario`, etc.) repetidos como `style={{ background:
+negocioConfig.colores.primario }}` en una docena de elementos. Eso:
+
+1. Inflaba el JSX con bloques `style={{...}}` de 10-14 propiedades
+   cada uno.
+2. Recreaba los objetos de estilo en cada render.
+3. Hacía imposible cambiar el branding sin tocar el JSX en N lugares.
+4. Acoplaba el CSS module al componente de manera frágil (el CSS no
+   conocía los colores y dependía del JSX para que se aplicaran).
+
+### Decisión
+
+**Inyectar los colores como CSS custom properties** en el contenedor
+`.screen` y consumirlas desde `page.module.css` con `var(--c-*)`:
+
+```tsx
+const screenVars = {
+  '--c-primario': negocioConfig.colores.primario,
+  '--c-secundario': negocioConfig.colores.secundario,
+  '--c-fondo': negocioConfig.colores.fondo,
+  '--c-texto-primario': negocioConfig.colores.textoPrimario,
+  '--c-texto-secundario': negocioConfig.colores.textoSecundario,
+  '--c-fila-impar': negocioConfig.colores.filaImpar,
+  '--table-font-scale': `${negocioConfig.tipografia.tabla / 100}`,
+} as CSSProperties
+
+<div className={styles.screen} style={screenVars}>
+```
+
+```css
+.cartelDiagonal { background: var(--c-secundario); }
+.cartelBadge   { background: var(--c-primario); color: #fff; }
+.row:nth-child(even) { background: var(--c-fila-impar); }
+.priceValue { color: var(--c-primario); }
+```
+
+El único `style={}` que sobrevive es ese contenedor: pasa las
+variables. El resto del JSX usa solo `className`.
+
+### Por qué esta forma y no otras
+
+- **CSS variables vs. clases hardcoded**: si en algún momento el
+  cliente pide variantes (ej: paleta "navidad", "fiestas patrias",
+  "halloween"), solo hay que cambiar el objeto que define
+  `screenVars`. El CSS no se toca.
+- **CSS variables vs. CSS-in-JS runtime**: cero peso de runtime, cero
+  hidratación de estilos. El CSS module se compila estático y solo
+  las variables viajan como `style=` mínimo. Funciona idéntico en
+  Server Components.
+- **CSS variables vs. Tailwind**: ya está descartado Tailwind del
+  reset (ver decisión "Reset CSS centralizado"). Mantener el proyecto
+  con un solo enfoque (CSS modules + variables) es más simple para
+  vender.
+
+### Trade-offs
+
+- Si alguien edita `config/negocio.ts` y agrega un color nuevo, tiene
+  que recordar dos pasos:
+  1. Inyectarlo como variable en `screenVars`.
+  2. Usarlo desde el CSS con `var(--c-...)`.
+  Si solo hace (1), no afecta nada (no rompe). Si solo hace (2),
+  cae al default que se ponga en `var(--c-x, #fallback)`. La regla
+  está documentada arriba del CSS module y al lado de `screenVars`
+  en el TSX.
+- Los selectores `:nth-child(odd/even)` para alternar fondos de
+  filas funcionan porque el `<tr>` empty-state está en otra rama del
+  ternario y no entra en el mismo `<tbody>`. Si en el futuro se
+  intercalan filas de otro tipo dentro del listado, hay que revisar.
+
+### Impacto medible
+
+- `components/PantallaRotativa.tsx`: pasó de 303 líneas con ~12
+  bloques `style={{...}}` a 199 líneas con 0 inline literals (solo
+  `style={screenVars}` en el contenedor).
+- `app/page.module.css`: pasó de 161 a ~270 líneas, pero esas líneas
+  ahora son CSS legible con secciones comentadas (Tabla / Cartel /
+  Animaciones) en vez de strings JS.
+- CSS muerto eliminado en el mismo paso: `.headCell`, `.priceHead`,
+  `.rowEven`, `.rowOdd`.
+
+---
+
 ## 2026-05-25 — Mantener `<img>` en vez de `next/image`
 
 ### Problema

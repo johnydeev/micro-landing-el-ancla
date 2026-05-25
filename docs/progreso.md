@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 25/05/2026 (sesión 2).
+Actualizado al 25/05/2026 (sesión 4).
 
 ---
 
@@ -79,6 +79,55 @@ types/
 
 ## Completado ✅
 
+- **Sesión 4 (25/05/2026) — Tipos y contrato: cierre del análisis**:
+  - **Mapper tipado en `getConfig`** (`lib/sheets.ts`): reemplazado
+    `CONFIG_KEYS_NUMERICOS: Set<string>` + casts `as number`/`as
+    string` por `CONFIG_PARSERS` con `satisfies { [K in keyof
+    Required<ConfigNegocio>]: ConfigParser<K> }`. Si alguien agrega
+    una clave nueva a `ConfigNegocio` sin actualizar `CONFIG_PARSERS`,
+    **el build rompe en compilación**. Probado en vivo agregando una
+    clave booleana — TS error confirmado y revertido.
+  - **Re-slugify de `oferta.imagen` con warning en dev**
+    (`components/PantallaRotativa.tsx`, `CartelOferta`): se mantiene
+    el slugify defensivo pero ahora hay `console.warn` cuando el
+    original difiere del slugificado, gateado por
+    `process.env.NODE_ENV !== 'production'`. Detecta cargas mal hechas
+    en desarrollo sin ensuciar la consola en producción.
+  - **Empty state amable** (`PantallaRotativa.tsx` + nueva clase
+    `.emptyStateContact` en `page.module.css`): el `Sin productos
+    disponibles` pasó a `Estamos actualizando la lista de precios.
+    Consultá por <whatsapp>`. El número se toma del config remoto con
+    fallback al local.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓ ruta `/` estática con revalidación 1m.
+  - **Análisis técnico cerrado**: todos los items del análisis
+    inicial están resueltos o documentados como decisión consciente
+    de no hacer.
+
+- **Sesión 3 (25/05/2026) — Estilos: inline → CSS module + CSS vars**:
+  - **`app/page.module.css` reescrito**: ahora consume colores como
+    `var(--c-primario)`, `var(--c-secundario)`, etc. Agregadas
+    secciones comentadas (Tabla / Cartel / Animaciones) y todas las
+    clases nuevas del cartel (`.cartel`, `.cartelDiagonal`,
+    `.cartelBadge`, `.cartelTitleWrap`, `.cartelTitle`,
+    `.cartelImageWrap`, `.cartelImage`, `.cartelPrice`,
+    `.cartelPriceText`).
+  - **CSS muerto eliminado**: `.headCell`, `.priceHead`, `.rowEven`,
+    `.rowOdd`. La alternancia de filas usa una sola clase `.row` con
+    `:nth-child(odd/even)`.
+  - **`border-bottom: 1px solid #e5e7eb`** movido a `.cellBase`
+    (antes estaba inline en cada `<td>`).
+  - **`PantallaRotativa.tsx` reescrito**: el contenedor `.screen`
+    inyecta las CSS variables; el resto del JSX usa solo `className`.
+    `CartelOferta` pasó de ~135 líneas con ~10 bloques `style={{...}}`
+    a ~35 líneas con `className` puro. Total del archivo: 303 → 199
+    líneas (-34 %).
+  - **0 bloques `style={{...}}` literales** en todo el componente.
+    El único `style=` que queda es `style={screenVars}`, que pasa las
+    custom properties y es justamente lo que habilita el patrón.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓ ruta `/` estática con revalidación 1m.
+
 - **Sesión 2 (25/05/2026) — UX de borde + tolerancia de formato + decisiones documentadas**:
   - **`app/loading.tsx`** creado: pantalla de carga con branding (logo
     en color primario + "Cargando ofertas…" + spinner). Mismo layout
@@ -135,40 +184,44 @@ types/
 
 ## Pendientes 📋
 
-Priorizadas según el orden acordado: bloque actual está cerrado
-(sesión 2 cubrió 7+4+9); siguen 1+2+3 y por último 5+6+8.
+**Sesiones 1, 2, 3 y 4 cerradas — análisis técnico completo.**
 
-### Próximo bloque (Sesión 3 propuesta) — Estilos
-- **Estilos inline en `CartelOferta`**: decenas de `style={{...}}` que
-  pertenecen al `.module.css`. Mover a clases CSS. Pasar colores de
-  `negocioConfig` como CSS variables desde el contenedor padre. Ver
-  `components/PantallaRotativa.tsx` líneas ~150-280.
-- **CSS muerto en `page.module.css`**: `.headCell`, `.priceHead`,
-  `.rowEven`/`.rowOdd` casi vacíos. Limpiar.
-- _(El item #3 de "imágenes con `next/image`" se descartó como
-  decisión de proyecto. Ver `docs/decisiones.md` — "Mantener `<img>`
-  en vez de `next/image`")_.
+No quedan items del análisis inicial sin resolver. El proyecto está
+listo para vender en su estado actual.
 
-### Bloque de cierre (Sesión 4 propuesta) — Tipos y contrato
-- **Tipado en `getConfig`** (`lib/sheets.ts:281-285`): el cast
-  `(config[clave] as number) = num` esconde el tipo. Reemplazar por un
-  mapper `Record<keyof ConfigNegocio, parser>` con `satisfies` para
-  que TS exija un parser por clave nueva.
-- **Re-slugify de `oferta.imagen`** (`components/PantallaRotativa.tsx`
-  líneas ~178-181): la columna ya se llama "slug imagen". Decidir
-  contrato: confiar en lo cargado, o dejarlo y loguear `console.warn`
-  cuando difiere del slugificado, para detectar cargas mal hechas.
-- **Estado de carga visible distinguible del "vacío legítimo"**: hoy
-  si los fetch devuelven `[]` la pantalla muestra "Sin productos
-  disponibles" sin contexto. Con `loading.tsx` + `error.tsx` ya
-  cubrimos los bordes; queda decidir qué mostrar si Sheets devuelve
-  arrays vacíos genuinos (planilla en mantenimiento, por ejemplo).
+### Ideas opcionales para iteraciones futuras
 
-### Resuelto (referencia)
-- ✅ `loading.tsx` + `error.tsx` (sesión 2)
+Estas no salen del análisis original — son extensiones posibles si
+aparece un caso de uso real:
+
+- **Theming dinámico**: las CSS variables ya están en `.screen`, así
+  que basta con aceptar un prop `paleta` en `PantallaRotativa` y
+  derivar `screenVars` desde ahí. Util si se vende a múltiples
+  locales con paletas distintas, o si el cliente quiere variantes
+  por evento (fiestas patrias, navidad).
+- **Logging remoto** del warning de slug mal cargado. Hoy solo se ve
+  en dev; con Sentry o LogTail se podría detectar el patrón en
+  producción.
+- **Pestaña CONFIG con `modoMantenimiento: boolean`** para pantalla
+  dedicada. El mapper tipado (sesión 4) ya soporta agregar la clave
+  sin riesgo.
+- **CI/CD**: hoy no hay workflow de GitHub Actions. Si el cliente lo
+  pide, agregar `tsc --noEmit` + `next lint` + `next build` en cada
+  PR.
+
+### Resuelto (referencia completa)
+- ✅ Refactor a Server Component + `AutoRefresh` consolidado (sesión 1)
+- ✅ Regex de diacríticos con `new RegExp` + escapes Unicode (sesión 1)
+- ✅ `slugifyNombre` muerto, `isNaN` → `Number.isNaN` (sesión 1)
+- ✅ `loading.tsx` + `error.tsx` con branding (sesión 2)
 - ✅ `formatPrecio` formato AR (sesión 2)
-- ✅ Tailwind v4 en `layout.tsx` — reset centralizado en `globals.css` (sesión 2)
+- ✅ Reset CSS centralizado en `globals.css` (sesión 2)
 - ✅ Endpoints `/api/*` documentados en `docs/api.md` (sesión 2)
+- ✅ Estilos inline → CSS module + CSS vars (sesión 3)
+- ✅ CSS muerto eliminado (sesión 3)
+- ✅ Mapper tipado en `getConfig` con `satisfies` (sesión 4)
+- ✅ Warning en dev por slug mal cargado (sesión 4)
+- ✅ Empty state amable con datos de contacto (sesión 4)
 - ❌ `next/image` — **descartado** por costo en capa gratuita (sesión 2)
 
 ---

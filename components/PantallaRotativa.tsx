@@ -86,7 +86,16 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
     return () => window.clearInterval(intervalId)
   }, [modo, listas.length, ofertas.length, segundosCartel, segundosTabla])
 
-  const tableFontVars = {
+  // Inyectamos los colores de marca y el factor de tipografia como CSS custom
+  // properties en el contenedor `.screen`. El CSS module los consume via
+  // `var(--c-*)`. Asi el JSX no carga inline styles y el CSS queda estatico.
+  const screenVars = {
+    '--c-primario': negocioConfig.colores.primario,
+    '--c-secundario': negocioConfig.colores.secundario,
+    '--c-fondo': negocioConfig.colores.fondo,
+    '--c-texto-primario': negocioConfig.colores.textoPrimario,
+    '--c-texto-secundario': negocioConfig.colores.textoSecundario,
+    '--c-fila-impar': negocioConfig.colores.filaImpar,
     '--table-font-scale': `${negocioConfig.tipografia.tabla / 100}`,
   } as CSSProperties
 
@@ -96,7 +105,7 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
 
   return (
     <main className={styles.pageShell}>
-      <div className={styles.screen} style={tableFontVars}>
+      <div className={styles.screen} style={screenVars}>
         <Header />
         {ofertaActual ? (
           <CartelOferta key={ofertaActual.nombre} oferta={ofertaActual} />
@@ -104,12 +113,8 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr className={styles.headRow} style={{ background: negocioConfig.colores.secundario }}>
-                  <th
-                    className={styles.superHeadCell}
-                    style={{ color: negocioConfig.colores.fondo, background: negocioConfig.colores.secundario }}
-                    colSpan={2}
-                  >
+                <tr className={styles.headRow}>
+                  <th className={styles.superHeadCell} colSpan={2}>
                     {listaActual?.titulo ?? 'Lista de Precios'}
                   </th>
                 </tr>
@@ -117,24 +122,27 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
               <tbody>
                 {productosActuales.length > 0 ? (
                   productosActuales.map((producto, i) => (
-                    <tr
-                      key={`${producto.nombre}-${i}`}
-                      className={i % 2 === 0 ? styles.rowEven : styles.rowOdd}
-                      style={{ background: i % 2 === 0 ? negocioConfig.colores.fondo : negocioConfig.colores.filaImpar }}
-                    >
-                      <td className={`${styles.cellBase} ${styles.descriptionCell}`} style={{ color: negocioConfig.colores.textoPrimario, borderBottom: '1px solid #e5e7eb' }}>{producto.nombre}</td>
-                      <td className={`${styles.cellBase} ${styles.priceCell}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <tr key={`${producto.nombre}-${i}`} className={styles.row}>
+                      <td className={`${styles.cellBase} ${styles.descriptionCell}`}>
+                        {producto.nombre}
+                      </td>
+                      <td className={`${styles.cellBase} ${styles.priceCell}`}>
                         <div className={styles.priceInline}>
-                          <span className={styles.priceValue} style={{ color: negocioConfig.colores.primario }}>{formatPrecio(producto.precio)}</span>
-                          {producto.unidad && <span className={styles.unitValue} style={{ color: negocioConfig.colores.textoSecundario }}>por {producto.unidad}</span>}
+                          <span className={styles.priceValue}>{formatPrecio(producto.precio)}</span>
+                          {producto.unidad && (
+                            <span className={styles.unitValue}>por {producto.unidad}</span>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={2} className={`${styles.cellBase} ${styles.emptyState}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      Sin productos disponibles
+                    <td colSpan={2} className={`${styles.cellBase} ${styles.emptyState}`}>
+                      <div>Estamos actualizando la lista de precios.</div>
+                      <div className={styles.emptyStateContact}>
+                        Consultá por {configRemota.whatsapp ?? negocioConfig.whatsapp ?? negocioConfig.telefono}
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -150,136 +158,56 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
 
 function CartelOferta({ oferta }: { oferta: Oferta }) {
   const [imgError, setImgError] = useState(false)
+
+  // La columna del CSV ya se llama "slug imagen" — el contrato con el cliente
+  // es cargar un slug, no un nombre con espacios o mayusculas. Aun asi
+  // re-slugificamos para que la pantalla del local no se rompa si el cliente
+  // se equivoca. Lo loguearmos solo en dev para detectar el patron sin
+  // ensuciar la consola en produccion.
   const slug = oferta.imagen
     .toLowerCase()
     .trim()
     .replace(/\s+/g, '-')
+  if (process.env.NODE_ENV !== 'production' && slug !== oferta.imagen) {
+    console.warn(
+      `[ofertas] "${oferta.imagen}" se re-slugify como "${slug}". ` +
+        `Cargar el slug correcto en la planilla (columna "slug imagen").`,
+    )
+  }
 
+  // Todo el layout vive en page.module.css. Los colores entran via CSS vars
+  // inyectadas en `.screen`, por lo que aca solo manejamos:
+  //   1. el slug dinamico de la imagen,
+  //   2. el fallback cuando la imagen no existe (imgError),
+  //   3. las clases combinadas para sumar animaciones de entrada.
   return (
-    <div
-      style={{
-        flex: 1,
-        position: 'relative',
-        overflow: 'hidden',
-        background: '#fff',
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          height: '100%',
-          width: '22%',
-          background: negocioConfig.colores.secundario,
-          clipPath: 'polygon(0 0, 100% 0, 55% 100%, 0% 100%)',
-        }}
-      />
+    <div className={styles.cartel}>
+      <div className={styles.cartelDiagonal} />
 
-      <div
-        className={styles.pulseSuperOferta}
-        style={{
-          position: 'absolute',
-          top: '3%',
-          left: '8%',
-          background: negocioConfig.colores.primario,
-          color: '#fff',
-          borderRadius: 16,
-          padding: '24px 40px',
-          fontSize: 'clamp(28px, 4vw, 60px)',
-          fontWeight: 'bold',
-          textAlign: 'center',
-          lineHeight: 1.2,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
+      <div className={`${styles.cartelBadge} ${styles.pulseSuperOferta}`}>
         SUPER
         <br />
         OFERTA
       </div>
 
-      <div
-        style={{
-          position: 'absolute',
-          left: '33%', //LIMITE IZQUIERDO DE LA ZONA DE CENTRADO (borde derecho del cartel SUPER OFERTA)
-          right: '5%', //LIMITE DERECHO DE LA ZONA DE CENTRADO
-          top: '3%',
-          display: 'flex',
-          justifyContent: 'center',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 'clamp(36px, 6vw, 90px)', //TAMAÑO DEL NOMBRE DE LA OFERTA
-            background: negocioConfig.colores.secundario,
-            color: '#FFFFFF',
-            borderRadius: '16px',
-            padding: '16px 28px',
-            fontWeight: 'bold',
-            maxWidth: '100%',
-            textAlign: 'center',
-            boxSizing: 'border-box',
-            lineHeight: 1.1,
-          }}
-        >
-          {oferta.nombre}
-        </div>
+      <div className={styles.cartelTitleWrap}>
+        <div className={styles.cartelTitle}>{oferta.nombre}</div>
       </div>
 
       {!imgError && (
-        <div
-          style={{
-            position: 'absolute',
-            left: '10%',
-            right: '18%',
-            top: '16%',
-            bottom: '0%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <div className={styles.cartelImageWrap}>
           <img
             src={`/ofertas/${slug}.png`}
             alt={oferta.nombre}
             onError={() => setImgError(true)}
-            className={styles.pulseImage}
-            style={{
-              height: '80%',
-              width: '80%',
-              objectFit: 'contain',
-            }}
+            className={`${styles.cartelImage} ${styles.pulseImage}`}
           />
         </div>
       )}
 
-      <div
-        className={styles.pulsePrice}
-        style={{
-          position: 'absolute',
-          right: '5%',
-          bottom: '5%',
-          ['--circle-size' as string]: 'clamp(180px, 20vw, 320px)',
-          width: 'var(--circle-size)',
-          aspectRatio: '1',
-          background: negocioConfig.colores.secundario,
-          borderRadius: '50%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          color: '#fff',
-          textAlign: 'center',
-          padding: '0 8%',
-          fontSize: 'calc(var(--circle-size) * 0.25)', //TAMAÑO DEL PRECIO EN EL CIRCULO, 25% del tamaño del circulo
-        }}
-      >
-        <span style={{ fontWeight: 'bold' }}>
-          {formatPrecio(oferta.precio)}
-        </span>
+      <div className={`${styles.cartelPrice} ${styles.pulsePrice}`}>
+        <span className={styles.cartelPriceText}>{formatPrecio(oferta.precio)}</span>
       </div>
-
     </div>
   )
 }

@@ -5,6 +5,84 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 4 — 2026-05-25 (Tipos y contrato: cierre del análisis)
+
+**Changed**
+- **`lib/sheets.ts` — mapper tipado en `getConfig`.** Reemplazado el
+  `CONFIG_KEYS_NUMERICOS: Set<string>` + casts `as number`/`as
+  string` por `CONFIG_PARSERS` validado con `satisfies { [K in keyof
+  Required<ConfigNegocio>]: ConfigParser<K> }`. Helper genérico
+  `asignarConfig<K>(...)` aplica el parser correcto y preserva el
+  tipo. Si alguien agrega una clave nueva a `ConfigNegocio` sin
+  registrar su parser, **el build rompe en compilación**. Probado en
+  vivo con `modoMantenimiento?: boolean` — TS reportó el error
+  esperado y se revertió.
+- **`parseStr`** ahora retorna `undefined` para strings vacíos (no
+  contamina el objeto config con claves vacías).
+- **Empty state de la tabla**: el `Sin productos disponibles` pasó a
+  `Estamos actualizando la lista de precios. / Consultá por
+  <whatsapp>`. El WhatsApp viene de `configRemota.whatsapp ??
+  negocioConfig.whatsapp ?? negocioConfig.telefono`.
+
+**Added**
+- **`console.warn` en dev** cuando `oferta.imagen` difiere del
+  slug calculado. Gateado por `process.env.NODE_ENV !== 'production'`
+  para no ensuciar consola productiva. Detecta cargas mal hechas
+  durante desarrollo o staging sin afectar al público final.
+- **Clase `.emptyStateContact`** en `app/page.module.css` para el
+  subtítulo del empty state. Usa `var(--c-texto-secundario)`.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores. Confirmado que el `satisfies` del
+  mapper rompe compilación si falta un parser.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: ruta `/` sigue prerenderizada estática con
+  revalidación 1 min.
+
+**Análisis técnico cerrado.** Todos los items del análisis inicial
+están resueltos o documentados como decisión consciente de no hacer.
+Ver `docs/progreso.md` § Resuelto.
+
+---
+
+### Sesión 3 — 2026-05-25 (Estilos: inline → CSS module + CSS vars)
+
+**Changed**
+- **`app/page.module.css` reescrito.** Ahora consume colores de marca
+  como CSS custom properties (`var(--c-primario)`,
+  `var(--c-secundario)`, `var(--c-fondo)`, `var(--c-texto-primario)`,
+  `var(--c-texto-secundario)`, `var(--c-fila-impar)`). Las variables
+  se inyectan en el contenedor `.screen` desde `PantallaRotativa.tsx`.
+  Archivo dividido en secciones comentadas: Tabla / Cartel /
+  Animaciones.
+- **Clase única `.row`** con `:nth-child(odd/even)` reemplaza a
+  `.rowEven` y `.rowOdd`. Antes esas clases solo aportaban la
+  `transition` y el fondo venía inline por `<tr>`.
+- **`border-bottom: 1px solid #e5e7eb`** movido a `.cellBase` (antes
+  estaba inline en cada `<td>`).
+- **`components/PantallaRotativa.tsx`**: pasó de 303 a 199 líneas
+  (-34 %). 0 bloques `style={{...}}` literales en el JSX. Único
+  `style={}` que sobrevive: `style={screenVars}` en `.screen`, que
+  pasa las CSS variables (es lo que habilita el patrón).
+- **`CartelOferta`** reescrito: ~135 líneas con ~10 bloques de
+  estilos inline pasaron a ~35 líneas con `className` puro. Usa
+  clases combinadas para animaciones (`${styles.cartelImage}
+  ${styles.pulseImage}`).
+
+**Removed**
+- Clases CSS muertas en `app/page.module.css`: **`.headCell`**,
+  **`.priceHead`** (definidas pero nunca usadas en el JSX),
+  **`.rowEven`**, **`.rowOdd`** (reemplazadas por `.row` +
+  `:nth-child`).
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0 errores, 0 warnings).
+- `npm run build`: ruta `/` sigue prerenderizada estática con
+  revalidación 1 min.
+
+---
+
 ### Sesión 2 — 2026-05-25 (UX de borde + formato AR + decisiones)
 
 **Added**

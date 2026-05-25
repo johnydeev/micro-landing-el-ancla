@@ -1,3 +1,22 @@
+/*
+ * Estilos de la pantalla principal y del cartel de oferta.
+ *
+ * Los colores de la marca se inyectan como CSS custom properties desde el
+ * contenedor `.screen` en componente padre (ver components/PantallaRotativa.tsx).
+ * Eso permite que este CSS sea estatico y no dependa de pasar `style={{...}}`
+ * por cada elemento. Si en algun momento se quiere theming por horario,
+ * sucursal o evento, basta con cambiar las variables en el contenedor.
+ *
+ * Variables esperadas:
+ *   --c-primario          color de marca principal (rojo)
+ *   --c-secundario        color secundario (azul marino)
+ *   --c-fondo             fondo base (blanco)
+ *   --c-texto-primario    texto principal sobre fondo claro
+ *   --c-texto-secundario  texto auxiliar (unidades, leyendas)
+ *   --c-fila-impar        fondo alterno de las filas de la tabla
+ *   --table-font-scale    multiplicador de tipografia de la tabla (1.0 = 100%)
+ */
+
 .pageShell {
   min-height: 100vh;
   display: flex;
@@ -16,6 +35,10 @@
   max-height: 100vh;
 }
 
+/* ---------------------------------------------------------------------------
+ * Tabla de precios
+ * ------------------------------------------------------------------------- */
+
 .tableWrap {
   flex: 1;
   overflow: hidden;
@@ -29,21 +52,9 @@
 }
 
 .headRow {
+  background: var(--c-secundario);
   border-bottom: 1px solid rgba(0, 0, 0, 0.15);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
-}
-
-.headCell {
-  width: 75%;
-  padding: 0.4vh 40px 0.4vh 70px;
-  font-size: clamp(
-    calc(11px * var(--table-font-scale, 1)),
-    calc(1.35vw * var(--table-font-scale, 1)),
-    calc(22px * var(--table-font-scale, 1))
-  );
-  font-weight: 700;
-  text-align: left;
-  text-transform: uppercase;
 }
 
 .superHeadCell {
@@ -57,25 +68,29 @@
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  background: var(--c-secundario);
+  color: var(--c-fondo);
 }
 
-.priceHead {
-  width: 25%;
-  padding-left: 40px;
-  text-align: center;
-}
-
-.rowEven {
+/*
+ * Una sola clase `.row` con :nth-child para alternar fondos. Antes habia
+ * `.rowEven` y `.rowOdd` que solo aportaban la `transition` y el color de
+ * fondo venia inline desde el JSX — duplicacion innecesaria.
+ */
+.row {
   transition: background-color 0.25s ease;
 }
-
-.rowOdd {
-  transition: background-color 0.25s ease;
+.row:nth-child(odd) {
+  background: var(--c-fondo);
+}
+.row:nth-child(even) {
+  background: var(--c-fila-impar);
 }
 
 .cellBase {
   padding: 0.55vh 40px;
   text-align: center;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .descriptionCell {
@@ -88,6 +103,7 @@
   text-transform: uppercase;
   text-align: left;
   padding-left: 14vw;
+  color: var(--c-texto-primario);
 }
 
 .priceCell {
@@ -111,6 +127,7 @@
     calc(22px * var(--table-font-scale, 1))
   );
   font-weight: 700;
+  color: var(--c-primario);
 }
 
 .unitValue {
@@ -119,6 +136,7 @@
     calc(0.9vw * var(--table-font-scale, 1)),
     calc(14px * var(--table-font-scale, 1))
   );
+  color: var(--c-texto-secundario);
 }
 
 .emptyState {
@@ -130,6 +148,138 @@
   );
   text-align: center;
 }
+
+/* Subtitulo del empty state con los datos de contacto del local. */
+.emptyStateContact {
+  margin-top: 1.2vh;
+  color: var(--c-texto-secundario);
+  font-size: clamp(
+    calc(10px * var(--table-font-scale, 1)),
+    calc(1.2vw * var(--table-font-scale, 1)),
+    calc(20px * var(--table-font-scale, 1))
+  );
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+ * Cartel de superoferta
+ *
+ * Layout pensado para 16:9 fijo. Todas las posiciones son porcentajes
+ * relativos al contenedor `.cartel`. Los colores vienen via CSS vars
+ * inyectadas en `.screen`.
+ * ------------------------------------------------------------------------- */
+
+.cartel {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Banda diagonal a la izquierda, color secundario. */
+.cartelDiagonal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 22%;
+  background: var(--c-secundario);
+  clip-path: polygon(0 0, 100% 0, 55% 100%, 0% 100%);
+}
+
+/* Badge "SUPER OFERTA" arriba a la izquierda, color primario. */
+.cartelBadge {
+  position: absolute;
+  top: 3%;
+  left: 8%;
+  background: var(--c-primario);
+  color: #fff;
+  border-radius: 16px;
+  padding: 24px 40px;
+  font-size: clamp(28px, 4vw, 60px);
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * Zona de centrado del nombre de la oferta.
+ * Limite izquierdo (33%) = borde derecho del badge SUPER OFERTA.
+ * Limite derecho (5%)    = margen al borde de la pantalla.
+ */
+.cartelTitleWrap {
+  position: absolute;
+  left: 33%;
+  right: 5%;
+  top: 3%;
+  display: flex;
+  justify-content: center;
+}
+
+.cartelTitle {
+  font-size: clamp(36px, 6vw, 90px);
+  background: var(--c-secundario);
+  color: #fff;
+  border-radius: 16px;
+  padding: 16px 28px;
+  font-weight: bold;
+  max-width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+  line-height: 1.1;
+}
+
+.cartelImageWrap {
+  position: absolute;
+  left: 10%;
+  right: 18%;
+  top: 16%;
+  bottom: 0%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cartelImage {
+  height: 80%;
+  width: 80%;
+  object-fit: contain;
+}
+
+/*
+ * Circulo de precio abajo a la derecha. `--circle-size` se define aca
+ * para que el `font-size` interno escale proporcional al tamano del circulo.
+ */
+.cartelPrice {
+  --circle-size: clamp(180px, 20vw, 320px);
+  position: absolute;
+  right: 5%;
+  bottom: 5%;
+  width: var(--circle-size);
+  aspect-ratio: 1;
+  background: var(--c-secundario);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  text-align: center;
+  padding: 0 8%;
+  font-size: calc(var(--circle-size) * 0.25);
+}
+
+.cartelPriceText {
+  font-weight: bold;
+}
+
+/* ---------------------------------------------------------------------------
+ * Animaciones de entrada del cartel.
+ * Se combinan con las clases anteriores (ej: `.cartelImage .pulseImage`)
+ * para que la animacion se reproduzca una sola vez al montar.
+ * ------------------------------------------------------------------------- */
 
 @keyframes pulseScale {
   0%,
