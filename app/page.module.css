@@ -94,6 +94,15 @@
 }
 
 .descriptionCell {
+  /*
+   * Ancho explicito al 65% para darle prioridad a la descripcion sobre el
+   * precio. La tabla usa `table-layout: fixed`, asi que estos % se respetan
+   * estrictamente. Antes era 50/50 implicito y descripciones largas como
+   * "Falda parrillera x 2 KG" forzaban salto de linea.
+   * `padding-left` bajado de 14vw a 6vw por el mismo motivo: ganar
+   * horizontal sin perder la sangria visual del texto a izquierda.
+   */
+  width: 65%;
   font-size: clamp(
     calc(10px * var(--table-font-scale, 1)),
     calc(1.25vw * var(--table-font-scale, 1)),
@@ -102,11 +111,13 @@
   font-weight: 600;
   text-transform: uppercase;
   text-align: left;
-  padding-left: 14vw;
+  padding-left: 12vw;
   color: var(--c-texto-primario);
+  white-space: nowrap;
 }
 
 .priceCell {
+  width: 35%;
   padding-left: 40px;
   text-align: center;
   vertical-align: middle;
