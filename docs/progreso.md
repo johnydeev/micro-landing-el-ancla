@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 25/05/2026 (sesión 4).
+Actualizado al 25/05/2026 (sesión 5).
 
 ---
 
@@ -78,6 +78,33 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 5 (25/05/2026) — Feature: tamaño de imagen por-oferta + tweak de tabla**:
+  - **Nueva columna opcional `tamaño` en la pestaña de ofertas del
+    Sheets**. Escala 1-5 mapeada a porcentajes del wrapper de imagen
+    (60/70/80/90/100 %). Default `3` = 80 % = comportamiento previo.
+    Backwards compatible: si la columna no existe o el valor es
+    inválido, todas las ofertas usan `3`.
+  - **`types/index.ts`**: `Oferta.tamano: number` agregado, requerido
+    (default aplicado en el parser, no en la UI).
+  - **`lib/sheets.ts`**: nuevo tipo `OfertasTableHeader { offset,
+    tieneTamano }`. `findOfertasTableOffsets` detecta el header de
+    la 5ta columna (acepta `tamaño`, `tamano`, `escala`, `size`,
+    etc., normalizado sin acentos). `parseTamanoOferta` valida y
+    clampea al rango 1-5. `mapRowToOfertas` lee la columna solo si
+    el header está presente.
+  - **`PantallaRotativa.tsx`**: mapa `TAMANO_OFERTA_A_ESCALA` y
+    aplicación vía CSS variable inline `--cartel-image-scale` en el
+    `<img>`. Consistente con el patrón de `screenVars` (sesión 3).
+  - **`page.module.css`**: `.cartelImage` ahora usa
+    `var(--cartel-image-scale, 80%)` para `height` y `width`.
+  - **Tweak menor del mismo día**: `.descriptionCell` pasó a
+    `width: 65%; padding-left: 6vw; white-space: nowrap` (antes
+    50/50 implícito + 14vw) para que descripciones largas como
+    "Falda parrillera x 2 KG" no hagan salto de línea. `.priceCell`
+    pasó a `width: 35%`.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓ ruta `/` estática con revalidación 1m.
 
 - **Sesión 4 (25/05/2026) — Tipos y contrato: cierre del análisis**:
   - **Mapper tipado en `getConfig`** (`lib/sheets.ts`): reemplazado

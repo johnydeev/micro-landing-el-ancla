@@ -5,6 +5,50 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 5 — 2026-05-25 (Feature: tamaño imagen por-oferta + tweak tabla)
+
+**Added**
+- **Columna opcional `tamaño` (1-5) en la pestaña de ofertas del Sheets.**
+  Permite ajustar el tamaño de la imagen del cartel por oferta sin
+  tocar código. Mapeo: `1=60%`, `2=70%`, `3=80%` (default),
+  `4=90%`, `5=100%` del wrapper de imagen. Backwards compatible: si
+  la columna no existe o el valor es inválido, se usa `3`.
+- **Headers aceptados** (normalizados sin acentos): `tamano`,
+  `tamano imagen`, `tamano de imagen`, `escala`, `escala imagen`,
+  `size`.
+- **`types/index.ts`**: campo `tamano: number` en `Oferta`.
+- **`lib/sheets.ts`**: nuevo tipo `OfertasTableHeader`, helper
+  `parseTamanoOferta`, constantes `TAMANO_OFERTA_HEADERS`,
+  `TAMANO_OFERTA_DEFAULT`, `TAMANO_OFERTA_MIN`, `TAMANO_OFERTA_MAX`.
+- **`PantallaRotativa.tsx`**: mapa `TAMANO_OFERTA_A_ESCALA` y
+  aplicación de la escala vía CSS variable inline
+  `--cartel-image-scale` en el `<img>`.
+
+**Changed**
+- **`.cartelImage`** ahora usa `var(--cartel-image-scale, 80%)` para
+  `height` y `width`. Fallback `80%` preserva el comportamiento
+  previo a la feature.
+- **Tweak de tabla de precios** (mismo día): `.descriptionCell`
+  pasó a `width: 65%; padding-left: 6vw; white-space: nowrap`
+  (antes implícito 50/50 + `padding-left: 14vw`) para que
+  descripciones largas no rompan la grilla. `.priceCell` a
+  `width: 35%`.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: ruta `/` sigue prerenderizada estática con
+  revalidación 1 min.
+
+**Doc updates**
+- `docs/api.md`: response shape de `/api/ofertas` incluye `tamano`.
+  Nueva nota sobre la columna opcional.
+- `docs/decisiones.md`: ADR "Tamaño de imagen por-oferta: escala
+  discreta 1-5 vía Sheets" con problema, decisión, por qué discreta
+  y no porcentaje libre, trade-offs, e instrucciones para el cliente.
+
+---
+
 ### Sesión 4 — 2026-05-25 (Tipos y contrato: cierre del análisis)
 
 **Changed**

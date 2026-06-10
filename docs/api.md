@@ -78,7 +78,8 @@ GOOGLE_SHEETS_GID_OFERTAS`.
     "nombre": "Asado x 5kg",
     "precio": "18000",
     "imagen": "asado",
-    "estado": "ACTIVO"
+    "estado": "ACTIVO",
+    "tamano": 3
   }
 ]
 ```
@@ -89,9 +90,14 @@ GOOGLE_SHEETS_GID_OFERTAS`.
   `"INACTIVO"` se filtran en el servidor.
 - `imagen` es el **slug del PNG** dentro de `public/ofertas/`. La
   pantalla principal lo usa como `/ofertas/{slug}.png`.
+- `tamano` es un entero **1-5** que controla el tamaño de la imagen
+  dentro del cartel (1 = más chica, 5 = más grande). Default `3`.
+  Es opcional en el Sheets: si falta la columna o el valor es
+  inválido (no entero, fuera de rango), se aplica `3`.
 - Si falta `GOOGLE_SHEETS_GID_OFERTAS` o el CSV no contiene la fila de
   encabezado esperada (`titulo`, `precio`, `slug imagen`, `estado`),
-  devuelve `[]`.
+  devuelve `[]`. La 5ta columna `tamaño` / `escala` / `size` es
+  **opcional** — ver `docs/decisiones.md` para los nombres aceptados.
 
 ### `GET /api/config`
 

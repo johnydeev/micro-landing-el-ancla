@@ -156,6 +156,21 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
   )
 }
 
+/*
+ * Mapeo de la escala 1-5 de la columna "tamano" del Sheets a un porcentaje
+ * concreto del wrapper de la imagen. El default (3 = 80%) coincide con el
+ * comportamiento previo a la feature, para que las ofertas existentes sin
+ * la columna no cambien visualmente. Si en el futuro se quiere mas
+ * granularidad (1-10) o ajustar valores, este es el unico lugar a tocar.
+ */
+const TAMANO_OFERTA_A_ESCALA: Record<number, string> = {
+  1: '60%',
+  2: '70%',
+  3: '80%',
+  4: '90%',
+  5: '100%',
+}
+
 function CartelOferta({ oferta }: { oferta: Oferta }) {
   const [imgError, setImgError] = useState(false)
 
@@ -175,11 +190,18 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
     )
   }
 
+  // Tamano por-oferta via CSS variable. El parser de lib/sheets.ts ya
+  // garantiza que `tamano` esta en el rango 1-5, asi que el fallback
+  // a TAMANO_OFERTA_A_ESCALA[3] solo se usaria si alguien rompe el contrato.
+  const escalaImagen = TAMANO_OFERTA_A_ESCALA[oferta.tamano] ?? TAMANO_OFERTA_A_ESCALA[3]
+  const imageVars = { '--cartel-image-scale': escalaImagen } as CSSProperties
+
   // Todo el layout vive en page.module.css. Los colores entran via CSS vars
   // inyectadas en `.screen`, por lo que aca solo manejamos:
   //   1. el slug dinamico de la imagen,
   //   2. el fallback cuando la imagen no existe (imgError),
-  //   3. las clases combinadas para sumar animaciones de entrada.
+  //   3. la escala por-oferta via CSS variable,
+  //   4. las clases combinadas para sumar animaciones de entrada.
   return (
     <div className={styles.cartel}>
       <div className={styles.cartelDiagonal} />
@@ -201,6 +223,7 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
             alt={oferta.nombre}
             onError={() => setImgError(true)}
             className={`${styles.cartelImage} ${styles.pulseImage}`}
+            style={imageVars}
           />
         </div>
       )}

@@ -253,9 +253,14 @@
   justify-content: center;
 }
 
+/*
+ * `--cartel-image-scale` se inyecta inline desde CartelOferta segun la
+ * columna "tamano" del Sheets (escala 1-5 mapeada a porcentaje). El
+ * fallback `80%` reproduce el comportamiento previo a la feature.
+ */
 .cartelImage {
-  height: 80%;
-  width: 80%;
+  height: var(--cartel-image-scale, 80%);
+  width: var(--cartel-image-scale, 80%);
   object-fit: contain;
 }
 

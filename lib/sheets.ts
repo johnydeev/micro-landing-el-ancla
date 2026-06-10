@@ -94,8 +94,33 @@ function findProductosTableOffsets(headerRow: string[]): number[] {
   return offsets
 }
 
-function findOfertasTableOffsets(headerRow: string[]): number[] {
-  const offsets: number[] = []
+/*
+ * Encabezados aceptados para la columna OPCIONAL de tamano de imagen
+ * (5ta columna del bloque de ofertas). Se normalizan sin acentos y en
+ * minusculas antes de comparar — el cliente puede cargar "Tamaño",
+ * "tamano", "Escala", etc.
+ */
+const TAMANO_OFERTA_HEADERS = new Set([
+  'tamano',
+  'tamano imagen',
+  'tamano de imagen',
+  'escala',
+  'escala imagen',
+  'size',
+])
+
+const TAMANO_OFERTA_DEFAULT = 3
+const TAMANO_OFERTA_MIN = 1
+const TAMANO_OFERTA_MAX = 5
+
+interface OfertasTableHeader {
+  offset: number
+  /** true si la 5ta columna (offset+4) es un header de tamano. */
+  tieneTamano: boolean
+}
+
+function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
+  const result: OfertasTableHeader[] = []
 
   for (let i = 0; i <= headerRow.length - 4; i += 1) {
     const slice = headerRow.slice(i, i + 4).map((column) => (column ?? '').trim().toLowerCase())
@@ -105,17 +130,34 @@ function findOfertasTableOffsets(headerRow: string[]): number[] {
       slice[2] === 'slug imagen' &&
       slice[3] === 'estado'
     ) {
-      offsets.push(i)
+      // Chequeo opcional de la 5ta columna. Normalizamos sin acentos para
+      // aceptar "tamaño", "Tamaño", "tamano", etc. Si la columna no esta
+      // (o es un header de otra tabla pegada al costado), tieneTamano=false
+      // y las ofertas usan el default.
+      const quinta = (headerRow[i + 4] ?? '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(COMBINING_DIACRITICS, '')
+      const tieneTamano = TAMANO_OFERTA_HEADERS.has(quinta)
+      result.push({ offset: i, tieneTamano })
     }
   }
 
-  return offsets
+  return result
 }
 
-function mapRowToOfertas(columns: string[], offsets: number[]): Oferta[] {
+function parseTamanoOferta(raw: string): number {
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed)) return TAMANO_OFERTA_DEFAULT
+  if (parsed < TAMANO_OFERTA_MIN || parsed > TAMANO_OFERTA_MAX) return TAMANO_OFERTA_DEFAULT
+  return parsed
+}
+
+function mapRowToOfertas(columns: string[], headers: OfertasTableHeader[]): Oferta[] {
   const ofertas: Oferta[] = []
 
-  for (const offset of offsets) {
+  for (const { offset, tieneTamano } of headers) {
     const [nombre = '', precio = '', imagen = '', estado = ''] = columns
       .slice(offset, offset + 4)
       .map((column) => (column ?? '').trim())
@@ -124,7 +166,11 @@ function mapRowToOfertas(columns: string[], offsets: number[]): Oferta[] {
 
     const estadoNormalizado = estado.toUpperCase() === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO'
 
-    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado })
+    const tamano = tieneTamano
+      ? parseTamanoOferta((columns[offset + 4] ?? '').trim())
+      : TAMANO_OFERTA_DEFAULT
+
+    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado, tamano })
   }
 
   return ofertas
@@ -360,12 +406,12 @@ export async function getOfertas(): Promise<Oferta[]> {
     const text = await res.text()
     const rows = parseCsvRows(text)
 
-    let offsets: number[] = []
+    let headers: OfertasTableHeader[] = []
     let headerRowIndex = -1
     for (let i = 0; i < rows.length; i += 1) {
       const found = findOfertasTableOffsets(rows[i])
       if (found.length > 0) {
-        offsets = found
+        headers = found
         headerRowIndex = i
         break
       }
@@ -378,7 +424,7 @@ export async function getOfertas(): Promise<Oferta[]> {
 
     return rows
       .slice(headerRowIndex + 1)
-      .flatMap((columns) => mapRowToOfertas(columns, offsets))
+      .flatMap((columns) => mapRowToOfertas(columns, headers))
       .filter((o) => o.estado === 'ACTIVO')
   } catch (error) {
     console.error('Error en getOfertas:', error)

@@ -85,6 +85,87 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-05-25 — Tamaño de imagen por-oferta: escala discreta 1-5 vía Sheets
+
+### Problema
+
+El layout del cartel está pensado para imágenes con proporción
+aproximadamente cuadrada o ligeramente apaisada. Algunas imágenes
+(carnes con cortes muy alargados, productos altos, packs envueltos
+en bolsas) tienen proporciones distintas y se ven mal con el 80% de
+tamaño que aplica a todas. El cliente necesitaba poder **ajustar
+el tamaño por oferta sin tocar el código**.
+
+### Decisión
+
+Agregar una **columna opcional** al bloque de ofertas del Sheets,
+con un valor entero entre **1 y 5**, mapeado a porcentajes del
+wrapper de la imagen:
+
+| Valor | Porcentaje | Uso típico |
+|---|---|---|
+| `1` | 60 % | Imagen que se ve demasiado grande |
+| `2` | 70 % | Levemente más chica |
+| `3` (default) | 80 % | Comportamiento previo a la feature |
+| `4` | 90 % | Levemente más grande |
+| `5` | 100 % | Imagen muy chica que necesita llenar el wrapper |
+
+**Backwards compatible:** si la columna no existe o el valor es
+inválido (no entero, fuera de rango, vacío), se aplica `3` y la
+oferta se ve igual que antes de la feature.
+
+**Headers aceptados** para la 5ta columna (normalizados sin acentos):
+`tamano`, `tamano imagen`, `tamano de imagen`, `escala`, `escala
+imagen`, `size`.
+
+### Por qué escala discreta y no porcentaje libre
+
+- **Audiencia es no técnica.** El dueño del local edita Sheets a
+  mano; pedirle valores como `87%` o `1.2` agrega fricción. `1 a 5`
+  es inmediato.
+- **Cubre los casos reales.** El layout es fijo (16:9 del display)
+  y el wrapper está en una posición determinada. Hay un rango útil
+  estrecho — más allá de 100 % la imagen se sale del cartel; debajo
+  de 60 % se pierde el impacto visual. Cinco pasos son suficientes.
+- **Limita el espacio de pruebas.** Si en el futuro alguien ve que
+  un valor no funciona bien, hay solo cinco mapeos a revisar en
+  un único lugar (`TAMANO_OFERTA_A_ESCALA` en
+  `components/PantallaRotativa.tsx`).
+
+### Por qué CSS variable inline y no clase
+
+La escala se aplica como `style={{ '--cartel-image-scale': '90%' }}`
+sobre el `<img>`, y `.cartelImage` consume `var(--cartel-image-scale,
+80%)`. Esto es consistente con la decisión previa sobre **CSS
+variables inyectadas en `.screen`** (ver ADR del 25/05/2026):
+el JSX solo emite variables, el layout entero vive en CSS.
+
+Alternativa descartada: tener cinco clases `.cartelImage1` …
+`.cartelImage5` y elegir cuál aplicar. Más bullets en el CSS, sin
+ganancia.
+
+### Trade-offs
+
+- Si el cliente carga `7` (fuera de rango), la oferta cae a `3`
+  silenciosamente. No se loguea. Si en el futuro queremos detectarlo
+  podemos sumar un `console.warn` en dev como ya hacemos con el slug
+  (ver ADR "Re-slugify de oferta.imagen con warning en dev").
+- El parser está acotado al rango 1-5. Si más adelante se necesita
+  un valor intermedio (75 %, 85 %), hay que decidir si granular más
+  el mapeo (1-10) o cambiar a porcentaje libre. Ambas opciones tocan
+  solo dos lugares: el parser (`lib/sheets.ts`) y el mapeo
+  (`PantallaRotativa.tsx`).
+
+### Instrucciones para el cliente
+
+En la pestaña de ofertas del Google Sheets, agregar una **5ta
+columna** después de `ESTADO` con cualquiera de estos nombres:
+`tamaño`, `escala`, `size`. Llenar con un número de 1 a 5 solo
+para las ofertas que necesitan ajuste — las demás pueden quedar en
+blanco y se renderizan al tamaño normal.
+
+---
+
 ## 2026-05-25 — Mapper tipado en `getConfig` (parsers por clave con `satisfies`)
 
 ### Problema
