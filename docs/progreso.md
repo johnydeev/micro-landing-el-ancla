@@ -221,6 +221,30 @@ listo para vender en su estado actual.
 Estas no salen del análisis original — son extensiones posibles si
 aparece un caso de uso real:
 
+- **Proteger la estructura de columnas del Sheets** (alta
+  prioridad cuando haya muchos clientes). Sheets es muy sensible:
+  un `Tab` extra, un paste mal hecho, o arrastrar el cursor por
+  error pueden desplazar una columna entera sin que el cliente lo
+  note, rompiendo el parser que exige headers contiguos.
+  - Caso real ya visto (25/05/2026): se insertó una celda vacía
+    entre `Precio` y `Unidad` en dos tablas del listado de
+    productos. Las tablas dejaron de renderizar. Detectado y
+    arreglado a mano, pero es exactamente el tipo de error que un
+    cliente final no sabe diagnosticar.
+  - Solución: aplicar **rangos protegidos** sobre la pestaña de
+    productos y la de ofertas. Hoy el proyecto usa el modelo
+    "publicar CSV" sin credenciales, así que la protección habría
+    que aplicarla manualmente en cada planilla. Para automatizarlo
+    hace falta migrar a la **Sheets API con service account**
+    (más infra, más costo de setup por cliente). Por eso queda para
+    cuando el volumen de clientes lo justifique.
+  - Alternativa intermedia: dar al cliente un **template con
+    rangos ya protegidos** que tenga que copiar tal cual. Cero
+    código nuestro, pero exige disciplina en el onboarding.
+  - Otra alternativa intermedia: hacer el parser **tolerante a una
+    celda vacía** entre `Precio` y `Unidad` (cambio chico en
+    `findProductosTableOffsets`). Pros: nunca rompe por este error.
+    Contras: enmascara otros errores de estructura.
 - **Theming dinámico**: las CSS variables ya están en `.screen`, así
   que basta con aceptar un prop `paleta` en `PantallaRotativa` y
   derivar `screenVars` desde ahí. Util si se vende a múltiples
