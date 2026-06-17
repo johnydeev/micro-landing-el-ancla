@@ -85,6 +85,137 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-05-25 — Service Worker para resistir caídas de wifi en el Stick TV
+
+### Problema
+
+En producción, la pantalla del local (Stick TV con Android TV genérico)
+quedaba mostrando la página de error del navegador Chrome:
+
+```
+Página web no disponible
+No ha sido posible cargar la página web https://precios-el-ancla.vercel.app/ porque:
+net::ERR_INTERNET_DISCONNECTED
+```
+
+Cuando la wifi del local se cae (señal inestable común en
+comercios), el navegador descartaba nuestra app y mostraba su propio
+error. JavaScript no podía recuperarse porque ya no estaba corriendo
+— alguien físicamente tenía que agarrar el control remoto y recargar.
+
+### Decisión
+
+Implementar un **Service Worker** que intercepta todos los fetches
+same-origin y los cachea, con estrategia **network-first con fallback
+a cache**:
+
+- **Online**: pasa el request a la red, cachea la respuesta, devuelve
+  al cliente. Comportamiento idéntico al actual.
+- **Offline / red caída**: el `fetch` tira, el SW devuelve la copia
+  cacheada. El navegador ve un response 200 OK y nunca muestra
+  ERR_INTERNET_DISCONNECTED.
+- **Último recurso** para navegaciones (`req.mode === 'navigate'`):
+  si el path específico no está cacheado, devolvemos la home cacheada
+  para que al menos algo se renderice.
+
+Combinado con dos defensas complementarias:
+
+1. **Listener `online` en `PantallaRotativa`**: cuando el navegador
+   detecta que volvió la red sin que la app haya muerto, fuerza un
+   `router.refresh()` inmediato para no esperar al próximo tick.
+2. **Auto-retry en `error.tsx`** cada 10s: si caemos al boundary
+   nuestro (no al del browser), se recupera solo sin operador.
+
+### Alternativa descartada
+
+- **Instalar un navegador kiosko (Fully Kiosk Browser) en el Stick
+  TV.** Es la solución estándar de la industria para cartelería
+  digital y resuelve también el caso de cold-start con red caída.
+  El cliente la descartó: no quiere mantener una app extra en el
+  Stick, prefiere que el problema viva dentro del código del
+  proyecto.
+
+### Limitación honesta
+
+El Service Worker se instala **después** del primer load exitoso.
+Esto significa:
+
+- **Caso resuelto**: pantalla ya estaba andando + wifi se cae → SW
+  sirve cache → no se ve pantalla blanca. **Es el caso real
+  reportado.**
+- **Caso NO resuelto**: Stick TV se enciende desde cero con la wifi
+  caída → no hay SW instalado todavía → Chrome muestra error. Si
+  esto se vuelve problema, la solución es la app kiosko (ya
+  descartada) o una solución a nivel del Stick (router con UPS,
+  cron de reboot, etc.).
+
+### Estrategia de cache: network-first vs cache-first
+
+Elegimos **network-first** para TODO (incluyendo assets estáticos
+de `_next/static/*`). Pros y contras:
+
+- **Pros**: garantiza que online siempre vemos data fresca. Si el
+  cliente subió un precio nuevo, lo vemos en el próximo
+  `router.refresh()`, no en el siguiente boot.
+- **Contras**: cada request paga el round-trip a la red incluso si
+  está cacheado. Para assets hasheados de Next esto es un poco
+  redundante (los hashes ya garantizan inmutabilidad), pero la
+  pérdida es marginal en una pantalla 16:9 que carga 1 sola vez por
+  boot y después solo refresca data via RSC.
+- **Por qué no cache-first para `/_next/static/*`**: agregaría
+  complejidad al SW (path matching, dos estrategias) sin beneficio
+  real para este caso de uso. La simplicidad gana.
+
+### Riesgo: SW pegajoso con código bugueado
+
+Service Workers son notoriamente difíciles de "desinstalar" en
+producción. Si shipeo un SW bugueado, queda atascado en el Stick
+TV indefinidamente hasta que alguien limpie cache manualmente.
+
+**Mitigaciones aplicadas:**
+
+1. **Versionado del cache** (`CACHE_VERSION = 'micro-landing-v1'`).
+   Cada bump invalida todas las caches viejas en el `activate`.
+2. **`skipWaiting()` + `clients.claim()`** en `install`/`activate`:
+   cuando un SW nuevo se descarga, toma control inmediatamente sin
+   esperar a que se cierren tabs (en el Stick no hay multiples
+   tabs).
+3. **Headers en `next.config.ts`**: `/sw.js` se sirve con
+   `Cache-Control: public, max-age=0, must-revalidate` para que el
+   navegador revalide el SW en cada navegación. Sin esto, Vercel
+   podría cachear `/sw.js` con TTL largo y el SW viejo seguiría
+   vigente días/semanas.
+4. **Registro solo en producción**: en dev (`NODE_ENV !==
+   'production'`) el SW no se registra. Evita pesadillas de cache
+   stale durante desarrollo.
+
+### Kill switch de emergencia
+
+Si en algún momento el SW genera problemas serios y necesitamos
+desactivarlo en producción rápido, el camino es:
+
+1. Reemplazar `public/sw.js` por un script que se auto-desinstala:
+
+```js
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', async (event) => {
+  const keys = await caches.keys()
+  await Promise.all(keys.map((k) => caches.delete(k)))
+  const clients = await self.clients.matchAll()
+  clients.forEach((c) => c.navigate(c.url))
+  await self.registration.unregister()
+})
+```
+
+2. Deploy a Vercel.
+3. La próxima vez que el Stick recargue, este SW reemplaza al
+   anterior, limpia todas las caches, se desregistra y recarga la
+   página. Después de eso, la app vuelve al estado pre-SW.
+
+Documentado por si llega ese momento — no se aplica todavía.
+
+---
+
 ## 2026-05-25 — Tamaño de imagen por-oferta: escala discreta 1-5 vía Sheets
 
 ### Problema

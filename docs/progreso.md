@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 25/05/2026 (sesión 5).
+Actualizado al 25/05/2026 (sesión 6).
 
 ---
 
@@ -78,6 +78,41 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 6 (25/05/2026) — Resiliencia a wifi inestable: Service Worker + recovery**:
+  - **`public/sw.js`** nuevo: Service Worker con estrategia
+    network-first y fallback a cache. Intercepta todos los GET
+    same-origin. Cuando la wifi del local se cae, sirve la última
+    versión cacheada en vez de dejar que el navegador del Stick TV
+    muestre `ERR_INTERNET_DISCONNECTED`.
+  - **`components/ServiceWorkerRegistrar.tsx`** nuevo: Client
+    Component minúsculo que registra el SW. Solo en producción para
+    evitar pesadillas de cache en dev. Montado desde `layout.tsx`.
+  - **`next.config.ts`**: nuevo `headers()` que sirve `/sw.js` con
+    `Cache-Control: max-age=0, must-revalidate` + `Service-Worker-
+    Allowed: /`. Sin esto, Vercel cachearía el SW con TTL largo y
+    quedaríamos atascados con un SW viejo en producción.
+  - **`app/error.tsx`**: agregado `setInterval` que llama a `reset()`
+    cada 10s. Si caemos al boundary nuestro, se recupera solo (no
+    requiere control remoto).
+  - **`PantallaRotativa.tsx`**: agregado listener `window.online` →
+    `router.refresh()`. Cuando vuelve la wifi sin matar la app,
+    sincroniza data al toque en vez de esperar al próximo tick del
+    intervalo.
+  - **Caso real reportado en producción que motivó esta sesión**:
+    Stick TV con Android TV genérico mostraba pantalla blanca con
+    `ERR_INTERNET_DISCONNECTED` cuando la wifi del local fluctuaba.
+    Requería refresh manual con el control remoto.
+  - **Limitación conocida y documentada**: el SW se instala
+    *después* del primer load exitoso. Si el Stick arranca con la
+    wifi caída, el SW no existe todavía y Chrome muestra su error.
+    Caso muy raro (el Stick suele encenderse con red OK).
+  - **Kill switch documentado**: en `docs/decisiones.md` hay un
+    snippet listo para desactivar el SW en producción si causara
+    problemas. Solo aplicar si hace falta.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓ headers de `/sw.js` confirmados en
+    `.next/routes-manifest.json`.
 
 - **Sesión 5 (25/05/2026) — Feature: tamaño de imagen por-oferta + tweak de tabla**:
   - **Nueva columna opcional `tamaño` en la pestaña de ofertas del

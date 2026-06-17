@@ -53,6 +53,21 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
     return () => window.clearInterval(intervalId)
   }, [router, minutosActualizacion])
 
+  // Cuando la wifi del local se cae y vuelve sin matar la app (caso comun
+  // en el Stick TV), forzamos un refresh para sincronizar datos en vez de
+  // esperar al proximo tick del intervalo. Combina con el Service Worker:
+  // el SW evita que se vea la pantalla blanca del browser, este listener
+  // se asegura de que apenas vuelva la red la data se actualice.
+  useEffect(() => {
+    const handleOnline = () => {
+      startTransition(() => {
+        router.refresh()
+      })
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [router])
+
   // Rotacion entre tabla de precios y cartel de oferta.
   // Las dependencias se limitan a longitudes y duraciones para evitar reschedulings espurios;
   // los setters funcionales evitan closures rancias sin necesidad de listar los indices.

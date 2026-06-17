@@ -20,6 +20,18 @@ export default function Error({ error, reset }: ErrorProps) {
     console.error('[micro-landing] error boundary:', error)
   }, [error])
 
+  // Auto-retry cada 10s. La pantalla se ve en la vidriera del local sin
+  // operador cerca, asi que el boton "Reintentar" tiene que activarse solo.
+  // Si la red sigue caida, reset() vuelve a fallar y entramos de nuevo al
+  // boundary — comportamiento aceptable, no se rompe nada. Cuando vuelve
+  // la red, el siguiente intento se renderiza la pantalla normal.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      reset()
+    }, 10_000)
+    return () => window.clearInterval(id)
+  }, [reset])
+
   return (
     <main
       style={{

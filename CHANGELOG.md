@@ -5,6 +5,52 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 6 — 2026-05-25 (Resiliencia a wifi inestable: Service Worker)
+
+**Context**: en producción, el Stick TV mostraba pantalla blanca con
+`ERR_INTERNET_DISCONNECTED` cuando la wifi del local fluctuaba.
+Requería intervención manual con el control remoto.
+
+**Added**
+- **`public/sw.js`** — Service Worker con estrategia network-first
+  + cache fallback. Intercepta GET same-origin, cachea respuestas
+  OK, sirve cache cuando la red falla. El navegador nunca ve un
+  fetch fallado, por lo que no muestra su página de error.
+- **`components/ServiceWorkerRegistrar.tsx`** — Client Component
+  que registra el SW. Solo activo en producción
+  (`NODE_ENV === 'production'`). Montado desde `app/layout.tsx`.
+- **`next.config.ts → headers()`** — sirve `/sw.js` con
+  `Cache-Control: public, max-age=0, must-revalidate` y
+  `Service-Worker-Allowed: /` para evitar que Vercel cachee el SW
+  con TTL largo y nos deje atascados con una versión vieja.
+- **Listener `window.online`** en `PantallaRotativa.tsx` → dispara
+  `router.refresh()` cuando vuelve la wifi sin que la app haya
+  muerto.
+- **Auto-retry en `app/error.tsx`** cada 10 segundos. Si caemos al
+  boundary nuestro, se recupera solo sin intervención.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito. Headers de `/sw.js` confirmados leyendo
+  `.next/routes-manifest.json` (`Cache-Control: max-age=0,
+  must-revalidate` + `Service-Worker-Allowed: /`).
+
+**Doc updates**
+- `docs/decisiones.md`: ADR completo "Service Worker para resistir
+  caídas de wifi en el Stick TV" con problema, decisión, alternativa
+  descartada (Fully Kiosk Browser, rechazada por el cliente),
+  limitación honesta (no cubre cold start con red caída), estrategia
+  de cache, y **kill switch documentado** para desactivar el SW
+  en producción si causara problemas.
+
+**Known limitation**
+- El SW se instala *después* del primer load exitoso. Si el Stick
+  TV arranca con la wifi caída, el SW no está y Chrome muestra
+  ERR_INTERNET_DISCONNECTED. Caso poco frecuente.
+
+---
+
 ### Sesión 5 — 2026-05-25 (Feature: tamaño imagen por-oferta + tweak tabla)
 
 **Added**
