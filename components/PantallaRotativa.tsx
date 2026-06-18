@@ -44,8 +44,16 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
   // Refresca los datos del Server Component periodicamente.
   // router.refresh() reusa el fetch cache del servidor (revalidate: 60),
   // por lo que las solicitudes nuevas a Google Sheets ocurren cuando expira la cache.
+  //
+  // Skip cuando `navigator.onLine === false`: si la wifi del local cayo,
+  // disparar el refresh igual genera un RSC fetch que va a fallar, y queremos
+  // evitar cualquier ciclo de errores en el cliente Next. Cuando la red
+  // vuelva, el listener `online` (mas abajo) hace el refresh inmediato.
+  // navigator.onLine no es 100% confiable (a veces dice true sin internet),
+  // pero cuando dice false podemos confiar.
   useEffect(() => {
     const intervalId = window.setInterval(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
       startTransition(() => {
         router.refresh()
       })

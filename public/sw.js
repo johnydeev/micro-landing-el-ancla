@@ -18,7 +18,14 @@
  * version, el SW borra todas las caches que no coincidan.
  */
 
-const CACHE_VERSION = 'micro-landing-v1'
+// v2: trata los RSC requests (router.refresh) por separado. Antes, cuando
+// fallaba la red y no habia RSC cacheado, devolviamos el HTML de `/` como
+// fallback — pero Next esperaba un payload RSC binario, no HTML. Eso
+// rompia el parser de React en el cliente y dejaba el main thread del
+// browser bloqueado: la rotacion se freezaba en una oferta y los inputs
+// del control remoto no respondian. Ahora un RSC sin cache propio falla
+// limpio y Next lo maneja internamente sin romper nada.
+const CACHE_VERSION = 'micro-landing-v2'
 
 self.addEventListener('install', () => {
   // Skip waiting para que un SW nuevo desplace al viejo en cuanto se descarga,
@@ -55,11 +62,30 @@ self.addEventListener('fetch', (event) => {
   // defensivo). Vercel sirve _next/* desde el mismo origen.
   if (url.origin !== self.location.origin) return
 
-  event.respondWith(handleFetch(req))
+  event.respondWith(handleFetch(req, url))
 })
 
-async function handleFetch(req) {
+/*
+ * Distingue requests RSC (los que dispara router.refresh y la navegacion
+ * client-side de Next) de navegaciones HTML normales.
+ *
+ * - URL con `?_rsc=...`: Next agrega ese query param en todos los RSC
+ *   fetches client-side.
+ * - Header `RSC: 1` o `Next-Router-State-Tree`: presentes en RSC fetches.
+ *
+ * Importa diferenciar porque RSC y HTML tienen content-types distintos
+ * y el cliente Next rompe si recibe HTML donde esperaba un payload RSC.
+ */
+function esRscRequest(req, url) {
+  if (url.searchParams.has('_rsc')) return true
+  if (req.headers.get('RSC')) return true
+  if (req.headers.get('Next-Router-State-Tree')) return true
+  return false
+}
+
+async function handleFetch(req, url) {
   const cache = await caches.open(CACHE_VERSION)
+  const isRsc = esRscRequest(req, url)
 
   try {
     const response = await fetch(req)
@@ -73,20 +99,28 @@ async function handleFetch(req) {
     return response
   } catch (networkError) {
     // La red fallo (typicamente porque la wifi del local se cayo).
-    // Intentamos devolver la version cacheada.
+    // Intentamos devolver la version cacheada del mismo request.
     const cached = await cache.match(req)
     if (cached) return cached
 
-    // Ultimo recurso para navegaciones: devolver la home cacheada.
-    // Asi una navegacion fresca a una URL no cacheada igual muestra algo.
+    // RSC sin cache propio: dejar que falle. NUNCA devolver HTML aca —
+    // si Next recibe HTML donde esperaba RSC, rompe el parser de React
+    // y bloquea el main thread del browser (rotacion congelada + inputs
+    // muertos). Mejor que el refresh falle silenciosamente: Next maneja
+    // ese error internamente y simplemente no actualiza la data.
+    if (isRsc) {
+      throw networkError
+    }
+
+    // Para navegaciones HTML reales (full page load), el / cacheado es
+    // un buen ultimo recurso. Solo se llega aca si la URL pedida nunca
+    // se cacheo antes — situacion rara en una pantalla 16:9 con una sola ruta.
     if (req.mode === 'navigate') {
       const homepage = await cache.match('/')
       if (homepage) return homepage
     }
 
-    // No hay nada que servir. Propagamos el error (el browser veria
-    // ERR_INTERNET_DISCONNECTED). Esto solo deberia pasar en el primer
-    // load con red caida — situacion fuera del alcance del SW.
+    // No hay nada que servir. Propagamos el error original.
     throw networkError
   }
 }

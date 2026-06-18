@@ -85,6 +85,127 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-06-18 — Service Worker v2: distinguir RSC requests para no freezar el browser
+
+### Problema descubierto en producción
+
+Al día siguiente del deploy del SW v1 (sesión 6), el cliente reportó un
+nuevo comportamiento en el Stick TV cuando la wifi del local se cayó:
+
+- ✅ Ya **no** se mostraba la pantalla blanca de Chrome
+  (`ERR_INTERNET_DISCONNECTED`). El SW estaba haciendo su trabajo
+  principal.
+- ❌ Pero la rotación entre tabla de precios y carteles de oferta
+  **se congelaba en una sola muestra del ciclo**.
+- ❌ Y el control remoto del Stick TV **dejaba de responder**: no
+  pasaba al cursor de la app, ni al botón "atrás". El browser
+  quedaba completamente bloqueado.
+
+### Diagnóstico
+
+El SW v1 interceptaba **todos** los GET same-origin con la misma
+estrategia: network-first, fallback a cache, último recurso = HTML
+de `/`.
+
+Eso era OK para navegaciones HTML reales, pero Next.js dispara
+también **RSC requests** (router.refresh() y navegación
+client-side). Los RSC requests:
+
+- Llegan con `?_rsc=...` en la URL.
+- O traen header `RSC: 1` / `Next-Router-State-Tree`.
+- Esperan un **payload binario serializado** (`text/x-component`),
+  NO HTML.
+
+Cuando la wifi cayó:
+
+1. El timer de `router.refresh()` disparó un RSC fetch.
+2. Network falló (no hay wifi).
+3. SW v1 no encontró un RSC cacheado específico para esa URL.
+4. SW v1 cayó al "último recurso": devolvió el HTML de `/`.
+5. El cliente Next recibió HTML donde esperaba un payload RSC.
+6. El parser de React intentó deserializar HTML como RSC →
+   estado inconsistente.
+7. El main thread del browser quedó bloqueado intentando
+   "recuperarse" / loopeando.
+8. El `setInterval` de rotación seguía tickeando, pero
+   `setState` no causaba re-render (React stuck) → rotación
+   congelada visualmente.
+9. Los eventos de input del control remoto se encolan en el main
+   thread y nunca se procesan → botones no responden.
+
+El usuario tuvo que reiniciar el Stick físicamente.
+
+### Decisión
+
+**SW v2** distingue RSC requests de navegaciones HTML, y aplica
+estrategias separadas:
+
+```js
+function esRscRequest(req, url) {
+  if (url.searchParams.has('_rsc')) return true
+  if (req.headers.get('RSC')) return true
+  if (req.headers.get('Next-Router-State-Tree')) return true
+  return false
+}
+```
+
+- **Navegación HTML normal**: red → cache propio → `/` cacheado
+  como último recurso (igual que v1).
+- **RSC request**: red → cache propio. Si no hay cache → **dejar
+  fallar**. NUNCA servir HTML como fallback.
+
+La consecuencia: cuando la wifi cae, los `router.refresh()`
+periódicos fallan limpio. Next maneja ese error internamente
+(simplemente no actualiza la data, mantiene la última versión que
+tenía en memoria). El main thread no se bloquea. La rotación sigue
+funcionando con los datos cacheados en estado de React.
+
+### Defensa extra en el cliente
+
+Para reducir aún más la chance de error, agregamos un guard antes
+de disparar `router.refresh()`:
+
+```ts
+if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+```
+
+Si el browser sabe que está offline, no disparamos el refresh. Si
+sabemos que viene un fallo, mejor no intentarlo. El listener
+`window.online` (de la sesión 6) se encarga del refresh apenas
+vuelve la red.
+
+`navigator.onLine` es notoriamente poco confiable cuando dice
+`true` (puede haber wifi pero sin internet), pero cuando dice
+`false` es de fiar — el browser detectó pérdida total de
+conectividad de red.
+
+### Versionado del cache
+
+Bumpeamos `CACHE_VERSION` de `'micro-landing-v1'` a
+`'micro-landing-v2'`. El `activate` del SW v2 borra todas las
+caches que no coincidan con `v2`, eliminando cualquier RSC mal
+cacheado del v1 que pudiera tener mezcla de HTML.
+
+### Trade-offs
+
+- Cuando la wifi cae, los datos quedan en el estado que estaban en
+  el último refresh exitoso. Si pasaron varias horas sin red, los
+  precios podrían ser viejos. Aceptable — la alternativa (browser
+  congelado, requerir reinicio físico del Stick) es claramente peor.
+- Si Next.js cambia el formato de los headers/query params que
+  usan los RSC requests en una versión futura, `esRscRequest`
+  podría dejar de detectarlos. Mitigación: chequear esos
+  identificadores cuando se haga `next` upgrade major.
+
+### Cómo se detecta este bug en el futuro
+
+Si vuelve a pasar (rotación congelada + inputs muertos), el patrón
+es casi siempre el mismo: **algún fetch está devolviendo contenido
+del tipo equivocado al cliente Next**. Revisar el SW y agregar
+más checks de tipo de request si aparecen nuevos endpoints.
+
+---
+
 ## 2026-05-25 — Service Worker para resistir caídas de wifi en el Stick TV
 
 ### Problema

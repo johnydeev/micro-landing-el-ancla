@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 25/05/2026 (sesión 6).
+Actualizado al 18/06/2026 (sesión 7).
 
 ---
 
@@ -78,6 +78,35 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 7 (18/06/2026) — Hotfix: SW v2 distingue RSC requests**:
+  - **Reporte del cliente post-deploy de SW v1**: el SW evitó la
+    pantalla blanca, pero introdujo un bug nuevo. Cuando la wifi
+    caía, la rotación se congelaba en una oferta y los inputs del
+    control remoto del Stick TV dejaban de responder. Requería
+    reinicio físico.
+  - **Causa raíz identificada**: el SW v1 servía HTML como último
+    recurso para CUALQUIER request, incluyendo los RSC fetches que
+    dispara `router.refresh()`. Next esperaba un payload RSC
+    binario; al recibir HTML el parser de React se rompía y
+    bloqueaba el main thread del browser.
+  - **`public/sw.js`** — versión bumpeada a `v2`. Nueva función
+    `esRscRequest(req, url)` que detecta RSC fetches por:
+    1. Query param `?_rsc=...`
+    2. Header `RSC: 1`
+    3. Header `Next-Router-State-Tree`
+  - **Estrategia diferenciada**: navegación HTML sigue con el
+    fallback a `/` cacheado; RSC sin cache propio **falla limpio**
+    (Next maneja el error y mantiene los datos en memoria, sin
+    romper el cliente).
+  - **`PantallaRotativa.tsx`**: guard `if (navigator.onLine ===
+    false) return` antes del `router.refresh()` del intervalo. Si
+    sabemos que estamos offline, ni intentamos el refresh.
+  - **Versionado del cache**: el bump a `v2` invalida cualquier
+    cache contaminada con HTML donde debería haber RSC, que pudiera
+    haber quedado de v1.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0),
+    `next build` ✓.
 
 - **Sesión 6 (25/05/2026) — Resiliencia a wifi inestable: Service Worker + recovery**:
   - **`public/sw.js`** nuevo: Service Worker con estrategia

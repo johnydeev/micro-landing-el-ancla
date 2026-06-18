@@ -5,6 +5,52 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 7 — 2026-06-18 (Hotfix: SW v2 distingue RSC requests)
+
+**Context**: el día siguiente al deploy del SW v1 (sesión 6), el
+cliente reportó comportamiento nuevo en el Stick TV cuando se caía la
+wifi. La pantalla blanca ya no aparecía (✓ objetivo cumplido), pero la
+rotación se congelaba en una oferta y los inputs del control remoto no
+respondían. Requería reinicio físico del Stick.
+
+Causa raíz: el SW v1 servía HTML como último recurso para cualquier
+request, incluyendo los RSC fetches que dispara `router.refresh()`.
+Next esperaba payload RSC binario; al recibir HTML, el parser de
+React entraba en estado inconsistente y bloqueaba el main thread del
+browser.
+
+**Changed**
+- **`public/sw.js`** — versión bumpeada a `'micro-landing-v2'`.
+  Estrategias separadas:
+  - **Navegación HTML**: red → cache propio → `/` cacheado como
+    último recurso (igual que v1).
+  - **RSC requests**: red → cache propio → **fallar limpio si no hay
+    cache**. NUNCA servir HTML como fallback para RSC.
+- **`PantallaRotativa.tsx`** — el `setInterval` del refresh ahora
+  hace `if (navigator.onLine === false) return` antes de disparar
+  `router.refresh()`. Defensa en profundidad: si sabemos que estamos
+  offline, no intentamos. El listener `online` (de la sesión 6) se
+  encarga del refresh apenas vuelve la red.
+
+**Added**
+- **Función `esRscRequest(req, url)`** en `public/sw.js`. Detecta
+  RSC fetches por query param `?_rsc=...`, header `RSC: 1`, o header
+  `Next-Router-State-Tree`.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito. Cache version bumpeado garantiza que el
+  v2 deployado invalide el v1 en los Sticks.
+
+**Doc updates**
+- `docs/decisiones.md`: ADR nuevo "Service Worker v2: distinguir RSC
+  requests para no freezar el browser" con diagnóstico paso a paso,
+  decisión, trade-offs, y guía para detectar este tipo de bug en el
+  futuro.
+
+---
+
 ### Sesión 6 — 2026-05-25 (Resiliencia a wifi inestable: Service Worker)
 
 **Context**: en producción, el Stick TV mostraba pantalla blanca con
