@@ -1,7 +1,6 @@
 'use client'
 
-import { startTransition, useEffect, useState, type CSSProperties } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, type CSSProperties } from 'react'
 
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
@@ -31,8 +30,26 @@ interface PantallaRotativaProps {
   configRemota: ConfigNegocio
 }
 
-export default function PantallaRotativa({ listas, ofertas, configRemota }: PantallaRotativaProps) {
-  const router = useRouter()
+export default function PantallaRotativa({
+  listas: listasIniciales,
+  ofertas: ofertasIniciales,
+  configRemota: configRemotaInicial,
+}: PantallaRotativaProps) {
+  // Datos: arrancan con lo que vino del Server Component (primer paint
+  // instantaneo, sin loading), despues se actualizan via fetch a los
+  // endpoints /api/* cada `minutosActualizacion`.
+  //
+  // Por que NO usamos router.refresh() ya: vivimos un bug en produccion
+  // (sesion 7) donde el RSC fetch que dispara router.refresh dejaba a
+  // Next/React en un estado raro cuando la wifi del local se caia. El
+  // main thread del browser quedaba bloqueado: la rotacion se congelaba
+  // y el control remoto no respondia. Con fetch directo + setState
+  // tenemos control total: si la red falla, catcheamos, mantenemos datos
+  // viejos, la rotacion sigue. Cero interaccion con los internals de Next.
+  const [listas, setListas] = useState(listasIniciales)
+  const [ofertas, setOfertas] = useState(ofertasIniciales)
+  const [configRemota, setConfigRemota] = useState(configRemotaInicial)
+
   const [modo, setModo] = useState<'cartel' | 'tabla'>('tabla')
   const [cartelIndex, setCartelIndex] = useState(0)
   const [listaIndex, setListaIndex] = useState(0)
@@ -41,40 +58,65 @@ export default function PantallaRotativa({ listas, ofertas, configRemota }: Pant
   const segundosTabla = configRemota.segundosTabla ?? negocioConfig.segundosTabla
   const minutosActualizacion = configRemota.minutosActualizacion ?? negocioConfig.minutosActualizacion
 
-  // Refresca los datos del Server Component periodicamente.
-  // router.refresh() reusa el fetch cache del servidor (revalidate: 60),
-  // por lo que las solicitudes nuevas a Google Sheets ocurren cuando expira la cache.
-  //
-  // Skip cuando `navigator.onLine === false`: si la wifi del local cayo,
-  // disparar el refresh igual genera un RSC fetch que va a fallar, y queremos
-  // evitar cualquier ciclo de errores en el cliente Next. Cuando la red
-  // vuelva, el listener `online` (mas abajo) hace el refresh inmediato.
-  // navigator.onLine no es 100% confiable (a veces dice true sin internet),
-  // pero cuando dice false podemos confiar.
+  // Polling de datos via API endpoints + listener `online` para refrescar
+  // apenas vuelve la wifi. Todo en un solo useEffect porque comparten el
+  // cleanup y la misma funcion fetchAll.
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
-      startTransition(() => {
-        router.refresh()
-      })
-    }, minutosActualizacion * 60 * 1000)
-    return () => window.clearInterval(intervalId)
-  }, [router, minutosActualizacion])
+    let mounted = true
 
-  // Cuando la wifi del local se cae y vuelve sin matar la app (caso comun
-  // en el Stick TV), forzamos un refresh para sincronizar datos en vez de
-  // esperar al proximo tick del intervalo. Combina con el Service Worker:
-  // el SW evita que se vea la pantalla blanca del browser, este listener
-  // se asegura de que apenas vuelva la red la data se actualice.
-  useEffect(() => {
-    const handleOnline = () => {
-      startTransition(() => {
-        router.refresh()
-      })
+    const fetchAll = async () => {
+      // Skip si el browser sabe que no hay red. Evita el round-trip que
+      // sabemos que va a fallar. navigator.onLine no es confiable cuando
+      // dice true (a veces hay wifi sin internet), pero cuando dice false
+      // es de fiar (no hay conexion fisica de red).
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+
+      let listasNuevas: ListaPrecios[] | null = null
+      let ofertasNuevas: Oferta[] | null = null
+      let configNueva: ConfigNegocio | null = null
+
+      try {
+        const [resProductos, resOfertas, resConfig] = await Promise.all([
+          fetch('/api/productos').catch(() => null),
+          fetch('/api/ofertas').catch(() => null),
+          fetch('/api/config').catch(() => null),
+        ])
+
+        if (resProductos?.ok) {
+          const data: unknown = await resProductos.json()
+          if (Array.isArray(data)) listasNuevas = data as ListaPrecios[]
+        }
+        if (resOfertas?.ok) {
+          const data: unknown = await resOfertas.json()
+          if (Array.isArray(data)) ofertasNuevas = data as Oferta[]
+        }
+        if (resConfig?.ok) {
+          const data: unknown = await resConfig.json()
+          if (data && typeof data === 'object' && !Array.isArray(data)) {
+            configNueva = data as ConfigNegocio
+          }
+        }
+      } catch {
+        // Cualquier error de fetch/parse: silenciar y mantener los datos
+        // viejos. La pantalla nunca debe romperse por falla de red.
+      }
+
+      if (!mounted) return
+      if (listasNuevas) setListas(listasNuevas)
+      if (ofertasNuevas) setOfertas(ofertasNuevas)
+      if (configNueva) setConfigRemota(configNueva)
     }
+
+    const intervalId = window.setInterval(fetchAll, minutosActualizacion * 60 * 1000)
+    const handleOnline = () => fetchAll()
     window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [router])
+
+    return () => {
+      mounted = false
+      window.clearInterval(intervalId)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [minutosActualizacion])
 
   // Rotacion entre tabla de precios y cartel de oferta.
   // Las dependencias se limitan a longitudes y duraciones para evitar reschedulings espurios;

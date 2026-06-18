@@ -85,6 +85,118 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-06-18 — Sacar `router.refresh()` y pasar a fetch + useState
+
+### Problema
+
+Después del deploy del SW v2 (mismo día), el cliente reportó que el
+bug de freeze del Stick TV **seguía pasando**:
+
+- La rotación volvía a quedar congelada en una vista del ciclo (esta
+  vez una tabla de precios, antes una oferta).
+- El control remoto seguía sin responder.
+- Confirmado por el cliente: la TV se apaga al fin de la jornada y
+  se enciende al día siguiente, así que la página se recarga limpia
+  cada mañana. **No era un problema de SW viejo cacheado** — el v2
+  estaba activo y aún así el bug ocurría.
+
+### Diagnóstico ampliado
+
+El SW v2 ya no servía HTML como fallback para RSC fetches (que era
+mi hipótesis inicial). Aún así el freeze volvió. Conclusión: el
+problema no estaba solo en cómo el SW manejaba el fallback, sino
+en cómo Next/React reaccionaban internamente cuando una RSC fetch
+fallaba con `NetworkError`.
+
+`router.refresh()` es una caja negra: no devuelve promesa, no se
+puede catchear, y el manejo de errores del fetch interno depende
+de la versión de Next. En este caso específico, parece que algún
+estado en el reconciler de React quedaba inconsistente cuando
+la RSC fetch fallaba con la red caída, **bloqueando el main
+thread del browser**.
+
+### Decisión
+
+**Eliminar `router.refresh()` del flujo y reemplazarlo por
+`fetch + useState` con los endpoints `/api/*` que ya existen**.
+
+Cambios concretos en `PantallaRotativa.tsx`:
+
+1. Datos pasan a estado local: `useState(listasIniciales)`,
+   `useState(ofertasIniciales)`, `useState(configRemotaInicial)`.
+   El Server Component sigue pasando los datos iniciales por
+   props (primer paint instantáneo desde el SSR).
+2. Un `useEffect` único maneja:
+   - Polling cada `minutosActualizacion` minutos.
+   - Listener `online` para refrescar al volver la red.
+3. La función `fetchAll`:
+   - Skip si `navigator.onLine === false`.
+   - `Promise.all` a `/api/productos`, `/api/ofertas`,
+     `/api/config` con `.catch(() => null)` por endpoint.
+   - Validación defensiva del shape antes de aplicar
+     (`Array.isArray`, `typeof === 'object'`).
+   - `try/catch` global que silencia cualquier error de
+     parseo. **Nunca actualiza estado si algo falló.**
+4. Removidos `useRouter` y `startTransition`.
+
+### Por qué esto resuelve el bug
+
+| Aspecto | Con `router.refresh()` | Con `fetch + useState` |
+|---|---|---|
+| Manejo de errores | Caja negra de Next | Try/catch explícito |
+| Si la red falla | Next decide qué hacer | No actualizamos estado, fin |
+| Si la respuesta viene mal | Puede romper React | Validamos antes |
+| Impacto en main thread | Posible bloqueo | Cero |
+| Datos viejos en pantalla | Sí (sin saber por qué) | Sí (por diseño explícito) |
+| Recovery cuando vuelve la red | Implícito | Próximo tick o evento `online` |
+
+El cambio clave: **el fetch normal devuelve una Promise que podemos
+catchear**. `router.refresh()` no. Esa diferencia es la que nos
+permite garantizar que un error de red NUNCA toque los internals
+de Next.
+
+### Trade-offs
+
+- **Doble fetch en cada poll** (cliente al server, server al
+  Sheets). Antes era uno solo: el RSC fetch hacía que el server
+  re-renderizara y el server llamaba a Sheets. Ahora el cliente
+  llama a `/api/*` y cada handler llama a `lib/sheets.ts`. Pero
+  los handlers reusan la cache `fetch({ next: { revalidate: 60 } })`
+  de `lib/sheets.ts`, así que la llamada real a Sheets sigue
+  siendo cada 60s máximo.
+- **La pantalla nunca re-renderiza el Server Component después
+  del primer load.** Si en algún momento queremos cambios de
+  layout/estructura via Server Component, hay que volver a meter
+  router.refresh (con su riesgo). Para este proyecto no aplica:
+  el layout es fijo, solo los datos cambian.
+- **El `revalidate: 60` del page.tsx queda academicamente
+  configurado**. Sigue aplicando para visitas frescas (cuando
+  el Stick se enciende a la mañana), no para la app corriendo.
+
+### SW bumpeado a v3
+
+Cambio de comportamiento en cliente → bump de cache version. Eso
+garantiza que la próxima vez que el Stick boote, descargue el
+HTML/JS nuevo (sin `router.refresh()`) en vez de servir el
+cacheado v2.
+
+### Cómo verificar que el bug se fue
+
+Después del deploy + reload del Stick:
+
+1. Dejar la pantalla andando con la rotación normal.
+2. Apagar el router 30-60 segundos.
+3. **Resultado esperado**:
+   - Pantalla blanca: NO (SW sirve cache).
+   - Rotación: SIGUE funcionando con los datos en memoria.
+   - Control remoto: RESPONDE normalmente.
+4. Prender el router.
+5. En el próximo tick del intervalo (o inmediatamente por el
+   `online` listener), `fetchAll` se ejecuta, trae datos
+   frescos, los aplica.
+
+---
+
 ## 2026-06-18 — Service Worker v2: distinguir RSC requests para no freezar el browser
 
 ### Problema descubierto en producción

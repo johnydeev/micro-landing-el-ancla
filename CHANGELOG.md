@@ -5,6 +5,55 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 8 — 2026-06-18 (Hotfix definitivo: sacar router.refresh)
+
+**Context**: el v2 (sesión 7) no resolvió el bug. El cliente reportó
+horas después que la rotación volvía a congelarse en una vista del
+ciclo (una tabla esta vez) y el control remoto seguía sin responder.
+Confirmado: la TV se apaga al fin de jornada y se enciende a la
+mañana → la página carga JS limpio cada día → el bug no era de SW
+viejo cacheado, era de Next/React manejando mal los errores de
+`router.refresh()` ante fallos de red.
+
+**Removed**
+- `useRouter` y `startTransition` en `PantallaRotativa.tsx`.
+- Los dos `useEffect` que hacían `router.refresh()` (uno periódico,
+  otro en `online`).
+
+**Changed**
+- **`PantallaRotativa.tsx` reescrito**: datos ahora viven en
+  `useState`, inicializados desde props del Server Component. Un
+  único `useEffect` maneja:
+  - Polling cada `minutosActualizacion` con `fetch` directo a
+    `/api/productos`, `/api/ofertas`, `/api/config`.
+  - Listener `window.online` para refrescar al volver la red.
+  - Skip si `navigator.onLine === false`.
+  - `try/catch` global + validación de shape antes de aplicar
+    estado. Si algo falla, mantiene los datos viejos.
+- **`public/sw.js`** — `CACHE_VERSION` bumpeado a `'micro-landing-v3'`
+  para forzar invalidación del cache anterior y que los Sticks
+  descarguen el JS sin `router.refresh()`.
+
+**Why**
+- `router.refresh()` es caja negra: no devuelve promesa, no se puede
+  catchear, el manejo de errores depende de Next interno. Con `fetch`
+  directo tenemos control total: error de red → no actualizamos
+  estado → pantalla sigue viva con datos viejos.
+- Los endpoints `/api/*` ya existían (sesión 1 + sesión 2
+  documentados en `docs/api.md`). No hubo que construir nada nuevo.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito.
+
+**Doc updates**
+- `docs/decisiones.md`: ADR completo "Sacar `router.refresh()` y
+  pasar a fetch + useState" con diagnóstico ampliado, tabla
+  comparativa, trade-offs.
+
+---
+
 ### Sesión 7 — 2026-06-18 (Hotfix: SW v2 distingue RSC requests)
 
 **Context**: el día siguiente al deploy del SW v1 (sesión 6), el

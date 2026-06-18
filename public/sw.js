@@ -18,6 +18,14 @@
  * version, el SW borra todas las caches que no coincidan.
  */
 
+// v3: el cliente ya no usa router.refresh (sesion 8 — pasamos a fetch a
+// /api/* + useState). Eso significa que ya no hay RSC requests periodicos
+// que pudieran romper el browser cuando falla la red, asi que la
+// distincion RSC/HTML del v2 quedo academica. Igual la mantenemos por las
+// dudas (navegacion directa a la URL podria seguir generando RSC).
+// Bumpeamos a v3 para que los Sticks invaliden el cache viejo y descarguen
+// el nuevo HTML/JS que NO incluye router.refresh.
+//
 // v2: trata los RSC requests (router.refresh) por separado. Antes, cuando
 // fallaba la red y no habia RSC cacheado, devolviamos el HTML de `/` como
 // fallback — pero Next esperaba un payload RSC binario, no HTML. Eso
@@ -25,7 +33,7 @@
 // browser bloqueado: la rotacion se freezaba en una oferta y los inputs
 // del control remoto no respondian. Ahora un RSC sin cache propio falla
 // limpio y Next lo maneja internamente sin romper nada.
-const CACHE_VERSION = 'micro-landing-v2'
+const CACHE_VERSION = 'micro-landing-v3'
 
 self.addEventListener('install', () => {
   // Skip waiting para que un SW nuevo desplace al viejo en cuanto se descarga,

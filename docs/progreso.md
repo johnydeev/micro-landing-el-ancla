@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 18/06/2026 (sesión 7).
+Actualizado al 18/06/2026 (sesión 8).
 
 ---
 
@@ -78,6 +78,44 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 8 (18/06/2026) — Hotfix definitivo: sacar `router.refresh()`,
+  pasar a fetch + useState**:
+  - **El v2 (sesión 7) no resolvió el bug** completamente. El
+    cliente reportó al día siguiente que la rotación volvió a
+    congelarse en una vista del ciclo (esta vez una tabla) y el
+    control remoto seguía sin responder. Confirmado que la página se
+    recargaba limpia cada mañana (la TV se apaga al fin de la
+    jornada), o sea no era cache vieja — el v2 estaba activo y aún
+    así el bug ocurría.
+  - **Diagnóstico ampliado**: `router.refresh()` es caja negra. No
+    devuelve promesa, no se puede catchear, y el manejo de errores
+    interno de Next ante fallas de red no es confiable en este
+    Stick TV. Sin importar cómo manejara el SW las RSC requests,
+    Next reaccionaba mal al `NetworkError` y bloqueaba el main
+    thread.
+  - **Cambio arquitectónico**: `PantallaRotativa.tsx` reescrito
+    para usar `useState` + `fetch` directo a los endpoints
+    `/api/productos`, `/api/ofertas`, `/api/config` (que ya
+    existían desde la sesión 1). Removidos `useRouter` y
+    `startTransition`.
+  - **Datos iniciales**: siguen viniendo del Server Component por
+    props (primer paint instantáneo). Después, polling cada
+    `minutosActualizacion` actualiza estado local.
+  - **Manejo de errores defensivo**: `Promise.all` con
+    `.catch(() => null)` por endpoint + `try/catch` global +
+    validación de shape (`Array.isArray`, `typeof === 'object'`)
+    antes de hacer setState. Si algo falla, no se actualiza —
+    rotación sigue con datos viejos, cero impacto.
+  - **`navigator.onLine === false` skip**: si el browser sabe que
+    no hay red, ni intenta el fetch.
+  - **`window.online` listener**: cuando vuelve la red, dispara
+    `fetchAll()` inmediato sin esperar al próximo tick.
+  - **SW bumpeado a v3**: garantiza que los Sticks descarguen
+    el JS nuevo (sin `router.refresh()`) y no sigan corriendo
+    código viejo cacheado.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0),
+    `next build` ✓.
 
 - **Sesión 7 (18/06/2026) — Hotfix: SW v2 distingue RSC requests**:
   - **Reporte del cliente post-deploy de SW v1**: el SW evitó la
