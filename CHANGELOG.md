@@ -5,6 +5,85 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 10 — 2026-06-23 (Polling eliminado + reload horario + HealthIndicator)
+
+**Context**: el freeze del Stick TV seguía apareciendo después de
+sesiones 7-9 (~2 veces en 4 hs). El cliente reportó que también pasa
+en tablas de texto puro (sin imágenes) y sin corte de red, con
+periodicidad de ~2hs. Eso sugiere acumulación gradual de
+memoria/estado en el browser del Stick, no las causas que ya
+atacamos. Sin posibilidad de profilear remotamente, decidimos atacar
+el síntoma con prevención agresiva.
+
+**Removed**
+- **Polling client-side de `/api/productos`, `/api/ofertas`,
+  `/api/config`** desde `PantallaRotativa.tsx`. De ~4.320
+  fetches/día a ~25/día (-99.4%). Los endpoints siguen vivos
+  (documentados en `docs/api.md`), solo no los consume la pantalla.
+- **`useState` para `listas`/`ofertas`/`configRemota`** — ya no
+  hace falta, los datos vienen directo de props del Server Component
+  en cada reload.
+
+**Changed**
+- **`PantallaRotativa.tsx`**: rotation state refactoreado a
+  `useReducer` con `rotationReducer`. Anti-patrón eliminado: ya no
+  llamamos a `setCartelIndex`/`setModo` dentro del updater de
+  `setListaIndex`. Cada tick es un solo dispatch atómico que el
+  reducer convierte en la transición completa.
+- **`public/sw.js`**: `CACHE_VERSION` bumpeado a
+  `'micro-landing-v4'` para invalidar el cache del JS de sesión 8.
+
+**Added**
+- **`window.location.reload()` cada 1 hora** vía `setInterval` en
+  un `useEffect` dedicado. Doble propósito: refresh de datos (vía
+  re-SSR) y reset preventivo de cualquier acumulación de memoria
+  o listeners del browser.
+- **`components/HealthIndicator.tsx`** — Client Component minúsculo
+  que muestra un dot semi-transparente arriba a la derecha del
+  `.screen`:
+  - 🟢 verde: online
+  - 🔴 rojo: offline
+  - ⚪ gris: durante SSR / antes de hidratar
+  - Usa `useSyncExternalStore` (patrón moderno R18+) para
+    suscribirse a `online`/`offline` events sin polling.
+- **`app/page.module.css`**: `.screen` ahora tiene
+  `position: relative` para que el HealthIndicator se posicione
+  `absolute` relativo al área de pantalla.
+
+**Decided / Discarded**
+- **Webhook server → cliente** (propuesta del cliente). Descartado
+  por restricciones técnicas: el Stick TV está detrás de NAT (no
+  alcanzable desde internet), Vercel free tier no soporta
+  WebSocket/SSE long-lived. Para updates urgentes el operador
+  power-cycla la TV (15 seg); caso normal espera al próximo reload
+  horario.
+
+**Trade-offs**
+- Datos pueden tener hasta 1 hora de retraso entre edición en
+  Sheets y aparición en pantalla. Aceptable para precios de
+  carnicería.
+- El reload horario funciona como **prevención** del freeze, no
+  como recovery: si el thread ya está muerto cuando llega el
+  momento del reload, no se ejecuta. Si esto sigue siendo
+  insuficiente, la próxima iteración sería un watchdog vía Service
+  Worker.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0). Lint nuevo de React 19
+  (`set-state-in-effect`) requirió usar `useSyncExternalStore` en
+  vez de `useState + useEffect` en HealthIndicator — quedó
+  cumplido.
+- `npm run build`: éxito.
+
+**Doc updates**
+- `docs/decisiones.md`: ADR completo con problema, decisión,
+  trade-offs, alternativa descartada (webhook), e hipótesis sobre
+  cuál de los tres frentes ya atacados sería el responsable real
+  si el freeze desaparece.
+
+---
+
 ### Sesión 9 — 2026-06-23 (Restauración de trabajo perdido por merge)
 
 **Context**: el 19/06 una sesión Claude paralela optimizó las 17

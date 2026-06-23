@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 23/06/2026 (sesión 9).
+Actualizado al 23/06/2026 (sesión 10).
 
 ---
 
@@ -78,6 +78,46 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 10 (23/06/2026) — Eliminar polling, reload horario, HealthIndicator**:
+  - **Contexto**: el freeze del Stick TV persistía después de las
+    sesiones 7-9 (~2 veces en 4 horas). Datos del cliente cambiaron
+    el diagnóstico: freeza también en tablas de texto (no solo
+    carteles con imagen), sin corte de red, periodicidad ~2hs.
+    Sugiere acumulación de memoria/listeners/estado de React, no las
+    causas que ya habíamos atacado.
+  - **`PantallaRotativa.tsx` reescrita**:
+    - Eliminado el polling de `/api/*` completamente. Los datos
+      vienen ahora **solo de props** del Server Component. De
+      ~4.320 fetches/día a ~25/día (12 reloads × 3 endpoints vía
+      SSR). **Reducción del 99.4%**.
+    - **Reload completo cada 1 hora** vía `window.location.reload()`.
+      Doble propósito: refrescar datos (re-ejecuta el SSR) y
+      resetear cualquier acumulación del browser (memoria,
+      listeners, estado de React).
+    - **Refactor del rotation state a `useReducer`**: ya no hay
+      `setCartelIndex(0)` y `setModo('cartel')` *dentro* del updater
+      de `setListaIndex`. Un solo dispatch atómico por tick, sin
+      anti-patrones de React.
+  - **`components/HealthIndicator.tsx` nuevo**: indicador chico
+    arriba a la derecha del `.screen`. Usa `useSyncExternalStore`
+    (patrón moderno de React 18+) para suscribirse a los eventos
+    `online`/`offline` del browser. Verde si online, rojo si offline,
+    gris durante SSR. ~10-14px, opacidad 0.6 — discreto para el
+    público, visible para el operador.
+  - **`app/page.module.css`**: `.screen` pasó a `position: relative`
+    para crear el contexto donde el HealthIndicator se posiciona
+    `absolute`.
+  - **`public/sw.js`**: `CACHE_VERSION` bumpeado a `'micro-landing-v4'`
+    para forzar invalidación del JS viejo (el de la sesión 8 con
+    polling) y descargar el bundle nuevo.
+  - **Webhook descartado** (era propuesta del cliente). Razones
+    técnicas en `docs/decisiones.md`: el Stick no es alcanzable
+    desde internet, Vercel free tier no soporta long-lived
+    connections. Para updates urgentes el operador power-cycla la
+    TV; caso contrario espera el próximo reload horario.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓.
 
 - **Sesión 9 (23/06/2026) — Restauración del trabajo perdido por
   merge mal-resuelto + optimización de imagen nueva**:

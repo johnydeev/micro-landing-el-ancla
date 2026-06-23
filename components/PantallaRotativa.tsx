@@ -1,12 +1,72 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useReducer, useState, type CSSProperties } from 'react'
 
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
+import HealthIndicator from '@/components/HealthIndicator'
 import { negocioConfig } from '@/config/negocio'
 import type { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
 import styles from '@/app/page.module.css'
+
+/*
+ * Cada cuanto la pantalla se reloadea completa. El reload completo es
+ * nuestro mecanismo unico de actualizacion de datos (no hay polling).
+ * Cada reload re-ejecuta el Server Component que va a Sheets (cache de
+ * 60s en lib/sheets.ts) y obtiene la version mas fresca. Ademas resetea
+ * cualquier acumulacion de memoria/estado del browser — funciona como
+ * safety net contra el freeze residual del Stick TV (sesion 10).
+ *
+ * 1 hora = balance entre frescura de datos y reset preventivo.
+ */
+const RELOAD_INTERVAL_MS = 60 * 60 * 1000
+
+/*
+ * Estado de la rotacion entre tabla de precios y cartel de oferta,
+ * manejado con useReducer para tener una sola transicion atomica por
+ * tick. Antes usabamos 3 useState separados (modo, listaIndex,
+ * cartelIndex) y las transiciones entre modos requerian llamar a un
+ * setter dentro del updater de otro setter — anti-patron de React que
+ * puede causar dispatches duplicados o estados inconsistentes
+ * acumulativos. El reducer resuelve todo en una sola actualizacion.
+ */
+type RotationState = {
+  modo: 'tabla' | 'cartel'
+  listaIndex: number
+  cartelIndex: number
+}
+
+type RotationAction = {
+  type: 'tick'
+  listasCount: number
+  ofertasCount: number
+}
+
+function rotationReducer(state: RotationState, action: RotationAction): RotationState {
+  const { listasCount, ofertasCount } = action
+
+  if (state.modo === 'tabla') {
+    if (state.listaIndex < listasCount - 1) {
+      return { ...state, listaIndex: state.listaIndex + 1 }
+    }
+    if (ofertasCount > 0) {
+      return { modo: 'cartel', listaIndex: 0, cartelIndex: 0 }
+    }
+    return { ...state, listaIndex: 0 }
+  }
+
+  // modo === 'cartel'
+  if (state.cartelIndex < ofertasCount - 1) {
+    return { ...state, cartelIndex: state.cartelIndex + 1 }
+  }
+  return { modo: 'tabla', listaIndex: 0, cartelIndex: 0 }
+}
+
+const ROTATION_INITIAL: RotationState = {
+  modo: 'tabla',
+  listaIndex: 0,
+  cartelIndex: 0,
+}
 
 function formatPrecio(precio: string): string {
   // El cliente carga precios en Sheets, y puede usar formato AR ("1.500,50",
@@ -31,121 +91,54 @@ interface PantallaRotativaProps {
 }
 
 export default function PantallaRotativa({
-  listas: listasIniciales,
-  ofertas: ofertasIniciales,
-  configRemota: configRemotaInicial,
+  listas,
+  ofertas,
+  configRemota,
 }: PantallaRotativaProps) {
-  // Datos: arrancan con lo que vino del Server Component (primer paint
-  // instantaneo, sin loading), despues se actualizan via fetch a los
-  // endpoints /api/* cada `minutosActualizacion`.
-  //
-  // Por que NO usamos router.refresh() ya: vivimos un bug en produccion
-  // (sesion 7) donde el RSC fetch que dispara router.refresh dejaba a
-  // Next/React en un estado raro cuando la wifi del local se caia. El
-  // main thread del browser quedaba bloqueado: la rotacion se congelaba
-  // y el control remoto no respondia. Con fetch directo + setState
-  // tenemos control total: si la red falla, catcheamos, mantenemos datos
-  // viejos, la rotacion sigue. Cero interaccion con los internals de Next.
-  const [listas, setListas] = useState(listasIniciales)
-  const [ofertas, setOfertas] = useState(ofertasIniciales)
-  const [configRemota, setConfigRemota] = useState(configRemotaInicial)
-
-  const [modo, setModo] = useState<'cartel' | 'tabla'>('tabla')
-  const [cartelIndex, setCartelIndex] = useState(0)
-  const [listaIndex, setListaIndex] = useState(0)
+  // Los datos vienen DIRECTO de props del Server Component. No hay polling
+  // client-side: cada `RELOAD_INTERVAL_MS` la pantalla se reloadea completa
+  // y el Server Component vuelve a SSR con datos frescos. Bajamos de ~4300
+  // peticiones/dia (polling cada 1min) a ~25/dia. Ademas el reload completo
+  // resetea cualquier acumulacion de memoria/listeners en el browser.
+  const [{ modo, listaIndex, cartelIndex }, dispatchRotation] = useReducer(
+    rotationReducer,
+    ROTATION_INITIAL,
+  )
 
   const segundosCartel = configRemota.segundosCartel ?? negocioConfig.segundosCartel
   const segundosTabla = configRemota.segundosTabla ?? negocioConfig.segundosTabla
-  const minutosActualizacion = configRemota.minutosActualizacion ?? negocioConfig.minutosActualizacion
 
-  // Polling de datos via API endpoints + listener `online` para refrescar
-  // apenas vuelve la wifi. Todo en un solo useEffect porque comparten el
-  // cleanup y la misma funcion fetchAll.
+  // Reload completo periodico. Doble proposito:
+  //   1. Refresca datos sin tener que pollear (el Server Component vuelve
+  //      a SSR contra Sheets).
+  //   2. Resetea cualquier acumulacion de memoria/leak del browser, que
+  //      es la sospecha mas fuerte para los freezes residuales en el
+  //      Stick TV (que ocurren tambien en tablas de texto sin imagenes,
+  //      descartando memoria de decodificacion como unica causa).
+  //
+  // location.reload() corre en el main thread. Si el thread esta freezado,
+  // no se ejecuta — pero entonces el daño ya esta hecho. Funciona como
+  // PREVENCION del freeze, no como recovery.
   useEffect(() => {
-    let mounted = true
+    const id = window.setInterval(() => {
+      window.location.reload()
+    }, RELOAD_INTERVAL_MS)
+    return () => window.clearInterval(id)
+  }, [])
 
-    const fetchAll = async () => {
-      // Skip si el browser sabe que no hay red. Evita el round-trip que
-      // sabemos que va a fallar. navigator.onLine no es confiable cuando
-      // dice true (a veces hay wifi sin internet), pero cuando dice false
-      // es de fiar (no hay conexion fisica de red).
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
-
-      let listasNuevas: ListaPrecios[] | null = null
-      let ofertasNuevas: Oferta[] | null = null
-      let configNueva: ConfigNegocio | null = null
-
-      try {
-        const [resProductos, resOfertas, resConfig] = await Promise.all([
-          fetch('/api/productos').catch(() => null),
-          fetch('/api/ofertas').catch(() => null),
-          fetch('/api/config').catch(() => null),
-        ])
-
-        if (resProductos?.ok) {
-          const data: unknown = await resProductos.json()
-          if (Array.isArray(data)) listasNuevas = data as ListaPrecios[]
-        }
-        if (resOfertas?.ok) {
-          const data: unknown = await resOfertas.json()
-          if (Array.isArray(data)) ofertasNuevas = data as Oferta[]
-        }
-        if (resConfig?.ok) {
-          const data: unknown = await resConfig.json()
-          if (data && typeof data === 'object' && !Array.isArray(data)) {
-            configNueva = data as ConfigNegocio
-          }
-        }
-      } catch {
-        // Cualquier error de fetch/parse: silenciar y mantener los datos
-        // viejos. La pantalla nunca debe romperse por falla de red.
-      }
-
-      if (!mounted) return
-      if (listasNuevas) setListas(listasNuevas)
-      if (ofertasNuevas) setOfertas(ofertasNuevas)
-      if (configNueva) setConfigRemota(configNueva)
-    }
-
-    const intervalId = window.setInterval(fetchAll, minutosActualizacion * 60 * 1000)
-    const handleOnline = () => fetchAll()
-    window.addEventListener('online', handleOnline)
-
-    return () => {
-      mounted = false
-      window.clearInterval(intervalId)
-      window.removeEventListener('online', handleOnline)
-    }
-  }, [minutosActualizacion])
-
-  // Rotacion entre tabla de precios y cartel de oferta.
-  // Las dependencias se limitan a longitudes y duraciones para evitar reschedulings espurios;
-  // los setters funcionales evitan closures rancias sin necesidad de listar los indices.
+  // Rotacion entre tabla y cartel. Un solo dispatch por tick — el reducer
+  // se encarga de calcular el nuevo estado atomicamente. Sin nested setters.
   useEffect(() => {
     if (listas.length === 0 && ofertas.length === 0) return
 
-    const isTabla = modo === 'tabla'
-    const ms = (isTabla ? segundosTabla : segundosCartel) * 1000
+    const ms = (modo === 'tabla' ? segundosTabla : segundosCartel) * 1000
 
     const intervalId = window.setInterval(() => {
-      if (isTabla) {
-        setListaIndex((prev) => {
-          if (prev < listas.length - 1) return prev + 1
-          if (ofertas.length > 0) {
-            setCartelIndex(0)
-            setModo('cartel')
-            return prev
-          }
-          return 0
-        })
-      } else {
-        setCartelIndex((prev) => {
-          if (prev < ofertas.length - 1) return prev + 1
-          setListaIndex(0)
-          setModo('tabla')
-          return prev
-        })
-      }
+      dispatchRotation({
+        type: 'tick',
+        listasCount: listas.length,
+        ofertasCount: ofertas.length,
+      })
     }, ms)
 
     return () => window.clearInterval(intervalId)
@@ -171,6 +164,7 @@ export default function PantallaRotativa({
   return (
     <main className={styles.pageShell}>
       <div className={styles.screen} style={screenVars}>
+        <HealthIndicator />
         <Header />
         {ofertaActual ? (
           <CartelOferta key={ofertaActual.nombre} oferta={ofertaActual} />

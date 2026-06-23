@@ -85,6 +85,132 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-06-23 — Eliminar polling, reload horario y HealthIndicator
+
+### Problema
+
+Después de las sesiones 7-9, el freeze del Stick TV seguía apareciendo
+en producción: ~2 veces en 4 horas. Tres datos del reporte que cambian
+el diagnóstico:
+
+1. **Freeza también en tablas de texto puro** (sin imágenes). Descarta
+   memoria de decodificación de imágenes como causa única.
+2. **Sin corte total de red** en el momento del freeze. Descarta los
+   bugs de network handling que arreglamos en sesiones 6-8.
+3. **Periodicidad de ~2 horas**. Sugiere acumulación gradual de algo
+   (memoria, listeners, timers, estado de React) en lugar de un evento
+   puntual.
+
+Conclusión: hay un leak o acumulación que el Stick TV (Android TV
+genérico, CPU/RAM justas) no puede sostener en sesiones largas.
+
+### Decisión
+
+Sin posibilidad de profilear el Stick remotamente, atacamos el síntoma
+con dos mecanismos en capas:
+
+**1. `location.reload()` cada 1 hora**. Si el main thread está vivo,
+un reload completo libera toda la memoria/estado/listeners acumulados
+y empieza limpio. Si el thread ya está freezado, no se ejecuta — el
+reload funciona como **prevención**, no recovery. La interrupción
+visual son 1-2 segundos por hora, imperceptible en una vidriera.
+
+**2. Eliminar el polling client-side de `/api/*`**. Antes hacíamos 3
+fetches paralelos cada minuto = 4.320 fetches/día. Eso es trabajo
+constante para el JS engine del Stick (parseo de respuestas, creación
+de Response objects, GC pressure). Ahora los datos vienen **solo
+desde el Server Component vía props**, y se refrescan en cada reload
+horario. Total: **~25 fetches/día** (12 reloads × 3 endpoints, vía
+SSR del Server Component). **Reducción del 99.4%**.
+
+Como efecto secundario, eliminar el polling también elimina cualquier
+posible leak nuestro en el `fetchAll` loop, las múltiples llamadas a
+`setListas`/`setOfertas`/`setConfigRemota` por minuto, o los closures
+de `mounted` que pudieran sobrevivir entre re-renders.
+
+**3. Refactor del rotation state a `useReducer`**. El código anterior
+llamaba a `setCartelIndex(0)` y `setModo('cartel')` *dentro* del
+updater de `setListaIndex`. Es un anti-patrón de React: las funciones
+updater corren durante el cálculo de estado y no son lugar para
+disparar más updates. Puede causar dispatches duplicados o estados
+inconsistentes acumulativos — exactamente el tipo de cosa que se
+agrava con horas de uso. Con `useReducer`, cada tick es un solo
+dispatch atómico que calcula el siguiente estado completo
+(`modo + listaIndex + cartelIndex`) en una transición pura.
+
+### Sobre el webhook que se descartó
+
+El cliente propuso reducir peticiones a 1-2 por día y usar webhook
+para updates inmediatos. La reducción quedó implementada, pero el
+webhook se descartó por dos razones técnicas:
+
+- **El Stick TV no es alcanzable desde internet** (sin IP pública,
+  detrás de NAT). Un webhook clásico server → client no funciona.
+- **Vercel free tier no soporta conexiones long-lived** (WebSocket,
+  SSE), que serían las alternativas para empujar datos al cliente.
+
+Para tener push real-time habría que sumar un servicio externo (Pusher,
+Ably). No vale la pena para precios de carnicería que cambian poco;
+si en algún momento se justifica, queda como camino documentado.
+
+**Mecanismo para updates urgentes hoy**: el operador del local
+power-cycla la TV (15 segundos) cuando edita Sheets y quiere ver el
+cambio inmediato. Caso contrario, espera hasta el próximo reload
+horario.
+
+### HealthIndicator
+
+Pauta del cliente: un indicador visual chico arriba a la derecha que
+muestre el estado de la pantalla. Implementado en
+`components/HealthIndicator.tsx`:
+
+- 🟢 Verde: `navigator.onLine === true`
+- 🔴 Rojo: `navigator.onLine === false`
+- ⚪ Gris: durante SSR / antes de hidratar
+
+Usa `useSyncExternalStore` (patrón moderno de React 18+) en vez de
+`useState + useEffect`, para evitar el lint `set-state-in-effect` y
+porque es el patrón idiomático para suscribirse a estado externo del
+browser. Cero polling, cero overhead — solo reacciona a los eventos
+`online`/`offline` del browser.
+
+Posición: `absolute` arriba a la derecha del `.screen` (que pasó a
+`position: relative` para crear el contexto). Diámetro ~10-14px,
+opacidad 0.6. Discreto para el público, visible para el operador.
+
+### Trade-offs
+
+- **Datos pueden tener hasta 1 hora de retraso** entre la edición en
+  Sheets y la aparición en pantalla (cota superior dada por
+  RELOAD_INTERVAL_MS). Aceptable para el caso de uso.
+- **El reload horario no es recovery**: si el main thread ya está
+  freezado cuando llega el momento del reload, no se ejecuta.
+  Resultado: en el peor caso, el freeze dura hasta el próximo reload
+  (1 hora máximo si se reactiva) o hasta el reinicio diario de la
+  TV. Si esto no alcanza, la siguiente iteración sería un watchdog
+  via Service Worker (capaz de forzar `client.navigate()` desde un
+  thread independiente).
+- **Sin polling, perdemos los endpoints `/api/*` como vía de
+  actualización**. Siguen funcionando (no se borraron), siguen
+  documentados en `docs/api.md` — solo no los consumimos desde el
+  cliente de la pantalla.
+
+### Hipótesis sobre la causa raíz del freeze
+
+Con tres frentes atacados (memoria de imágenes en sesión 9, polling
+y nested setState en sesión 10), si el freeze desaparece no vamos a
+saber con certeza cuál era el responsable. Mi sospecha más fuerte:
+**la combinación de polling cada 1min + nested setState en el
+reducer de rotación**, que cada hora acumulaba cientos de
+re-renders y updates fuera de orden hasta que el reconciler de
+React quedaba en un estado no recuperable.
+
+Si el freeze persiste, la próxima hipótesis es algo del Service
+Worker o del propio browser del Stick TV, que requeriría escalación
+a un watchdog SW o eventualmente cambiar de modelo de hardware.
+
+---
+
 ## 2026-06-19 — Header "Tamaño" tolerante a anotaciones extra (no era un bug de la ñ)
 
 ### Problema reportado
