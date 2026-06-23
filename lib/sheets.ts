@@ -69,6 +69,19 @@ function parseCsvRows(text: string): string[][] {
   return rows
 }
 
+// Rango U+0300-U+036F: "Combining Diacritical Marks" (acentos, tildes).
+// Tras normalize('NFD') los caracteres acentuados quedan como letra + marca combinatoria;
+// quitamos las marcas para comparar sin acentos. Se escriben con escapes
+// Unicode para no depender del encoding del archivo (los caracteres literales
+// son invisibles en muchos editores).
+const COMBINING_DIACRITICS = new RegExp('[\\u0300-\\u036f]', 'g')
+
+// Usado para comparar headers del CSV sin importar acentos/tildes que el
+// cliente cargue a mano (ej. "Tamaño" vs "tamano", "Título" vs "titulo").
+function quitarAcentos(raw: string): string {
+  return raw.normalize('NFD').replace(COMBINING_DIACRITICS, '')
+}
+
 function urlConGid(baseUrl: string, gid: string): string {
   if (/[?&]gid=\d+/.test(baseUrl)) {
     return baseUrl.replace(/([?&])gid=\d+/, `$1gid=${gid}`)
@@ -95,19 +108,18 @@ function findProductosTableOffsets(headerRow: string[]): number[] {
 }
 
 /*
- * Encabezados aceptados para la columna OPCIONAL de tamano de imagen
- * (5ta columna del bloque de ofertas). Se normalizan sin acentos y en
- * minusculas antes de comparar — el cliente puede cargar "Tamaño",
- * "tamano", "Escala", etc.
+ * Palabras clave aceptadas para la columna OPCIONAL de tamano de imagen
+ * (5ta columna del bloque de ofertas). El header se normaliza sin acentos
+ * y en minusculas, y alcanza con que CONTENGA alguna de estas palabras —
+ * no exige coincidencia exacta. Esto cubre tanto "Tamaño" (la normalizacion
+ * ya convierte la ñ a n, ver quitarAcentos) como anotaciones que un cliente
+ * no tecnico agrega de mas, ej. "Tamaño (1-5)" o "Tamaño:".
  */
-const TAMANO_OFERTA_HEADERS = new Set([
-  'tamano',
-  'tamano imagen',
-  'tamano de imagen',
-  'escala',
-  'escala imagen',
-  'size',
-])
+const TAMANO_OFERTA_KEYWORDS = ['tamano', 'escala', 'size']
+
+function esHeaderTamano(headerNormalizado: string): boolean {
+  return TAMANO_OFERTA_KEYWORDS.some((keyword) => headerNormalizado.includes(keyword))
+}
 
 const TAMANO_OFERTA_DEFAULT = 3
 const TAMANO_OFERTA_MIN = 1
@@ -123,7 +135,9 @@ function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
   const result: OfertasTableHeader[] = []
 
   for (let i = 0; i <= headerRow.length - 4; i += 1) {
-    const slice = headerRow.slice(i, i + 4).map((column) => (column ?? '').trim().toLowerCase())
+    const slice = headerRow
+      .slice(i, i + 4)
+      .map((column) => quitarAcentos((column ?? '').trim().toLowerCase()))
     if (
       slice[0] === 'titulo' &&
       slice[1] === 'precio' &&
@@ -134,12 +148,8 @@ function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
       // aceptar "tamaño", "Tamaño", "tamano", etc. Si la columna no esta
       // (o es un header de otra tabla pegada al costado), tieneTamano=false
       // y las ofertas usan el default.
-      const quinta = (headerRow[i + 4] ?? '')
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(COMBINING_DIACRITICS, '')
-      const tieneTamano = TAMANO_OFERTA_HEADERS.has(quinta)
+      const quinta = quitarAcentos((headerRow[i + 4] ?? '').trim().toLowerCase())
+      const tieneTamano = esHeaderTamano(quinta)
       result.push({ offset: i, tieneTamano })
     }
   }
@@ -311,19 +321,8 @@ const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
   'instagram': 'instagram',
 }
 
-// Rango U+0300-U+036F: "Combining Diacritical Marks" (acentos, tildes).
-// Tras normalize('NFD') los caracteres acentuados quedan como letra + marca combinatoria;
-// quitamos las marcas para comparar sin acentos. Se escriben con escapes
-// Unicode para no depender del encoding del archivo (los caracteres literales
-// son invisibles en muchos editores).
-const COMBINING_DIACRITICS = new RegExp('[\\u0300-\\u036f]', 'g')
-
 function normalizarClave(raw: string): keyof ConfigNegocio | null {
-  const key = raw
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(COMBINING_DIACRITICS, '')
+  const key = quitarAcentos(raw.trim().toLowerCase())
   return CONFIG_ALIASES[key] ?? null
 }
 
