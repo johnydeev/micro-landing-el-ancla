@@ -85,6 +85,197 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-06-19 — Header "Tamaño" tolerante a anotaciones extra (no era un bug de la ñ)
+
+### Problema reportado
+
+El cliente reportó que la columna "Tamaño" de la pestaña de ofertas
+"no soporta la ñ" y por eso no se aplicaba el tamaño de imagen
+(quedaba siempre en el default `3`).
+
+### Diagnóstico
+
+Se revisó `findOfertasTableOffsets` en `lib/sheets.ts`. El header se
+normalizaba con `.normalize('NFD').replace(COMBINING_DIACRITICS,
+'')` antes de comparar — y se confirmó con un test aislado que
+**"Tamaño" ya normalizaba correctamente a "tamano"** y matcheaba el
+`Set` de headers aceptados. La ñ, en sí misma, **nunca fue el
+problema**: `normalize('NFD')` descompone la ñ en `n` + marca de
+tilde combinatoria (U+0303), que cae dentro del rango
+`COMBINING_DIACRITICS` (U+0300-U+036F) y se elimina igual que un
+acento en una vocal.
+
+El problema real, reproducido con casos de prueba: la comparación
+exigía **igualdad exacta** contra un `Set` de 6 frases fijas
+(`'tamano'`, `'tamano imagen'`, `'escala'`, etc.). Si el cliente
+agregaba **cualquier anotación extra** al header — algo muy típico
+en un usuario no técnico que quiere dejarse una nota, ej. `"Tamaño
+(1-5)"` o `"Tamaño:"` — la igualdad exacta fallaba aunque la ñ se
+normalizara perfectamente bien. Esto es indistinguible para el
+cliente de "no soporta la ñ": en ambos casos la oferta cae al
+tamaño default y parece que la columna no se lee.
+
+### Decisión
+
+**Dos cambios en `lib/sheets.ts`:**
+
+1. **Matching por palabra clave en vez de igualdad exacta** para la
+   5ta columna. `esHeaderTamano()` ahora chequea si el header
+   normalizado **contiene** `'tamano'`, `'escala'` o `'size'`, en
+   vez de exigir que sea exactamente igual a una de 6 frases. Cubre
+   `"Tamaño (1-5)"`, `"Tamaño:"`, `"Escala de imagen aprox"`, etc.,
+   sin falsos positivos posibles (ninguna de las otras columnas
+   obligatorias — `titulo`, `precio`, `slug imagen`, `estado` —
+   contiene esas palabras).
+2. **Normalización sin acentos extendida a las 4 columnas
+   obligatorias** (`Título`, `Precio`, `Slug Imagen`, `Estado`).
+   Antes solo la 5ta columna (opcional) se normalizaba; las 4
+   obligatorias se comparaban con `.trim().toLowerCase()` puro. Si
+   el cliente escribía `"Título"` con tilde (ortografía correcta en
+   español), la tabla de ofertas **completa** no se detectaba. Ahora
+   usan el mismo helper `quitarAcentos()`.
+3. **Refactor**: `quitarAcentos()` se extrajo como helper compartido
+   (antes la cadena `.normalize('NFD').replace(COMBINING_DIACRITICS,
+   '')` estaba duplicada en `findOfertasTableOffsets` y
+   `normalizarClave`). Mismo comportamiento, una sola fuente de
+   verdad.
+
+### Validación
+
+Casos de prueba ejecutados contra la lógica real (ver commit): "Tamaño",
+"Título" con tilde, "Tamaño (1-5)", "Tamaño:", "Escala Imagen", header
+sin 5ta columna, y una 5ta columna ajena (`"Estado Otra Tabla"`, para
+confirmar que no matchea por error). Los 7 casos dieron el resultado
+esperado. `tsc --noEmit`, `npm run lint` y `next build` sin errores.
+
+### Trade-offs
+
+- El matching por substring es deliberadamente permisivo. Si en el
+  futuro aparece una columna real cuyo nombre contenga
+  casualmente "tamano", "escala" o "size" como palabra dentro de un
+  texto más largo no relacionado, podría matchear por error. Dado
+  que es la 5ta columna de un bloque ya delimitado por las 4
+  columnas obligatorias inmediatamente a la izquierda, el riesgo
+  práctico es bajo.
+- No se pudo probar contra el Sheets real del cliente (sin acceso a
+  la URL/credenciales desde este entorno). La validación es por
+  lógica + casos sintéticos que reproducen el patrón reportado.
+
+---
+
+## 2026-06-19 — Optimizar peso de imágenes de ofertas (sospecha de freeze por memoria/decodificación)
+
+### Problema
+
+El cliente reportó nuevamente que el Stick TV "se tilda en una
+oferta". A diferencia de los freezes de las sesiones 6-8:
+
+- La wifi del local **no tuvo un corte total**, a lo sumo
+  intermitencias o señal débil.
+- **No es siempre la misma oferta** la que queda congelada — varía.
+
+Ambos datos descartan el mecanismo ya resuelto (RSC fetch +
+`router.refresh()` rompiendo el reconciler de React ante
+`NetworkError`, sesiones 6-8): si fuera ese bug, el patrón sería
+"se cae cuando se corta la red", no "varía cuál oferta".
+
+### Diagnóstico
+
+Revisando `public/ofertas/*.png`: 17 imágenes, varias de **1.5 a
+3 MB** sin comprimir (1536×1024, pinta de exports de IA sin
+optimizar — bordes/fondo difuso típico). Algunas se agregaron en
+sesiones recientes junto con la baja de `segundosCartel` a 3
+segundos (commit `6b71805`).
+
+Hipótesis: el Stick TV (Android TV genérico, CPU/GPU muy débil)
+decodifica una imagen pesada nueva cada 3 segundos, indefinidamente,
+sin pausa entre ofertas. Esto es un patrón conocido de agotamiento
+de memoria/GPU en hardware débil — el navegador no libera memoria de
+decodificación lo bastante rápido y eventualmente el main thread (o
+el compositor) se traba. Como la presión es acumulada (no depende
+de una imagen específica), el punto exacto donde se traba **varía**
+según qué tan rápido el dispositivo recicló memoria esa vuelta —
+coincide con el síntoma reportado.
+
+No se pudo reproducir el freeze localmente (depende del hardware
+real del Stick), así que esto es la hipótesis más fuerte disponible,
+no una causa confirmada con repro.
+
+### Decisión
+
+**Recomprimir y redimensionar las 17 imágenes de `public/ofertas/`**
+con `sharp` (instalado temporalmente con `npm install --no-save
+sharp`, no quedó como dependencia del proyecto):
+
+```js
+await sharp(input)
+  .resize({ width: 1200, withoutEnlargement: true })
+  .png({ compressionLevel: 9, effort: 10 })
+  .toBuffer()
+```
+
+- `width: 1200` con `withoutEnlargement`: el wrapper del cartel
+  (`.cartelImageWrap`) ocupa como máximo ~72% del ancho de una
+  pantalla 16:9, así que 1200px de lado mayor cubre output 1080p sin
+  pérdida perceptible. Las imágenes ya menores a 1200px (ej.
+  `patamuslo.png`, `vacio2.png` a 500×500) no se agrandan.
+- `compressionLevel: 9, effort: 10`: máxima compresión PNG sin
+  pérdida. Sharp eligió automáticamente PNG indexado (8-bit
+  colormap) en la mayoría de los casos porque el rango de colores
+  real de estas fotos (fondo difuso + producto) lo permite sin
+  pérdida visible.
+- **Mismo formato y path** (`/ofertas/{slug}.png`) — cero cambios de
+  código, cero riesgo de romper el contrato con el Sheets del
+  cliente.
+
+**Resultado**: 33.3 MB → 4.4 MB total (-87 %). Verificación visual
+pixel a pixel de `costillar.png` y `lomo.png` (antes vs. después):
+sin artefactos ni banding detectable.
+
+### Alternativas descartadas
+
+- **Migrar a `next/image`.** Ya descartado en sesión 2 por costo en
+  la capa gratuita de Vercel — sigue aplicando, este problema no
+  cambia esa decisión.
+- **Convertir a WebP/AVIF.** Más liviano todavía, pero cambia la
+  extensión del archivo y rompe el contrato `/ofertas/{slug}.png`
+  que ya usan `CartelOferta` y el cliente al subir imágenes. Si la
+  optimización de PNG no alcanza, es la siguiente opción a evaluar
+  (requiere tocar `CartelOferta` para probar `.webp` con fallback a
+  `.png`).
+- **Bajar `segundosCartel` de vuelta.** Reduciría la frecuencia de
+  decodificación, pero es un cambio de UX (rotación más lenta) que
+  el cliente eligió a propósito. Se prueba primero la optimización
+  de imágenes, que no tiene trade-off de UX, antes de tocar timing.
+
+### Trade-offs
+
+- **No hay forma de confirmar el fix sin el Stick real en el
+  local.** Si el freeze vuelve a pasar después de este deploy, el
+  patrón "varía cuál oferta" + sin corte de red sigue siendo
+  consistente con presión de memoria, pero también podría ser otra
+  causa (ej. acumulación de listeners, memory leak en el propio
+  `useEffect` de polling). Revisar primero si el problema persiste
+  con la misma frecuencia o se redujo notablemente antes de invertir
+  en la siguiente hipótesis.
+- **Imágenes nuevas que suba el cliente a futuro no pasan por este
+  pipeline de optimización automáticamente.** Si el cliente sube un
+  PNG de varios MB directo a `public/ofertas/`, el problema puede
+  reaparecer. Documentar en el onboarding del cliente: pre-optimizar
+  imágenes antes de subir (ya existía esta recomendación para el
+  logo, sesión "Mantener `<img>` en vez de `next/image`" — ahora
+  aplica con más fuerza a las ofertas).
+
+### Cómo se detecta este bug en el futuro
+
+Si vuelve "se tilda en una oferta" sin corte de red y sin oferta
+fija: sospechar memoria/decodificación antes que red. Primer chequeo:
+`ls -la public/ofertas/` — si alguna imagen pesa más de ~500 KB,
+recomprimir con el mismo script de esta sesión antes de seguir
+investigando.
+
+---
+
 ## 2026-06-18 — Sacar `router.refresh()` y pasar a fetch + useState
 
 ### Problema
