@@ -85,6 +85,84 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-06-19 — Header "Tamaño" tolerante a anotaciones extra (no era un bug de la ñ)
+
+### Problema reportado
+
+El cliente reportó que la columna "Tamaño" de la pestaña de ofertas
+"no soporta la ñ" y por eso no se aplicaba el tamaño de imagen
+(quedaba siempre en el default `3`).
+
+### Diagnóstico
+
+Se revisó `findOfertasTableOffsets` en `lib/sheets.ts`. El header se
+normalizaba con `.normalize('NFD').replace(COMBINING_DIACRITICS,
+'')` antes de comparar — y se confirmó con un test aislado que
+**"Tamaño" ya normalizaba correctamente a "tamano"** y matcheaba el
+`Set` de headers aceptados. La ñ, en sí misma, **nunca fue el
+problema**: `normalize('NFD')` descompone la ñ en `n` + marca de
+tilde combinatoria (U+0303), que cae dentro del rango
+`COMBINING_DIACRITICS` (U+0300-U+036F) y se elimina igual que un
+acento en una vocal.
+
+El problema real, reproducido con casos de prueba: la comparación
+exigía **igualdad exacta** contra un `Set` de 6 frases fijas
+(`'tamano'`, `'tamano imagen'`, `'escala'`, etc.). Si el cliente
+agregaba **cualquier anotación extra** al header — algo muy típico
+en un usuario no técnico que quiere dejarse una nota, ej. `"Tamaño
+(1-5)"` o `"Tamaño:"` — la igualdad exacta fallaba aunque la ñ se
+normalizara perfectamente bien. Esto es indistinguible para el
+cliente de "no soporta la ñ": en ambos casos la oferta cae al
+tamaño default y parece que la columna no se lee.
+
+### Decisión
+
+**Dos cambios en `lib/sheets.ts`:**
+
+1. **Matching por palabra clave en vez de igualdad exacta** para la
+   5ta columna. `esHeaderTamano()` ahora chequea si el header
+   normalizado **contiene** `'tamano'`, `'escala'` o `'size'`, en
+   vez de exigir que sea exactamente igual a una de 6 frases. Cubre
+   `"Tamaño (1-5)"`, `"Tamaño:"`, `"Escala de imagen aprox"`, etc.,
+   sin falsos positivos posibles (ninguna de las otras columnas
+   obligatorias — `titulo`, `precio`, `slug imagen`, `estado` —
+   contiene esas palabras).
+2. **Normalización sin acentos extendida a las 4 columnas
+   obligatorias** (`Título`, `Precio`, `Slug Imagen`, `Estado`).
+   Antes solo la 5ta columna (opcional) se normalizaba; las 4
+   obligatorias se comparaban con `.trim().toLowerCase()` puro. Si
+   el cliente escribía `"Título"` con tilde (ortografía correcta en
+   español), la tabla de ofertas **completa** no se detectaba. Ahora
+   usan el mismo helper `quitarAcentos()`.
+3. **Refactor**: `quitarAcentos()` se extrajo como helper compartido
+   (antes la cadena `.normalize('NFD').replace(COMBINING_DIACRITICS,
+   '')` estaba duplicada en `findOfertasTableOffsets` y
+   `normalizarClave`). Mismo comportamiento, una sola fuente de
+   verdad.
+
+### Validación
+
+Casos de prueba ejecutados contra la lógica real (ver commit): "Tamaño",
+"Título" con tilde, "Tamaño (1-5)", "Tamaño:", "Escala Imagen", header
+sin 5ta columna, y una 5ta columna ajena (`"Estado Otra Tabla"`, para
+confirmar que no matchea por error). Los 7 casos dieron el resultado
+esperado. `tsc --noEmit`, `npm run lint` y `next build` sin errores.
+
+### Trade-offs
+
+- El matching por substring es deliberadamente permisivo. Si en el
+  futuro aparece una columna real cuyo nombre contenga
+  casualmente "tamano", "escala" o "size" como palabra dentro de un
+  texto más largo no relacionado, podría matchear por error. Dado
+  que es la 5ta columna de un bloque ya delimitado por las 4
+  columnas obligatorias inmediatamente a la izquierda, el riesgo
+  práctico es bajo.
+- No se pudo probar contra el Sheets real del cliente (sin acceso a
+  la URL/credenciales desde este entorno). La validación es por
+  lógica + casos sintéticos que reproducen el patrón reportado.
+
+---
+
 ## 2026-06-19 — Optimizar peso de imágenes de ofertas (sospecha de freeze por memoria/decodificación)
 
 ### Problema
