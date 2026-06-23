@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 19/06/2026 (sesión 9).
+Actualizado al 18/06/2026 (sesión 8).
 
 ---
 
@@ -78,42 +78,6 @@ types/
 ---
 
 ## Completado ✅
-
-- **Sesión 9 (19/06/2026) — Hipótesis nueva para el freeze recurrente:
-  optimizar peso de imágenes de ofertas**:
-  - **El cliente reportó otro freeze** ("se tilda en una oferta") con
-    la wifi del local funcionando (a lo sumo intermitencias/señal
-    débil, no un corte total) y **sin oferta fija** — varía cuál.
-    Esto descarta el patrón de las sesiones 6-8 (RSC + red caída
-    totalmente) y apunta a algo sistémico del cartel, no de una
-    oferta puntual ni de un corte de red.
-  - **Encontrado**: los PNG de `public/ofertas/*` pesaban entre 200 KB
-    y **3 MB** sin comprimir (varios a 1536×1024, exportados de IA sin
-    optimizar). Con `segundosCartel` en 3 s (bajado en sesión previa,
-    commit `6b71805`) y rotación indefinida, el Stick TV (CPU/GPU muy
-    débil) decodifica una imagen pesada nueva cada 3 segundos sin
-    pausa. Es un patrón conocido de agotamiento de memoria/GPU en
-    hardware débil — coincide con que el freeze "varíe" de oferta (no
-    es una imagen corrupta puntual, es presión acumulada de memoria
-    que revienta en cualquier punto del ciclo).
-  - **Acción**: recomprimidas las 17 imágenes de `public/ofertas/`
-    con `sharp` (resize a 1200px de lado mayor con
-    `withoutEnlargement`, PNG `compressionLevel: 9, effort: 10`).
-    Sharp eligió automáticamente PNG indexado (8-bit colormap) donde
-    no había pérdida perceptible. **Total: 33.3 MB → 4.4 MB (-87 %)**.
-    Sin cambios de código — mismo path `/ofertas/{slug}.png`, mismas
-    dimensiones relativas en pantalla.
-  - **Verificación visual**: comparadas `costillar.png` y `lomo.png`
-    originales vs. optimizadas, pixel a pixel — sin artefactos ni
-    banding visibles.
-  - Validación: `tsc --noEmit` ✓, `npm run lint` ✓, `next build` ✓.
-  - **Pendiente de confirmar en campo**: este fix reduce
-    drásticamente la carga de decodificación/memoria, pero no hay
-    forma de reproducir el freeze localmente (depende del hardware
-    real del Stick). Si vuelve a pasar después de este deploy,
-    revisar `docs/decisiones.md` (entrada de esta sesión) para la
-    siguiente hipótesis a probar (ej. bajar `segundosCartel` o subir
-    el polling de imágenes con `loading="lazy"`/`decoding="async"`).
 
 - **Sesión 8 (18/06/2026) — Hotfix definitivo: sacar `router.refresh()`,
   pasar a fetch + useState**:
