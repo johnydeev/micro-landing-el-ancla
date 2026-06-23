@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 18/06/2026 (sesión 8).
+Actualizado al 23/06/2026 (sesión 9).
 
 ---
 
@@ -78,6 +78,44 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 9 (23/06/2026) — Restauración del trabajo perdido por
+  merge mal-resuelto + optimización de imagen nueva**:
+  - **Contexto**: una sesión Claude paralela el 19/06 había
+    optimizado las 17 imágenes de `public/ofertas/` (33.3 MB →
+    4.4 MB) bajo la hipótesis de que el freeze residual del Stick
+    TV — el que persistía después de la sesión 8 — era por
+    presión de memoria/GPU al decodificar PNGs pesados cada 3
+    segundos. El PR (#1) se mergeó a `master` remoto el 22/06.
+  - **Problema descubierto al revisar commits**: un `git pull`
+    local del 22/06 generó un merge automático (`967b117`) que
+    revirtió completamente el trabajo del PR — tanto las imágenes
+    optimizadas como el ADR completo en `docs/decisiones.md`.
+    Estado de HEAD tras el merge: imágenes pesadas otra vez (~33
+    MB), ADR ausente. Sobrevivió solo el commit en la historia.
+  - **Implicación operativa**: si la hipótesis de memoria es
+    correcta, el cliente seguía expuesto al freeze residual con
+    deploy del trabajo de sesión 8.
+  - **Restauración aplicada**:
+    - 15 imágenes de `public/ofertas/` restauradas desde el commit
+      `5aa638f` (`git checkout 5aa638f -- ...`).
+    - `vacio.png` (337 KB) y `vacio2.png` (borrado) respetados como
+      los dejó johnydeev entre el 20 y 22/06 — sus cambios eran
+      intencionales y posteriores al PR.
+    - **`lechon.png` nueva** (agregada el 20/06 sin optimizar, 1.33
+      MB) recomprimida con el mismo pipeline de sharp del 19/06:
+      181 KB resultantes (-86 %).
+    - **Total final**: 4.08 MB en 19 archivos.
+    - **ADR completo restaurado** en `docs/decisiones.md` con nota
+      de procedencia que explica el episodio del merge para
+      trazabilidad futura.
+  - **Lección registrada para el futuro**: cuando se hagan merges
+    locales con cambios en archivos binarios y un PR remoto que
+    también los toca, revisar explícitamente que el merge no haya
+    revertido los binarios. `git diff HEAD~1 HEAD -- '*.png'` con
+    `--stat` es la forma rápida de chequear.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next
+    build` ✓.
 
 - **Sesión 8 (18/06/2026) — Hotfix definitivo: sacar `router.refresh()`,
   pasar a fetch + useState**:

@@ -5,6 +5,57 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 9 — 2026-06-23 (Restauración de trabajo perdido por merge)
+
+**Context**: el 19/06 una sesión Claude paralela optimizó las 17
+imágenes de `public/ofertas/` (33.3 MB → 4.4 MB) bajo la hipótesis
+de que el freeze residual del Stick TV — el que seguía pasando
+después de la sesión 8 — era por presión de memoria/GPU al
+decodificar PNGs pesados cada 3 segundos. El PR se mergeó a `master`
+remoto. Un `git pull` local del 22/06 generó un merge automático
+(`967b117`) que revirtió tanto las imágenes como el ADR completo en
+`docs/decisiones.md`. El revisado de commits del 23/06 detectó la
+regresión.
+
+**Restored**
+- **15 imágenes de `public/ofertas/`** restauradas desde el commit
+  `5aa638f` con `git checkout` selectivo:
+  `alita`, `bondiola`, `costillar`, `costillitas`, `falda`, `lomo`,
+  `osobuco`, `paleta`, `patamuslo`, `patamusloxcaja`,
+  `picada-premium`, `ribs`, `roastbeef`, `suprema`, `supremaxcaja`.
+  `vacio.png` y `vacio2.png` NO se tocaron — johnydeev las gestionó
+  intencionalmente después del PR.
+- **ADR completo** "Optimizar peso de imágenes de ofertas
+  (sospecha de freeze por memoria/decodificación)" restaurado en
+  `docs/decisiones.md` con nota de procedencia que documenta el
+  episodio del merge.
+
+**Changed**
+- **`lechon.png`** (1.33 MB, agregada el 20/06 sin pasar por el
+  pipeline de optimización del PR) recomprimida con `sharp` con la
+  misma configuración que usó la sesión paralela:
+  `resize({ width: 1200, withoutEnlargement: true })` +
+  `png({ compressionLevel: 9, effort: 10 })`. Resultado: 181 KB
+  (-86 %).
+
+**Result**
+- Total de `public/ofertas/`: **4.08 MB en 19 archivos** (vs. 33.3
+  MB que había en HEAD antes de esta sesión).
+- Documentación restaurada en `docs/decisiones.md` y `docs/progreso.md`.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito.
+
+**Note operativa**
+- En futuros `git pull` con cambios locales en archivos binarios y
+  un PR remoto que también los toca: chequear explícitamente con
+  `git diff HEAD~1 HEAD -- '*.png' --stat` que el merge automático
+  no haya revertido binarios sin avisar.
+
+---
+
 ### Sesión 8 — 2026-06-18 (Hotfix definitivo: sacar router.refresh)
 
 **Context**: el v2 (sesión 7) no resolvió el bug. El cliente reportó
