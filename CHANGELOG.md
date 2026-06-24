@@ -5,6 +5,74 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 11 — 2026-06-23 (Watchdog vía Service Worker)
+
+**Context**: el freeze persistió después del deploy de sesión 10.
+Cliente confirmó que el freeze pasa después de >1 hora (el reload
+preventivo del main thread NO se ejecuta porque el thread ya está
+muerto), con HealthIndicator en verde (no es problema de red) y
+control remoto sin respuesta (main thread completamente muerto).
+Única recuperación actual: power-cycle físico de la TV.
+
+**Diagnostic insight**: cualquier mecanismo en el main thread es
+inútil si el thread está muerto. Las únicas vías de recovery son
+el Service Worker (corre en otro thread) o algo a nivel sistema
+operativo (app kiosko, descartada). Implementamos la vía SW.
+
+**Added**
+- **`public/sw.js`**: implementado **watchdog completo**:
+  - `Map<clientId, timestamp>` para registrar último heartbeat de
+    cada cliente activo.
+  - Listener `message` que procesa heartbeats y programa un check
+    de clientes muertos vía `event.waitUntil(setTimeout(...))` —
+    mantiene al SW vivo 65s después de cada heartbeat.
+  - `checkDeadClients()`: si un cliente lleva más de
+    `HEARTBEAT_TIMEOUT_MS` (60s) sin heartbeat, fuerza
+    `client.navigate(client.url)` — reload desde el SW que
+    funciona aunque el main thread esté muerto.
+  - Limpieza automática del Map para clientes que ya no existen.
+- **`PantallaRotativa.tsx`**: nuevo `useEffect` que envía
+  `postMessage({ type: 'heartbeat' })` al SW cada
+  `HEARTBEAT_INTERVAL_MS` (20s). Primera llamada inmediata.
+
+**Changed**
+- **`RELOAD_INTERVAL_MS`** en `PantallaRotativa.tsx`: 60 min → 30 min.
+  Reduce ventana de exposición al freeze como capa adicional de
+  prevención. Sigue corriendo en main thread, no es recovery, pero
+  complementa al watchdog SW.
+- **`public/sw.js`**: `CACHE_VERSION` bumpeado a
+  `'micro-landing-v5'` para que los Sticks descarguen el JS nuevo
+  con el código del heartbeat.
+
+**Honest limitation**
+- El SW también puede ser dormido por el browser cuando está idle.
+  Mitigamos con el `waitUntil` que mantiene al SW vivo 65s después
+  de cada heartbeat. Mientras el main thread está sano, el SW está
+  siempre fresco. Cuando muere, el último heartbeat sigue
+  manteniendo al SW vivo el tiempo suficiente para detectar la
+  ausencia del próximo y disparar el navigate.
+- No es 100% garantizado, pero cubre la gran mayoría de escenarios
+  reales.
+
+**Plan B documented**
+- Si esto no resuelve, llegamos al techo de soluciones JS-only.
+  Siguiente paso lógico: **Fully Kiosk Browser** (la opción del
+  Stick descartada en sesión 6). Razones para reabrirla
+  documentadas en `docs/decisiones.md`.
+
+**Testing**
+- Procedimiento para testear el watchdog sin esperar un freeze
+  real documentado en `docs/decisiones.md`: Chrome desktop →
+  `while(true){}` en console → esperar 65-70s → la página debería
+  reloadearse sola.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito.
+
+---
+
 ### Sesión 10 — 2026-06-23 (Polling eliminado + reload horario + HealthIndicator)
 
 **Context**: el freeze del Stick TV seguía apareciendo después de

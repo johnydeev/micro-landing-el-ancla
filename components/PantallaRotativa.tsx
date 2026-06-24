@@ -15,11 +15,23 @@ import styles from '@/app/page.module.css'
  * Cada reload re-ejecuta el Server Component que va a Sheets (cache de
  * 60s en lib/sheets.ts) y obtiene la version mas fresca. Ademas resetea
  * cualquier acumulacion de memoria/estado del browser — funciona como
- * safety net contra el freeze residual del Stick TV (sesion 10).
+ * PREVENCION del freeze del Stick TV.
  *
- * 1 hora = balance entre frescura de datos y reset preventivo.
+ * 30 min (bajado de 1h en sesion 11) reduce la ventana de exposicion
+ * al freeze. Como esto corre en el main thread, no es recovery: si el
+ * thread ya esta muerto, el setInterval no se ejecuta. Para esos casos
+ * tenemos el watchdog en el Service Worker (ver sendHeartbeat abajo).
  */
-const RELOAD_INTERVAL_MS = 60 * 60 * 1000
+const RELOAD_INTERVAL_MS = 30 * 60 * 1000
+
+/*
+ * Cada cuanto el main thread le manda un heartbeat al SW. El SW tiene
+ * un timeout de 60s — si pasa mas sin recibir heartbeat, asume que el
+ * main thread esta freezado y fuerza un reload via client.navigate().
+ * 20s entre heartbeats da 3 oportunidades antes de que el SW asuma muerte:
+ * cubre los hipos cortos sin disparar falsos positivos.
+ */
+const HEARTBEAT_INTERVAL_MS = 20 * 1000
 
 /*
  * Estado de la rotacion entre tabla de precios y cartel de oferta,
@@ -108,22 +120,52 @@ export default function PantallaRotativa({
   const segundosCartel = configRemota.segundosCartel ?? negocioConfig.segundosCartel
   const segundosTabla = configRemota.segundosTabla ?? negocioConfig.segundosTabla
 
-  // Reload completo periodico. Doble proposito:
-  //   1. Refresca datos sin tener que pollear (el Server Component vuelve
-  //      a SSR contra Sheets).
-  //   2. Resetea cualquier acumulacion de memoria/leak del browser, que
-  //      es la sospecha mas fuerte para los freezes residuales en el
-  //      Stick TV (que ocurren tambien en tablas de texto sin imagenes,
-  //      descartando memoria de decodificacion como unica causa).
-  //
-  // location.reload() corre en el main thread. Si el thread esta freezado,
-  // no se ejecuta — pero entonces el daño ya esta hecho. Funciona como
-  // PREVENCION del freeze, no como recovery.
+  // Reload completo periodico (cada RELOAD_INTERVAL_MS = 30 min).
+  // Refresca datos via SSR y resetea cualquier acumulacion del browser.
+  // PREVENCION del freeze — si el main thread ya esta muerto, no corre.
+  // Para recovery cuando el main thread muere, el watchdog del SW
+  // (ver useEffect siguiente) toma el relevo.
   useEffect(() => {
     const id = window.setInterval(() => {
       window.location.reload()
     }, RELOAD_INTERVAL_MS)
     return () => window.clearInterval(id)
+  }, [])
+
+  // Heartbeat al Service Worker. El SW tiene logica de watchdog:
+  // si pasa mas de 60s sin recibir un heartbeat de un cliente, asume
+  // que ese cliente esta freezado y fuerza un client.navigate() para
+  // recargarlo. Esto SI puede ejecutarse aunque el main thread este
+  // muerto, porque el SW corre en otro thread.
+  //
+  // Mandamos cada HEARTBEAT_INTERVAL_MS = 20s. El SW espera 60s antes
+  // de declarar muerto — da 3 oportunidades antes del reload forzado.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return
+    }
+
+    let cancelled = false
+
+    const sendHeartbeat = async () => {
+      if (cancelled) return
+      try {
+        const registration = await navigator.serviceWorker.ready
+        registration.active?.postMessage({ type: 'heartbeat' })
+      } catch {
+        // SW no disponible — sin watchdog, pero el reload preventivo
+        // sigue activo. No es critico que esto falle.
+      }
+    }
+
+    // Primer heartbeat inmediato para que el SW arranque su timer cuanto antes.
+    sendHeartbeat()
+
+    const id = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
   }, [])
 
   // Rotacion entre tabla y cartel. Un solo dispatch por tick — el reducer

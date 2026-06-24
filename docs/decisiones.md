@@ -85,6 +85,125 @@ porque arriba hay un Server Component que sí re-fetchea.
 
 ---
 
+## 2026-06-23 — Watchdog vía Service Worker (recovery del freeze)
+
+### Problema
+
+Después del deploy de sesión 10 (eliminación de polling + reload horario
++ refactor con useReducer + HealthIndicator), el freeze del Stick TV
+**siguió pasando**. Datos críticos del reporte del cliente:
+
+- Freeze ocurrió **más de 1 hora** después de cargar la página → el
+  reload preventivo del main thread **no se ejecutó** porque el
+  thread ya estaba muerto cuando le tocaba el turno.
+- El HealthIndicator estaba en **verde** al momento del freeze
+  (foto del cliente) → no es problema de red. El browser pensaba
+  que estaba online.
+- El control remoto **no respondía** ni siquiera para salir de la
+  página → confirmación absoluta de main thread completamente muerto.
+- Único recovery actual: power-cycle de la TV.
+
+### Diagnóstico arquitectónico
+
+Hay un techo técnico que descubrimos: **JavaScript corre todo en un
+solo thread del browser**. Si ese thread muere (por bug del browser,
+acumulación, etc.), nada hecho en JS puede revivirlo. Ni
+`setInterval`, ni `setTimeout`, ni `location.reload()`, ni listeners
+de eventos. Todos los mecanismos que armamos hasta ahora corrían en
+el main thread y eran inútiles una vez que el thread se freezaba.
+
+Las **únicas dos cosas** que pueden actuar cuando el main thread está
+muerto son:
+
+1. **El Service Worker**, que corre en otro thread del browser.
+2. Algo a nivel sistema operativo (ej. una app kiosko).
+
+El cliente descartó la opción de app kiosko (sesión 6), así que la
+única salida puramente código es el SW.
+
+### Decisión
+
+Implementar **watchdog via Service Worker con heartbeats**:
+
+1. **Main thread envía heartbeat al SW cada 20s** vía
+   `navigator.serviceWorker.controller.postMessage({ type: 'heartbeat' })`.
+2. **SW registra el timestamp** del último heartbeat por cliente
+   (`Map<clientId, timestamp>`).
+3. **SW dispara `checkDeadClients()`** después de cada heartbeat,
+   con un retraso de `HEARTBEAT_TIMEOUT_MS + grace` (60s + 5s) usando
+   `event.waitUntil(setTimeout)`. Esto mantiene al SW vivo el tiempo
+   suficiente para detectar si los heartbeats subsiguientes paran.
+4. **Si un cliente lleva más de 60s sin enviar heartbeat**, el SW
+   asume que está freezado y dispara `client.navigate(client.url)`.
+   Esto es un reload forzado que el browser ejecuta **a nivel motor,
+   sin depender del main thread**. El Stick se recupera solo.
+
+### Por qué esto sí puede funcionar cuando el reload del main thread no
+
+| Mecanismo | Thread donde corre | Funciona con main thread muerto |
+|---|---|---|
+| `window.location.reload()` | Main thread | ❌ No |
+| `window.setTimeout/setInterval` | Main thread | ❌ No |
+| Cualquier listener (`online`, etc.) | Main thread | ❌ No |
+| `client.navigate()` desde SW | SW (otro thread) | ✅ Sí |
+| Push notification → SW | SW | ✅ Sí (pero requiere infra) |
+
+El SW es la única ruta sin infra externa.
+
+### Limitación honesta
+
+El SW también puede ser dormido por el browser cuando está idle. Si:
+- El main thread muere → no manda más heartbeats
+- El SW estaba durmiéndose en ese momento → puede no despertarse a tiempo
+
+Mitigación: el `waitUntil` con `setTimeout` mantiene al SW vivo por
+65 segundos después de cada heartbeat. Mientras el main thread esté
+sano, el SW está siempre "fresco". Cuando el main thread muere, el
+último heartbeat sigue manteniendo al SW vivo 65s adicionales —
+suficiente para detectar la ausencia del próximo heartbeat (que
+debería llegar a los 20s) y disparar el navigate antes de que el SW
+se duerma.
+
+**No es 100% garantizado** (el browser puede matar al SW antes de
+los 65s en algunos casos), pero cubre la gran mayoría de escenarios
+reales.
+
+### Reload preventivo bajado a 30 minutos
+
+Adicional: bajamos `RELOAD_INTERVAL_MS` de 60 → 30 min. Reduce la
+ventana de exposición al freeze. Como sigue corriendo en el main
+thread, no es recovery — pero suma prevención.
+
+### Plan B documentado si esto tampoco alcanza
+
+Si el watchdog SW + reload de 30min no resuelve el freeze, llegamos
+al techo de soluciones JS-only. Próximo paso lógico: **Fully Kiosk
+Browser en el Stick** (la opción que se descartó en sesión 6). Tiene
+a nivel browser:
+- "Reload on idle / on no response": detecta freeze del JS sin
+  depender de JS para detectarlo.
+- "Restart on crash": si el browser entero muere, lo levanta solo.
+
+Es la solución industrial estándar para cartelería digital. Quedan
+registradas las razones por las que se descartó originalmente y las
+razones por las que se reabriría: si llegamos a ese punto, ya hay
+evidencia de que JS-only no es suficiente para este hardware.
+
+### Cómo testear el watchdog (sin esperar a un freeze real)
+
+En Chrome de escritorio:
+1. Abrir la página deployada.
+2. DevTools → Application → Service Workers: confirmar que `v5` está
+   activated and running.
+3. Console: ejecutar `while(true){}` para freezear el main thread.
+4. Esperar ~65-70 segundos.
+5. La página debería reloadearse sola gracias al watchdog del SW.
+
+Si esto funciona en Chrome de escritorio, hay alta probabilidad de
+que funcione también en el Stick TV.
+
+---
+
 ## 2026-06-23 — Eliminar polling, reload horario y HealthIndicator
 
 ### Problema

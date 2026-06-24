@@ -37,7 +37,83 @@
 // browser bloqueado: la rotacion se freezaba en una oferta y los inputs
 // del control remoto no respondian. Ahora un RSC sin cache propio falla
 // limpio y Next lo maneja internamente sin romper nada.
-const CACHE_VERSION = 'micro-landing-v4'
+const CACHE_VERSION = 'micro-landing-v5'
+
+/*
+ * WATCHDOG (sesion 11) — recupera la pantalla cuando el main thread del
+ * Stick TV se freeza.
+ *
+ * El main thread envia un postMessage de tipo 'heartbeat' cada 20s. El SW
+ * registra el timestamp del ultimo heartbeat por cliente. Si pasa mas de
+ * HEARTBEAT_TIMEOUT_MS sin recibir uno, asumimos que ese cliente esta
+ * freezado y disparamos client.navigate(client.url) — un reload forzado
+ * que el browser ejecuta a nivel de motor, sin depender del JS del main
+ * thread (que esta muerto).
+ *
+ * Por que esto puede recuperar lo que el location.reload() del main thread
+ * no puede: el location.reload() corre EN el main thread; si el thread esta
+ * bloqueado, nunca se ejecuta. client.navigate() corre EN el SW (otro thread),
+ * el browser lo procesa, y la pestana se reloadea.
+ *
+ * Limitacion honesta: el SW puede ser dormido por el browser cuando esta
+ * idle. Si el main thread muere y el SW tambien se durmio, no hay quien
+ * dispare el check. Mitigamos esto con un setTimeout dentro de waitUntil
+ * que mantiene al SW vivo por HEARTBEAT_TIMEOUT_MS + gracia despues de
+ * cada heartbeat — asi el SW siempre esta vivo el tiempo suficiente para
+ * detectar la ausencia de heartbeats subsiguientes.
+ */
+const HEARTBEAT_TIMEOUT_MS = 60 * 1000
+const HEARTBEAT_CHECK_GRACE_MS = 5 * 1000
+const lastHeartbeat = new Map()
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'heartbeat') return
+
+  const clientId = event.source?.id
+  if (clientId) {
+    lastHeartbeat.set(clientId, Date.now())
+  }
+
+  // Mantener el SW vivo el tiempo suficiente para detectar si los heartbeats
+  // dejan de llegar. Si llega otro heartbeat antes, este setTimeout corre
+  // igual y solo encuentra timestamps frescos (no navega a nadie).
+  event.waitUntil(
+    new Promise((resolve) => {
+      setTimeout(() => {
+        checkDeadClients().finally(resolve)
+      }, HEARTBEAT_TIMEOUT_MS + HEARTBEAT_CHECK_GRACE_MS)
+    }),
+  )
+})
+
+async function checkDeadClients() {
+  const now = Date.now()
+  const clients = await self.clients.matchAll({ type: 'window' })
+  const activeIds = new Set(clients.map((c) => c.id))
+
+  // Limpieza: borrar timestamps de clientes que ya no existen.
+  for (const id of lastHeartbeat.keys()) {
+    if (!activeIds.has(id)) lastHeartbeat.delete(id)
+  }
+
+  // Chequear cada cliente activo.
+  for (const client of clients) {
+    const lastBeat = lastHeartbeat.get(client.id) ?? now
+    const silentFor = now - lastBeat
+
+    if (silentFor > HEARTBEAT_TIMEOUT_MS) {
+      console.warn(
+        `[sw watchdog] cliente ${client.id} silencioso por ${silentFor}ms — reloading`,
+      )
+      try {
+        await client.navigate(client.url)
+        lastHeartbeat.delete(client.id)
+      } catch (err) {
+        console.error('[sw watchdog] navigate fallo:', err)
+      }
+    }
+  }
+}
 
 self.addEventListener('install', () => {
   // Skip waiting para que un SW nuevo desplace al viejo en cuanto se descarga,

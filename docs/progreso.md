@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 23/06/2026 (sesión 10).
+Actualizado al 23/06/2026 (sesión 11).
 
 ---
 
@@ -78,6 +78,53 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 11 (23/06/2026) — Watchdog vía Service Worker (recovery del freeze)**:
+  - **Contexto**: el freeze persistió después de sesión 10. Cliente
+    confirmó tres datos críticos: pasó después de más de 1 hora (el
+    reload preventivo del main thread NO se ejecutó), HealthIndicator
+    estaba en verde (no era problema de red), control remoto no
+    respondía (main thread completamente muerto). Único recovery
+    disponible: power-cycle de la TV.
+  - **Diagnóstico arquitectónico**: cualquier mecanismo que corre en
+    el main thread del browser (`setInterval`, `location.reload`,
+    listeners) es inútil si ese thread está muerto. Las únicas
+    formas de recuperar son el Service Worker (otro thread) o algo
+    a nivel sistema operativo (app kiosko, descartada).
+  - **`public/sw.js`**: implementado watchdog completo.
+    - `Map<clientId, timestamp>` para tracker el último heartbeat de
+      cada cliente.
+    - Listener de mensajes que registra heartbeats y programa un
+      `setTimeout` dentro de `event.waitUntil` para mantener al SW
+      vivo `HEARTBEAT_TIMEOUT_MS + grace` (65s) después de cada
+      heartbeat.
+    - `checkDeadClients()`: si un cliente lleva más de 60s sin
+      heartbeat, dispara `client.navigate(client.url)` desde el SW
+      → reload forzado que funciona aunque el main thread esté
+      muerto.
+    - Limpieza automática de timestamps de clientes que ya no
+      existen (cerraron pestaña, navegaron a otro origen).
+  - **`PantallaRotativa.tsx`**: nuevo `useEffect` que envía
+    heartbeat al SW cada 20 segundos vía
+    `navigator.serviceWorker.controller.postMessage({type:
+    'heartbeat'})`. Primera llamada inmediata para que el SW arranque
+    su timer cuanto antes.
+  - **`RELOAD_INTERVAL_MS` bajado de 60 → 30 minutos**: reduce la
+    ventana de exposición al freeze. Sigue siendo prevención, no
+    recovery, pero suma.
+  - **`public/sw.js`**: `CACHE_VERSION` bumpeado a `'micro-landing-v5'`
+    para que los Sticks descarguen el nuevo bundle con el código del
+    heartbeat.
+  - **Plan B documentado**: si el watchdog SW + reload de 30min no
+    resuelve el freeze, llegamos al techo de JS-only. El siguiente
+    paso lógico sería **Fully Kiosk Browser** en el Stick (descartado
+    en sesión 6 pero reabierto si hace falta). Razones documentadas
+    en `docs/decisiones.md`.
+  - **Cómo testear sin esperar un freeze real**: documentado en
+    `decisiones.md`. Chrome desktop → `while(true){}` en console →
+    esperar 65-70s → la página debería reloadearse sola.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓.
 
 - **Sesión 10 (23/06/2026) — Eliminar polling, reload horario, HealthIndicator**:
   - **Contexto**: el freeze del Stick TV persistía después de las
