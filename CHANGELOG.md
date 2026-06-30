@@ -5,6 +5,106 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 14 — 2026-06-24 (Escala de tamaño: rango 55%-120%)
+
+**Context**: el cliente pidió que el máximo de la escala de tamaño
+llegara a 120% (antes 100%), para que algunas imágenes puedan exceder
+su contenedor y tener más presencia.
+
+**Changed**
+- **`components/PantallaRotativa.tsx`**: `TAMANO_OFERTA_A_ESCALA`
+  remapeado a rango 55%-120% con paso lineal ~7,22%:
+  `1=55%, 2=62%, 3=69%, 4=77%, 5=84%, 6=91%, 7=98%, 8=106%, 9=113%,
+  10=120%`. El default (nivel 6) pasó de 80% a 91%.
+- **`lib/sheets.ts`** y **`types/index.ts`**: comentarios
+  actualizados al nuevo rango. El parser (valores válidos 1-10) no
+  cambió funcionalmente.
+- **`docs/api.md`**: mapeo nuevo + nota sobre valores >100%.
+
+**Trade-off**
+- Niveles 8-10 superan el 100%: la imagen excede el wrapper y puede
+  solaparse con el título o el círculo de precio del cartel.
+  Intencional (pedido del cliente). Documentado en
+  `docs/decisiones.md`; usar valores altos solo en imágenes que lo
+  toleren.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito.
+
+---
+
+### Sesión 13 — 2026-06-24 (Escala de tamaño de oferta ampliada a 1-10)
+
+**Context**: el cliente reportó que la columna "Tamaño" no tomaba
+valores y sospechaba de la ñ. Verificación contra el CSV real: la ñ
+funciona perfecto; el problema era que cargó valores fuera de la
+escala 1-5 (varios 10, un 7, un 6) que el parser descartaba al
+default. El cliente eligió ampliar la escala en vez de corregir la
+planilla.
+
+**Changed**
+- **`lib/sheets.ts`**: `TAMANO_OFERTA_MAX` 5 → 10,
+  `TAMANO_OFERTA_DEFAULT` 3 → 6 (mantiene neutral en 80%).
+- **`components/PantallaRotativa.tsx`**: `TAMANO_OFERTA_A_ESCALA`
+  redefinido a 10 niveles, mapeo lineal 55%→100% con paso de 5%.
+  Default extraído a `TAMANO_OFERTA_ESCALA_DEFAULT` (= nivel 6 = 80%).
+- **`types/index.ts`**: comentario de `Oferta.tamano` actualizado
+  a escala 1-10.
+- **`docs/api.md`**: doc del campo `tamano` actualizada (1-10,
+  default 6, mapeo).
+
+**Mapeo nuevo**: 1=55%, 2=60%, 3=65%, 4=70%, 5=75%, 6=80% (default),
+7=85%, 8=90%, 9=95%, 10=100%.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito.
+- Verificado contra los valores reales del cliente: 4→70%, 3→65%,
+  6→80%, 7→85%, 10→100%. Ninguno cae ya al default.
+
+---
+
+### Sesión 12 — 2026-06-24 (Feature: atenuado de pantalla por horario)
+
+**Added**
+- **`components/DimOverlay.tsx`**: velo negro (`opacity` 0.94)
+  superpuesto al `.screen` durante un rango horario configurable,
+  transparente fuera de él, con transición suave de 2s. Re-evalúa la
+  hora cada 30s vía `useSyncExternalStore`. Soporta rangos que cruzan
+  medianoche. Si las claves faltan o el formato es inválido, no
+  atenúa (fail-safe).
+- **`types/index.ts`**: claves `atenuarDesde` y `atenuarHasta`
+  (strings `"HH"` o `"HH:MM"`, formato 24hs) en `ConfigNegocio`.
+- **`lib/sheets.ts`**: parsers y aliases para las dos claves nuevas
+  (`atenuar desde`, `inicio atenuado`, `atenuar hasta`, `fin
+  atenuado`, etc.).
+- **`docs/api.md`**: documentación de las claves de atenuado en la
+  pestaña CONFIG.
+
+**Changed**
+- **`PantallaRotativa.tsx`**: monta `<DimOverlay>` con
+  `configRemota.atenuarDesde` / `.atenuarHasta`.
+
+**Note sobre ahorro de energía**
+- El overlay oscurece la imagen pero NO apaga el backlight en TVs
+  LED/LCD → el ahorro de energía real es casi nulo en esas pantallas
+  (sí ahorra en OLED). Para ahorro garantizado habría que cortar
+  corriente, pero el cliente pidió explícitamente no apagar la
+  pantalla. Detalle y alternativas en `docs/decisiones.md`.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio (0/0).
+- `npm run build`: éxito.
+- Lógica de rango horario testeada con casos sintéticos (rango
+  13-16, cruce de medianoche 23-6, formato con minutos, valores
+  inválidos).
+
+---
+
 ### Sesión 11 — 2026-06-23 (Watchdog vía Service Worker)
 
 **Context**: el freeze persistió después del deploy de sesión 10.

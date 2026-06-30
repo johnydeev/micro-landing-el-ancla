@@ -121,9 +121,12 @@ function esHeaderTamano(headerNormalizado: string): boolean {
   return TAMANO_OFERTA_KEYWORDS.some((keyword) => headerNormalizado.includes(keyword))
 }
 
-const TAMANO_OFERTA_DEFAULT = 3
+// Escala 1-10. Default 6 (= 91% con el mapeo de sesion 14, rango 55-120%).
+// Valores fuera de [1,10] caen al default. Ver el mapeo a porcentajes en
+// components/PantallaRotativa.tsx -> TAMANO_OFERTA_A_ESCALA.
+const TAMANO_OFERTA_DEFAULT = 6
 const TAMANO_OFERTA_MIN = 1
-const TAMANO_OFERTA_MAX = 5
+const TAMANO_OFERTA_MAX = 10
 
 interface OfertasTableHeader {
   offset: number
@@ -294,6 +297,10 @@ const CONFIG_PARSERS = {
   horarios: parseStr,
   whatsapp: parseStr,
   instagram: parseStr,
+  // Horas de atenuado se guardan como string ("13" o "13:00") y se validan
+  // en el cliente (components/DimOverlay.tsx). parseStr solo descarta vacios.
+  atenuarDesde: parseStr,
+  atenuarHasta: parseStr,
 } satisfies { [K in keyof Required<ConfigNegocio>]: ConfigParser<K> }
 
 const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
@@ -319,6 +326,18 @@ const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
   'whatsapp': 'whatsapp',
   'telefono': 'whatsapp',
   'instagram': 'instagram',
+  'atenuardesde': 'atenuarDesde',
+  'atenuar desde': 'atenuarDesde',
+  'atenuado desde': 'atenuarDesde',
+  'inicio atenuado': 'atenuarDesde',
+  'atenuar inicio': 'atenuarDesde',
+  'hora atenuado desde': 'atenuarDesde',
+  'atenuarhasta': 'atenuarHasta',
+  'atenuar hasta': 'atenuarHasta',
+  'atenuado hasta': 'atenuarHasta',
+  'fin atenuado': 'atenuarHasta',
+  'atenuar fin': 'atenuarHasta',
+  'hora atenuado hasta': 'atenuarHasta',
 }
 
 function normalizarClave(raw: string): keyof ConfigNegocio | null {

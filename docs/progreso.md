@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 23/06/2026 (sesión 11).
+Actualizado al 24/06/2026 (sesión 14).
 
 ---
 
@@ -78,6 +78,68 @@ types/
 ---
 
 ## Completado ✅
+
+- **Sesión 14 (24/06/2026) — Escala de tamaño: rango 55%-120%**:
+  - El cliente pidió que el máximo de la escala llegara a 120% (antes
+    100%), manteniendo 1=55% y progresión lineal.
+  - **`PantallaRotativa.tsx`**: `TAMANO_OFERTA_A_ESCALA` actualizado
+    a rango 55%-120%, paso ~7,22%: 1=55%, 2=62%, 3=69%, 4=77%, 5=84%,
+    6=91%, 7=98%, 8=106%, 9=113%, 10=120%.
+  - Default (nivel 6) pasó de 80% a 91% como consecuencia. No afecta
+    en la práctica (todas las ofertas tienen valor explícito).
+  - **Comentarios actualizados** en `lib/sheets.ts` y `types/index.ts`.
+  - **`docs/api.md`** actualizada con el mapeo nuevo + nota sobre
+    valores >100%.
+  - **Trade-off documentado**: niveles 8-10 (>100%) hacen que la
+    imagen exceda el wrapper y pueda solaparse con título/precio.
+    Intencional, pero usar con criterio.
+  - Solo cambió el mapeo visual; el parser (rango 1-10) quedó intacto.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build` ✓.
+
+- **Sesión 13 (24/06/2026) — Ampliar escala de tamaño de oferta a 1-10**:
+  - **Diagnóstico**: el cliente reportó que la columna "Tamaño" no
+    tomaba valores, sospechando de la ñ. Verificado contra el CSV
+    real: la ñ funciona perfecto (las 3 tablas detectan "Tamaño").
+    El problema era que había cargado valores fuera de la escala 1-5
+    (varios 10, un 7, un 6) que el parser descartaba al default.
+  - **Decisión del cliente**: ampliar la escala 1-5 → 1-10 (en vez
+    de corregir la planilla).
+  - **`lib/sheets.ts`**: `TAMANO_OFERTA_MAX` 5→10,
+    `TAMANO_OFERTA_DEFAULT` 3→6.
+  - **`PantallaRotativa.tsx`**: `TAMANO_OFERTA_A_ESCALA` redefinido
+    a 10 niveles, mapeo lineal 55%→100% (paso de 5%). Default 6=80%.
+  - **`types/index.ts`**: comentario de `tamano` actualizado a 1-10.
+  - **`docs/api.md`**: doc de `tamano` actualizada.
+  - Verificado que todos los valores actuales del cliente (4, 3, 6,
+    7, 10) ahora son válidos y mapean a porcentajes correctos.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓.
+
+- **Sesión 12 (24/06/2026) — Feature: atenuado de pantalla por horario**:
+  - Nueva feature pedida por el cliente: atenuar la pantalla en un
+    rango horario configurable (ej. siesta del mediodía 13-16hs) sin
+    apagarla, con vuelta automática al brillo normal.
+  - **`components/DimOverlay.tsx` nuevo**: velo negro `absolute`
+    sobre el `.screen`, opacidad 0.94 dentro del rango, 0 fuera,
+    transición de 2s. Usa `useSyncExternalStore` (re-evalúa cada 30s)
+    para evitar el lint de React 19. Soporta cruce de medianoche.
+    Fail-safe: formato inválido o clave faltante → no atenúa.
+  - **`types/index.ts`**: `atenuarDesde` y `atenuarHasta` (strings
+    `"HH"` o `"HH:MM"`) en `ConfigNegocio`.
+  - **`lib/sheets.ts`**: parsers (`parseStr`) + aliases de las dos
+    claves (`atenuar desde`, `inicio atenuado`, `atenuar hasta`,
+    `fin atenuado`, etc.).
+  - **`PantallaRotativa.tsx`**: monta `<DimOverlay>` con las claves
+    de `configRemota`.
+  - **Aclaración de alcance documentada**: en TVs LED/LCD el overlay
+    oscurece pero NO apaga el backlight → ahorro de energía real casi
+    nulo. Solo ahorra en OLED. Para ahorro garantizado habría que
+    cortar corriente (enchufe inteligente), pero el cliente NO quiere
+    apagar la pantalla. Detalle en `docs/decisiones.md`.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓ (0/0), `next build`
+    ✓, lógica de rango horario testeada con casos sintéticos
+    (rango normal, cruce de medianoche, formato con minutos,
+    valores inválidos).
 
 - **Sesión 11 (23/06/2026) — Watchdog vía Service Worker (recovery del freeze)**:
   - **Contexto**: el freeze persistió después de sesión 10. Cliente

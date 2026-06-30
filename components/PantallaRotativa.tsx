@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer, useState, type CSSProperties } from 'react'
 
+import DimOverlay from '@/components/DimOverlay'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
 import HealthIndicator from '@/components/HealthIndicator'
@@ -206,6 +207,7 @@ export default function PantallaRotativa({
   return (
     <main className={styles.pageShell}>
       <div className={styles.screen} style={screenVars}>
+        <DimOverlay desde={configRemota.atenuarDesde} hasta={configRemota.atenuarHasta} />
         <HealthIndicator />
         <Header />
         {ofertaActual ? (
@@ -258,19 +260,33 @@ export default function PantallaRotativa({
 }
 
 /*
- * Mapeo de la escala 1-5 de la columna "tamano" del Sheets a un porcentaje
- * concreto del wrapper de la imagen. El default (3 = 80%) coincide con el
- * comportamiento previo a la feature, para que las ofertas existentes sin
- * la columna no cambien visualmente. Si en el futuro se quiere mas
- * granularidad (1-10) o ajustar valores, este es el unico lugar a tocar.
+ * Mapeo de la escala 1-10 de la columna "tamano" del Sheets a un porcentaje
+ * del wrapper de la imagen. Lineal: rango 55%-120%, paso de ~7,22% entre
+ * niveles (redondeado a entero). El default es el nivel 6 (= 91%).
+ * Ampliado a rango 55-120% en sesion 14 (antes 55-100%) porque el cliente
+ * queria que las imagenes mas grandes pudieran exceder el wrapper.
+ *
+ * OJO: niveles 8-10 (>100%) hacen que la imagen sea mas grande que su
+ * contenedor y pueda solaparse con el titulo o el circulo de precio del
+ * cartel. Es intencional (el cliente lo pidio) pero hay que usar esos
+ * valores altos solo en imagenes que visualmente lo toleren.
+ *
+ * Este es el unico lugar a tocar si se quieren ajustar los porcentajes.
  */
 const TAMANO_OFERTA_A_ESCALA: Record<number, string> = {
-  1: '60%',
-  2: '70%',
-  3: '80%',
-  4: '90%',
-  5: '100%',
+  1: '55%',
+  2: '62%',
+  3: '69%',
+  4: '77%',
+  5: '84%',
+  6: '91%',
+  7: '98%',
+  8: '106%',
+  9: '113%',
+  10: '120%',
 }
+
+const TAMANO_OFERTA_ESCALA_DEFAULT = TAMANO_OFERTA_A_ESCALA[6]
 
 function CartelOferta({ oferta }: { oferta: Oferta }) {
   const [imgError, setImgError] = useState(false)
@@ -292,9 +308,9 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
   }
 
   // Tamano por-oferta via CSS variable. El parser de lib/sheets.ts ya
-  // garantiza que `tamano` esta en el rango 1-5, asi que el fallback
-  // a TAMANO_OFERTA_A_ESCALA[3] solo se usaria si alguien rompe el contrato.
-  const escalaImagen = TAMANO_OFERTA_A_ESCALA[oferta.tamano] ?? TAMANO_OFERTA_A_ESCALA[3]
+  // garantiza que `tamano` esta en el rango 1-10, asi que el fallback
+  // solo se usaria si alguien rompe el contrato.
+  const escalaImagen = TAMANO_OFERTA_A_ESCALA[oferta.tamano] ?? TAMANO_OFERTA_ESCALA_DEFAULT
   const imageVars = { '--cartel-image-scale': escalaImagen } as CSSProperties
 
   // Todo el layout vive en page.module.css. Los colores entran via CSS vars

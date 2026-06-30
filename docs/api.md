@@ -90,14 +90,33 @@ GOOGLE_SHEETS_GID_OFERTAS`.
   `"INACTIVO"` se filtran en el servidor.
 - `imagen` es el **slug del PNG** dentro de `public/ofertas/`. La
   pantalla principal lo usa como `/ofertas/{slug}.png`.
-- `tamano` es un entero **1-5** que controla el tamaño de la imagen
-  dentro del cartel (1 = más chica, 5 = más grande). Default `3`.
-  Es opcional en el Sheets: si falta la columna o el valor es
-  inválido (no entero, fuera de rango), se aplica `3`.
+- `tamano` es un entero **1-10** que controla el tamaño de la imagen
+  dentro del cartel (1 = más chica = 55%, 10 = más grande = 120%).
+  Default `6` (=91%). Es opcional en el Sheets: si falta la columna o
+  el valor es inválido (no entero, fuera de rango 1-10), se aplica `6`.
+  Mapeo lineal (paso ~7%): 1=55%, 2=62%, 3=69%, 4=77%, 5=84%, 6=91%,
+  7=98%, 8=106%, 9=113%, 10=120%. **Nota**: valores 8-10 superan el
+  100%, la imagen excede su contenedor y puede solaparse con el título
+  o el precio — usar esos valores solo en imágenes que lo toleren.
 - Si falta `GOOGLE_SHEETS_GID_OFERTAS` o el CSV no contiene la fila de
   encabezado esperada (`titulo`, `precio`, `slug imagen`, `estado`),
   devuelve `[]`. La 5ta columna `tamaño` / `escala` / `size` es
   **opcional** — ver `docs/decisiones.md` para los nombres aceptados.
+
+### Atenuado de pantalla por horario (config)
+
+La pestaña CONFIG soporta dos claves opcionales para atenuar la
+pantalla en un rango horario (formato 24hs, `"HH"` o `"HH:MM"`):
+
+| Clave (alias aceptados) | Ejemplo | Descripción |
+|---|---|---|
+| `atenuar desde` / `inicio atenuado` | `13` o `13:00` | Hora en que empieza el atenuado |
+| `atenuar hasta` / `fin atenuado` | `16` o `16:00` | Hora en que termina el atenuado |
+
+Si falta cualquiera de las dos, o el formato es inválido, la
+atenuación queda **desactivada**. Soporta rangos que cruzan
+medianoche (ej. `23` a `6`). Ver `components/DimOverlay.tsx` y la
+nota sobre ahorro de energía en `docs/decisiones.md`.
 
 ### `GET /api/config`
 

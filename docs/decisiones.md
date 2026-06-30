@@ -5,6 +5,181 @@ motivó y la alternativa descartada.
 
 ---
 
+## 2026-06-24 — Escala de tamaño: rango 55%-120% (permitir exceder el wrapper)
+
+### Pedido
+
+Tras ampliar a 1-10 (escala 55%-100%), el cliente pidió que el
+máximo llegara a **120%**, manteniendo 1=55% y progresión lineal en
+los intermedios. Motivo: algunas imágenes necesitan ser más grandes
+que el contenedor para tener impacto visual en el cartel.
+
+### Cambio
+
+Solo se tocó el mapeo en `PantallaRotativa.tsx`
+(`TAMANO_OFERTA_A_ESCALA`). Rango pasó de 55-100% a **55-120%**, paso
+lineal ~7,22% redondeado a entero:
+
+`1=55%, 2=62%, 3=69%, 4=77%, 5=84%, 6=91%, 7=98%, 8=106%, 9=113%, 10=120%`
+
+El default (nivel 6) pasó de 80% a **91%** como consecuencia del
+nuevo rango. En la práctica no afecta porque todas las ofertas del
+cliente tienen un valor de tamaño explícito.
+
+### Trade-off importante: imágenes >100%
+
+Los niveles 8-10 hacen que la imagen sea **más grande que su
+wrapper** (`.cartelImageWrap`). Con `object-fit: contain` la imagen
+mantiene proporción pero ocupa más espacio del previsto, y **puede
+solaparse con el título de la oferta o el círculo de precio**.
+
+Es intencional (el cliente lo pidió), pero queda documentado que:
+- Esos valores altos hay que usarlos con criterio, solo en imágenes
+  cuya composición lo tolere (ej. producto centrado con aire
+  alrededor).
+- Si en el futuro molesta el solape, la solución sería recortar con
+  `overflow: hidden` en `.cartelImageWrap` o reposicionar los
+  elementos del cartel. No se hizo ahora porque el cliente quiere
+  justamente que la imagen "se desborde".
+
+### Por qué no se tocó el parser
+
+El rango de valores válidos sigue siendo 1-10 (`lib/sheets.ts` sin
+cambios funcionales). Solo cambió cómo cada nivel se traduce a
+porcentaje, que vive enteramente en el componente. Buena separación:
+el "qué valores acepta" (parser) y el "cómo se ve cada valor"
+(mapeo visual) están desacoplados.
+
+---
+
+## 2026-06-24 — Ampliar escala de tamaño de oferta de 1-5 a 1-10
+
+### Problema reportado
+
+El cliente reportó que la columna "Tamaño" de las ofertas "no tomaba
+los valores" y sospechaba de la ñ. Verificación contra el CSV real
+(descargado con las env vars y corrido contra la lógica real de
+`findOfertasTableOffsets` / `esHeaderTamano` / `parseTamanoOferta`):
+
+- **La ñ no era el problema.** Las 3 tablas (RES, CERDO, POLLO)
+  detectaban "Tamaño" → "tamano" → `tieneTamano=true` correctamente.
+  El fix del PR #2 (matching por substring + `quitarAcentos`) ya
+  funcionaba bien.
+- **El problema real**: el cliente había cargado valores fuera de la
+  escala 1-5 — varios `10`, un `7`, un `6`. El parser los descartaba
+  (correctamente, según el contrato vigente) y aplicaba el default
+  `3`. Para el cliente esto era indistinguible de "no toma el valor".
+
+### Decisión
+
+El cliente eligió **ampliar la escala de 1-5 a 1-10** (en vez de
+corregir la planilla a 1-5), porque quería más granularidad y ya
+estaba pensando en términos de "10 = lo más grande".
+
+Cambios:
+- `lib/sheets.ts`: `TAMANO_OFERTA_MAX` 5 → 10. `TAMANO_OFERTA_DEFAULT`
+  3 → 6 (mantiene el neutral en 80%).
+- `PantallaRotativa.tsx`: `TAMANO_OFERTA_A_ESCALA` redefinido a 10
+  niveles, mapeo lineal 55%→100% con paso de 5%.
+
+### Mapeo elegido
+
+| Valor | % | | Valor | % |
+|---|---|---|---|---|
+| 1 | 55% | | 6 (default) | 80% |
+| 2 | 60% | | 7 | 85% |
+| 3 | 65% | | 8 | 90% |
+| 4 | 70% | | 9 | 95% |
+| 5 | 75% | | 10 | 100% |
+
+- **Rango 55%-100%**: por debajo de 55% la imagen pierde impacto
+  visual; 100% es el máximo físico (llena el wrapper sin salirse).
+- **Default 6 = 80%**: equivalente al viejo default (3 = 80% en la
+  escala 1-5), para que ofertas sin configurar se vean igual que antes.
+- **Lineal con paso de 5%**: predecible para el cliente, fácil de
+  ajustar.
+
+### Trade-off
+
+Las ofertas que el cliente ya tenía configuradas en la escala vieja
+cambian de tamaño con el nuevo mapeo (ej. antes 4=90%, ahora 4=70%).
+Aceptable porque el cliente está reconfigurando activamente y los
+valores 6/7/10 que ya tenía cargados pasan a ser válidos y a
+aplicarse como espera. Se le mostró la tabla de cómo quedan sus
+valores actuales antes de cerrar.
+
+### Lección de diagnóstico
+
+"El cliente dice que X no funciona" no siempre es un bug de código.
+Acá el código funcionaba perfecto; el problema era input fuera de
+rango. La verificación correcta fue **correr la lógica real contra
+los datos reales** (descargar el CSV con las env vars), no leer el
+código y suponer. Esa técnica ya había servido antes (sesión del
+bug de las tablas que no renderizaban — celda vacía entre headers).
+
+---
+
+## 2026-06-24 — Atenuado de pantalla por horario (overlay, no backlight)
+
+### Pedido
+
+El cliente quiere atenuar la pantalla en las horas muertas (ej. la
+siesta del mediodía, 13 a 16hs) sin apagarla del todo, con horarios
+configurables desde la pestaña CONFIG del Sheets en formato 24hs, y
+que vuelva sola al brillo normal al terminar el rango.
+
+### Implementación
+
+`components/DimOverlay.tsx`: un velo negro `position: absolute` sobre
+todo el `.screen`, con `opacity` 0.94 durante el rango y 0 fuera de
+él, transición suave de 2s. Dos claves nuevas en `ConfigNegocio`:
+`atenuarDesde` y `atenuarHasta` (strings `"HH"` o `"HH:MM"`).
+
+- La hora se toma del **reloj del dispositivo** (Stick TV), no del
+  servidor. Asume que Android tiene la hora sincronizada por NTP.
+- Soporta rangos que cruzan medianoche (`estaEnRango` maneja
+  `desde > hasta`).
+- Usa `useSyncExternalStore` para suscribirse al paso del tiempo
+  (re-evalúa cada 30s) sin disparar el lint `set-state-in-effect`
+  de React 19.
+- Si falta alguna clave o el formato es inválido, la atenuación
+  queda desactivada (fail-safe: ante la duda, no atenúa).
+
+### Aclaración importante sobre "ahorro de energía"
+
+El cliente mencionó el ahorro de energía como motivación. Hay que
+ser honesto sobre el alcance real:
+
+- **En TVs LED/LCD** (la gran mayoría, y casi seguro la del local):
+  el overlay negro **oscurece la imagen pero NO apaga el backlight**.
+  El backlight es una lámpara detrás del panel que consume lo mismo
+  esté la imagen blanca o negra. **El ahorro de energía real es
+  prácticamente nulo.** Lo que sí se logra: menos luz molesta en
+  horas muertas, descanso visual, y potencialmente algo de vida útil
+  del panel.
+- **En TVs OLED**: cada píxel emite su propia luz, así que negro =
+  píxel apagado = ahorro real. Si la TV del local es OLED, sí ahorra.
+
+Para **ahorro de energía real garantizado**, la única vía es cortar
+la corriente de la TV (ej. el enchufe inteligente que ya se evaluó
+para el tema del freeze, programado para apagar la TV en el rango de
+siesta). Pero eso apaga la pantalla del todo, que es justo lo que el
+cliente dijo NO querer.
+
+La feature se implementó igual porque tiene valor (menos luz, menos
+desgaste, ahorro real si es OLED) y porque era un pedido explícito.
+La expectativa de ahorro quedó aclarada con el cliente.
+
+### Por qué una web no puede controlar el backlight
+
+Las APIs del navegador no exponen control del brillo de hardware de
+la pantalla. `Screen Brightness API` existe pero es experimental,
+solo en algunos contextos (PWA instalada, ciertos Android) y no
+disponible en el browser de un Stick TV genérico. El overlay es lo
+máximo que se puede hacer desde una web normal.
+
+---
+
 ## 2026-05-25 — Server Component + polling cliente sobre `router.refresh()`
 
 ### Problema
