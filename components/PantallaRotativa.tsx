@@ -101,12 +101,24 @@ interface PantallaRotativaProps {
   listas: ListaPrecios[]
   ofertas: Oferta[]
   configRemota: ConfigNegocio
+  /**
+   * Modo desarrollador: si esta definido, la pantalla arranca fija en ese
+   * modo y la rotacion NO corre (sin setInterval, sin reload periodico).
+   * Usado por las rutas /vistaCartel y /vistaLista para iterar sobre el
+   * diseno sin esperar el timer. La ruta `/` (cliente final) no pasa esta
+   * prop, asi que su comportamiento no cambia.
+   */
+  modoFijo?: 'tabla' | 'cartel'
+  /** Indice de lista/oferta a mostrar cuando `modoFijo` esta definido. Default 0. */
+  indiceFijo?: number
 }
 
 export default function PantallaRotativa({
   listas,
   ofertas,
   configRemota,
+  modoFijo,
+  indiceFijo = 0,
 }: PantallaRotativaProps) {
   // Los datos vienen DIRECTO de props del Server Component. No hay polling
   // client-side: cada `RELOAD_INTERVAL_MS` la pantalla se reloadea completa
@@ -116,6 +128,14 @@ export default function PantallaRotativa({
   const [{ modo, listaIndex, cartelIndex }, dispatchRotation] = useReducer(
     rotationReducer,
     ROTATION_INITIAL,
+    (initial) =>
+      modoFijo
+        ? {
+            modo: modoFijo,
+            listaIndex: modoFijo === 'tabla' ? indiceFijo : 0,
+            cartelIndex: modoFijo === 'cartel' ? indiceFijo : 0,
+          }
+        : initial,
   )
 
   const segundosCartel = configRemota.segundosCartel ?? negocioConfig.segundosCartel
@@ -127,11 +147,12 @@ export default function PantallaRotativa({
   // Para recovery cuando el main thread muere, el watchdog del SW
   // (ver useEffect siguiente) toma el relevo.
   useEffect(() => {
+    if (modoFijo) return // modo dev: sin reload periodico
     const id = window.setInterval(() => {
       window.location.reload()
     }, RELOAD_INTERVAL_MS)
     return () => window.clearInterval(id)
-  }, [])
+  }, [modoFijo])
 
   // Heartbeat al Service Worker. El SW tiene logica de watchdog:
   // si pasa mas de 60s sin recibir un heartbeat de un cliente, asume
@@ -172,6 +193,7 @@ export default function PantallaRotativa({
   // Rotacion entre tabla y cartel. Un solo dispatch por tick — el reducer
   // se encarga de calcular el nuevo estado atomicamente. Sin nested setters.
   useEffect(() => {
+    if (modoFijo) return // modo dev: pantalla fija, sin rotacion
     if (listas.length === 0 && ofertas.length === 0) return
 
     const ms = (modo === 'tabla' ? segundosTabla : segundosCartel) * 1000
@@ -185,7 +207,7 @@ export default function PantallaRotativa({
     }, ms)
 
     return () => window.clearInterval(intervalId)
-  }, [modo, listas.length, ofertas.length, segundosCartel, segundosTabla])
+  }, [modoFijo, modo, listas.length, ofertas.length, segundosCartel, segundosTabla])
 
   // Inyectamos los colores de marca y el factor de tipografia como CSS custom
   // properties en el contenedor `.screen`. El CSS module los consume via
@@ -328,6 +350,21 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
         <br />
         OFERTA
       </div>
+
+      {oferta.descripcion && (
+        <div className={styles.cartelAclaracion}>
+          {/* Cada coma en la celda "Nota" del Sheets es un salto de linea
+              explicito, para que el cliente controle el corte sin depender
+              del wrap automatico del CSS. */}
+          {oferta.descripcion
+            .split(',')
+            .map((linea) => linea.trim())
+            .filter(Boolean)
+            .map((linea, i) => (
+              <div key={i}>{linea}</div>
+            ))}
+        </div>
+      )}
 
       <div className={styles.cartelTitleWrap}>
         <div className={styles.cartelTitle}>{oferta.nombre}</div>

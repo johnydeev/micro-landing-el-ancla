@@ -22,6 +22,15 @@ export interface Oferta {
    * porcentaje en components/PantallaRotativa.tsx -> TAMANO_OFERTA_A_ESCALA.
    */
   tamano: number
+  /**
+   * Aclaracion/condicion corta de la oferta (ej. "Solo efectivo", "Valido
+   * de lunes a viernes"). No es una descripcion del producto. Se muestra en
+   * un badge debajo de "SUPER OFERTA". Columna opcional en el Sheets
+   * (alias aceptados: descripcion, aclaracion, condicion, detalle, nota) —
+   * si falta o esta vacia, el badge no se muestra. Parseo en
+   * lib/sheets.ts -> findOfertasTableOffsets / mapRowToOfertas.
+   */
+  descripcion: string
 }
 
 export interface ConfigNegocio {

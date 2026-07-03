@@ -128,10 +128,29 @@ const TAMANO_OFERTA_DEFAULT = 6
 const TAMANO_OFERTA_MIN = 1
 const TAMANO_OFERTA_MAX = 10
 
+/*
+ * Palabras clave aceptadas para la columna OPCIONAL de aclaracion/condicion
+ * de la oferta (ej. "Solo efectivo", "Valido de lunes a viernes"). No es
+ * una descripcion del producto: es una condicion corta que se muestra en un
+ * badge debajo de "SUPER OFERTA". Misma logica de deteccion tolerante que
+ * TAMANO_OFERTA_KEYWORDS: basta con que el header CONTENGA alguna palabra.
+ */
+const DESCRIPCION_OFERTA_KEYWORDS = ['descripcion', 'aclaracion', 'condicion', 'detalle', 'nota']
+
+function esHeaderDescripcion(headerNormalizado: string): boolean {
+  return DESCRIPCION_OFERTA_KEYWORDS.some((keyword) => headerNormalizado.includes(keyword))
+}
+
 interface OfertasTableHeader {
   offset: number
   /** true si la 5ta columna (offset+4) es un header de tamano. */
   tieneTamano: boolean
+  /**
+   * true si hay un header de descripcion/aclaracion. Su posicion depende de
+   * si tieneTamano: offset+5 si tamano esta presente, offset+4 si no (para
+   * seguir soportando el caso en que el cliente no cargo la columna tamano).
+   */
+  tieneDescripcion: boolean
 }
 
 function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
@@ -153,7 +172,14 @@ function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
       // y las ofertas usan el default.
       const quinta = quitarAcentos((headerRow[i + 4] ?? '').trim().toLowerCase())
       const tieneTamano = esHeaderTamano(quinta)
-      result.push({ offset: i, tieneTamano })
+
+      // La descripcion va despues de tamano si tamano esta presente, o
+      // justo despues de estado si no lo esta.
+      const offsetDescripcion = tieneTamano ? i + 5 : i + 4
+      const columnaDescripcion = quitarAcentos((headerRow[offsetDescripcion] ?? '').trim().toLowerCase())
+      const tieneDescripcion = esHeaderDescripcion(columnaDescripcion)
+
+      result.push({ offset: i, tieneTamano, tieneDescripcion })
     }
   }
 
@@ -170,7 +196,7 @@ function parseTamanoOferta(raw: string): number {
 function mapRowToOfertas(columns: string[], headers: OfertasTableHeader[]): Oferta[] {
   const ofertas: Oferta[] = []
 
-  for (const { offset, tieneTamano } of headers) {
+  for (const { offset, tieneTamano, tieneDescripcion } of headers) {
     const [nombre = '', precio = '', imagen = '', estado = ''] = columns
       .slice(offset, offset + 4)
       .map((column) => (column ?? '').trim())
@@ -183,7 +209,10 @@ function mapRowToOfertas(columns: string[], headers: OfertasTableHeader[]): Ofer
       ? parseTamanoOferta((columns[offset + 4] ?? '').trim())
       : TAMANO_OFERTA_DEFAULT
 
-    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado, tamano })
+    const offsetDescripcion = tieneTamano ? offset + 5 : offset + 4
+    const descripcion = tieneDescripcion ? (columns[offsetDescripcion] ?? '').trim() : ''
+
+    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado, tamano, descripcion })
   }
 
   return ofertas
@@ -398,6 +427,19 @@ export async function getConfig(): Promise<ConfigNegocio> {
     console.error('Error en getConfig:', error)
     return {}
   }
+}
+
+export async function getPantallaData(): Promise<{
+  listas: ListaPrecios[]
+  ofertas: Oferta[]
+  configRemota: ConfigNegocio
+}> {
+  const [listas, ofertas, configRemota] = await Promise.all([
+    getListasPrecios(),
+    getOfertas(),
+    getConfig(),
+  ])
+  return { listas, ofertas, configRemota }
 }
 
 export async function getOfertas(): Promise<Oferta[]> {

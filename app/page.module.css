@@ -199,6 +199,27 @@
   clip-path: polygon(0 0, 100% 0, 55% 100%, 0% 100%);
 }
 
+/*
+ * Badge de aclaracion/condicion de la oferta (ej. "Solo efectivo"), debajo
+ * de "SUPER OFERTA". Mismo azul marino que el titulo, texto blanco. Solo se
+ * renderiza si `oferta.descripcion` no esta vacio (ver CartelOferta).
+ */
+.cartelAclaracion {
+  position: absolute;
+  top: 50%;
+  left: 8%;
+  max-width: 18%;
+  background: var(--c-secundario);
+  border: 3px solid #fff;
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: clamp(18px, 2.1vw, 32px);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.25;
+}
+
 /* Badge "SUPER OFERTA" arriba a la izquierda, color primario. */
 .cartelBadge {
   position: absolute;
@@ -284,7 +305,7 @@
   align-items: center;
   color: #fff;
   text-align: center;
-  padding: 0 8%;
+  padding: 0 10%;
   font-size: calc(var(--circle-size) * 0.25);
 }
 
