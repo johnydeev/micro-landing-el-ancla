@@ -79,7 +79,8 @@ GOOGLE_SHEETS_GID_OFERTAS`.
     "precio": "18000",
     "imagen": "asado",
     "estado": "ACTIVO",
-    "tamano": 3
+    "tamano": 3,
+    "descripcion": "Solo efectivo"
   }
 ]
 ```
@@ -98,10 +99,19 @@ GOOGLE_SHEETS_GID_OFERTAS`.
   7=98%, 8=106%, 9=113%, 10=120%. **Nota**: valores 8-10 superan el
   100%, la imagen excede su contenedor y puede solaparse con el título
   o el precio — usar esos valores solo en imágenes que lo toleren.
+- `descripcion` es una **aclaración/condición corta de la oferta** (ej.
+  "Solo efectivo", "Válido de lunes a viernes") — **no** una descripción
+  del producto. Se muestra en un badge debajo de "SUPER OFERTA". Columna
+  opcional (alias aceptados: `descripcion`, `aclaracion`, `condicion`,
+  `detalle`, `nota`), posicionada después de `tamaño` si esa columna
+  existe, o después de `estado` si no. Si falta o está vacía, el string
+  es `""` y el badge no se renderiza. Cada coma en el valor se muestra
+  como salto de línea explícito en el cartel.
 - Si falta `GOOGLE_SHEETS_GID_OFERTAS` o el CSV no contiene la fila de
   encabezado esperada (`titulo`, `precio`, `slug imagen`, `estado`),
-  devuelve `[]`. La 5ta columna `tamaño` / `escala` / `size` es
-  **opcional** — ver `docs/decisiones.md` para los nombres aceptados.
+  devuelve `[]`. Las columnas `tamaño`/`escala`/`size` y
+  `descripcion`/`aclaracion`/`condicion`/`detalle`/`nota` son
+  **opcionales** — ver `docs/decisiones.md` para los nombres aceptados.
 
 ### Atenuado de pantalla por horario (config)
 

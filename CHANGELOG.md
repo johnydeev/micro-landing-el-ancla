@@ -5,6 +5,122 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 16 — 2026-07-03 (Auditoría de rendimiento Fire TV)
+
+**Context**: se pidió una auditoría completa de arquitectura/React/Next.js/
+imágenes orientada a estabilidad 24/7 en Fire TV (no congelarse, no
+degradar memoria, poder correr semanas sin reinicio). La mayoría de los
+anti-patrones "de manual" ya habían sido encontrados y corregidos en
+sesiones 6-11 (polling, nested setState, SW sirviendo el tipo de contenido
+equivocado). El hallazgo real fue una regresión de un bug ya documentado.
+
+**Found (🔴 crítico)**: 4 imágenes de `public/ofertas/` agregadas después
+del pipeline de compresión de sesión 9 (`rabito-huesito-cuerito.png` 3.2 MB,
+`mondongo.png` 2.0 MB, `pechitox2.png` 1.6 MB, `rabo.png` 0.76 MB — 7.3 MB
+sin optimizar sobre 12 MB totales) reproducen exactamente la hipótesis de
+freeze por presión de memoria/decodificación ya documentada en
+`docs/decisiones.md` (ADR 2026-06-19). El pipeline de `sharp` de esa sesión
+nunca se automatizó — se corrió a mano una vez y se olvidó, como ya había
+pasado con `lechon.png` en sesión 9.
+
+**Added**
+- **`scripts/optimize-images.mjs`**: formaliza el pipeline de compresión
+  (mismo `sharp.resize({width:1200}).png({compressionLevel:9, effort:10})`
+  de sesión 9) para `public/ofertas/*.png` y `public/logo.png` (400px de
+  ancho, suficiente para su tamaño en pantalla). Advierte (no bloquea) si
+  alguna oferta queda por encima de 500 KB tras comprimir.
+- **`sharp` como devDependency real** (antes era `npm install --no-save`,
+  no versionado).
+- **`npm run optimize:images`** y **`prebuild`** en `package.json`: el
+  pipeline corre automáticamente en cada `next build` (incluido el deploy
+  de Vercel), ya no depende de que alguien se acuerde de correrlo a mano.
+
+**Changed**
+- **Imágenes comprimidas**: `rabito-huesito-cuerito.png` 3.2MB→387KB,
+  `mondongo.png` 2.0MB→168KB, `pechitox2.png` 1.6MB→330KB, `rabo.png`
+  762KB→227KB, `vacio.png` 330KB→97KB (de yapa), `logo.png` 991KB→60KB.
+  `costillar.png` quedó en 576KB (ya estaba así desde sesión 9, `sharp` no
+  lo comprime más sin pérdida de calidad — no bloquea el build).
+- **`components/PantallaRotativa.tsx`**: `width`/`height` explícitos en el
+  `<img>` del cartel de oferta. **`components/Header.tsx`**: idem en el
+  logo. Ayuda al motor de renderizado (más débil en Fire TV) a reservar
+  espacio antes de decodificar.
+- **`public/sw.js` (`CACHE_VERSION` → `v6`)**: eliminada `esRscRequest()` y
+  la rama de manejo de RSC en `handleFetch()`. Ese código protegía contra
+  `router.refresh()` (sesiones 7-8), pero desde sesión 10 la app no hace
+  ningún fetch client-side — el único refresh es un reload completo
+  (navegación real, no RSC). Era código muerto desde entonces; se saca
+  para simplificar el próximo diagnóstico.
+- **`PantallaRotativa.tsx`**: guard `if (modoFijo) return` en el efecto de
+  heartbeat al Service Worker (las rutas dev `/vistaCartel`/`/vistaLista`
+  no necesitan alimentar un watchdog que no van a usar).
+
+**Pendiente (no se pudo hacer desde este entorno)**
+- **Validar el watchdog de Service Worker en el navegador real del Fire TV**
+  (Amazon Silk, no Chrome desktop). El procedimiento de test de sesión 11
+  solo se corrió en Chrome de escritorio; Silk podría tener soporte
+  parcial de `client.navigate()`/Service Worker que invalide la
+  recuperación automática. Requiere el dispositivo físico.
+- **Migración a WebP**: evaluada, no aplicada — cambia el contrato
+  `/ofertas/{slug}.png` que ya usa el cliente al subir imágenes. Queda
+  como mejora futura si hace falta más compresión.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio.
+- `npm run build`: éxito, incluyendo el `prebuild` corriendo el pipeline
+  de imágenes de punta a punta.
+
+---
+
+### Sesión 15 — 2026-07-02 (Badge de aclaración de oferta + rutas de desarrollo)
+
+**Context**: el cliente pidió agregar más columnas a las 3 tablas de la
+pestaña de Ofertas (RES/CERDO/POLLO, cada una detectada dinámicamente por
+`findOfertasTableOffsets`). Tras varias idas y vueltas de alcance, quedó
+claro que el pedido real era: una columna nueva de "aclaración/condición"
+de la oferta (ej. "Solo efectivo", "Válido de lunes a viernes" — **no** una
+descripción del producto) mostrada como badge en el cartel, más 2 columnas
+en blanco de separación visual entre cada tabla en el Sheets.
+
+**Added**
+- **`app/vistaCartel/page.tsx`** y **`app/vistaLista/page.tsx`**: rutas de
+  desarrollo que fijan la pantalla en modo `cartel`/`tabla` sin rotación
+  (acepta `?index=N`), para iterar sobre el diseño sin esperar el timer de
+  `segundosCartel`/`segundosTabla`. No las usa el cliente final — `/` no
+  cambia de comportamiento.
+- **`PantallaRotativa.tsx`**: props `modoFijo`/`indiceFijo`. Cuando
+  `modoFijo` está definido, el estado de rotación arranca fijo (lazy
+  initializer de `useReducer`) y los efectos de reload/rotación/heartbeat
+  no corren.
+- **`lib/sheets.ts` → `getPantallaData()`**: helper compartido que agrupa
+  los 3 fetches (`getListasPrecios`, `getOfertas`, `getConfig`) — lo usan
+  `app/page.tsx` y las 2 rutas nuevas.
+- **`Oferta.descripcion: string`** (`types/index.ts`): columna opcional en
+  el Sheets, detectada por header (`descripcion`, `aclaracion`,
+  `condicion`, `detalle`, `nota` — normalizado sin acentos, por substring).
+  Su posición es dinámica: `offset+5` si la columna `tamano` está presente,
+  `offset+4` si no. Si falta o está vacía, el badge no se renderiza.
+- **`components/PantallaRotativa.tsx` (`CartelOferta`)**: badge navy marino
+  (`var(--c-secundario)`) con borde blanco de 3px (para distinguirse de la
+  franja diagonal, que es del mismo azul), debajo del badge "SUPER OFERTA".
+  Cada coma en la celda del Sheets se renderiza como salto de línea
+  explícito (`descripcion.split(',').map(...)`), en vez de depender del
+  wrap automático del CSS.
+
+**Validated con datos reales de producción**: las 3 tablas (RES, CERDO,
+POLLO) del Sheets real se extendieron con una columna "Nota" + 2 columnas
+en blanco de separador antes de la siguiente tabla. Confirmado contra
+`/api/ofertas` que `PICADA PREMIUM` y `LOMO de Ternera` traen el campo
+`descripcion` poblado y el resto vacío, como se espera.
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio.
+- `npm run build`: éxito.
+
+---
+
 ### Sesión 14 — 2026-06-24 (Escala de tamaño: rango 55%-120%)
 
 **Context**: el cliente pidió que el máximo de la escala de tamaño

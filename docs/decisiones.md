@@ -5,6 +5,136 @@ motivó y la alternativa descartada.
 
 ---
 
+## 2026-07-03 — Automatizar el pipeline de optimización de imágenes (`prebuild`)
+
+### Problema
+
+El pipeline de compresión de imágenes con `sharp` (ADR 2026-06-19) se
+corrió **a mano** la primera vez y quedó documentado el riesgo de que
+volviera a pasar si alguien subía una imagen nueva sin pasarla por ahí.
+Pasó exactamente eso **dos veces**:
+
+1. `lechon.png` en sesión 9 (1.33 MB sin optimizar).
+2. Esta vez, **4 imágenes a la vez**: `rabito-huesito-cuerito.png` (3.2
+   MB), `mondongo.png` (2.0 MB), `pechitox2.png` (1.6 MB), `rabo.png`
+   (762 KB) — 7.3 MB sin comprimir sobre 12 MB totales en la carpeta.
+
+Se detectó durante una auditoría de rendimiento pedida explícitamente
+para verificar estabilidad 24/7 en Fire TV, no por un reporte de freeze
+puntual — pero reproduce con precisión la hipótesis de causa raíz más
+fuerte que tiene el proyecto sobre los freezes históricos (presión de
+memoria/decodificación de imágenes pesadas en hardware débil).
+
+### Decisión
+
+Convertir el pipeline manual en un **paso automático del build**:
+
+- `scripts/optimize-images.mjs`: mismo pipeline de `sharp`
+  (`resize({width:1200}).png({compressionLevel:9, effort:10})`) aplicado
+  a `public/ofertas/*.png` y `public/logo.png` (400px, alcanza para su
+  tamaño en pantalla). Sobreescribe el archivo solo si el resultado es
+  más liviano.
+- `"prebuild": "npm run optimize:images"` en `package.json` — Vercel
+  corre `prebuild` automáticamente antes de `next build` en cada deploy.
+- `sharp` pasó a ser **devDependency real** (antes `npm install
+  --no-save`, no versionado — cada máquina/CI tenía que reinstalarlo a
+  mano y nunca quedaba registrado en `package-lock.json`).
+- Umbral de advertencia en 500 KB (el mismo criterio informal que ya se
+  usaba en sesión 9): si algo queda por encima tras comprimir, el script
+  **advierte pero no falla el build**. Se decidió no bloquear porque una
+  imagen real (`costillar.png`, 576 KB) ya estaba en ese estado desde la
+  optimización original y `sharp` no la comprime más sin pérdida visible
+  — fallar el build por un caso límite pre-existente arriesgaba romper un
+  deploy de producción sin aviso previo.
+
+### Por qué esto y no una regla más estricta
+
+- **CI que bloquee hard** (exit code 1 si algo supera el umbral): se
+  consideró y se descartó por el motivo de arriba. Si en el futuro se
+  quiere ese nivel de estrictez, hay que primero resolver el caso
+  `costillar.png` (recortar la imagen en vez de solo comprimir) para que
+  el umbral no tenga excepciones conocidas.
+- **Rangos protegidos / validación en el Sheets**: no aplica acá, el
+  problema es el peso de los archivos de imagen en el repo, no la
+  estructura de columnas (ver el ítem de "rangos protegidos" ya pendiente
+  en `docs/progreso.md` para ese otro problema).
+
+### Trade-offs
+
+- El `prebuild` corre en cada build, incluso si ninguna imagen cambió
+  — recomprime y descarta si ya está optimizada (`sharp` es rápido, no es
+  un costo real en el tiempo de deploy).
+- Sigue sin haber una defensa que impida commitear una imagen pesada al
+  repo en sí — el pipeline la comprime en el próximo build, pero mientras
+  tanto el repo tiene el archivo pesado en su historia de git. Aceptable:
+  el objetivo es que el Fire TV nunca sirva la versión sin comprimir, no
+  mantener el repo liviano.
+
+---
+
+## 2026-07-02 — Badge de aclaración de oferta: separar "condición" de "descripción del producto"
+
+### Problema
+
+El pedido inicial ("agregar columnas a la hoja ofertas", "quiero agregar
+una descripción") fue ambiguo durante varias vueltas de la conversación:
+no estaba claro si se trataba de la hoja de Ofertas o de Productos, si
+las columnas nuevas eran separadores visuales o campos de datos, ni qué
+representaba el campo "descripción" hasta que el cliente lo aclaró
+explícitamente: **no es una descripción del producto, es una aclaración o
+condición de la oferta** (ej. "Solo efectivo", "Válido de lunes a
+viernes").
+
+### Decisión
+
+- Campo `Oferta.descripcion: string`, columna opcional en el Sheets
+  (alias: `descripcion`, `aclaracion`, `condicion`, `detalle`, `nota`),
+  posicionada después de `tamaño` si esa columna existe, o después de
+  `estado` si no — mismo patrón tolerante que ya usaba `tamaño`.
+- Visualmente: badge azul marino (`var(--c-secundario)`, el mismo color
+  que el título) con **borde blanco de 3px**, ubicado debajo del badge
+  "SUPER OFERTA", dentro de la franja diagonal. El borde blanco fue
+  necesario porque la franja diagonal **ya es del mismo azul marino** —
+  sin borde, el badge era invisible contra su propio fondo.
+- El texto se corta en líneas explícitas por comas
+  (`descripcion.split(',').map(...)`) en vez de depender del word-wrap
+  automático del CSS, para que el cliente controle el corte desde el
+  Sheets sin depender de cómo se vea el ancho del contenedor.
+- Iterado en vivo contra un servidor de desarrollo corriendo con datos
+  reales (`/vistaCartel?index=N`), no con mockups — ver el ADR de rutas
+  de desarrollo más abajo.
+
+### Alternativas descartadas durante la conversación
+
+- **Ensanchar la franja diagonal roja**: se probó como parte de una
+  opción de diseño visual pero el cliente la rechazó explícitamente
+  ("no quiero esos cambios") — la franja quedó en su ancho/color
+  original (22%, azul marino). Se revirtió dos veces por miscomunicación
+  sobre qué elemento se estaba pidiendo cambiar ("el cartel" se usó para
+  referirse a distintas piezas visuales en distintos momentos).
+- **Companion visual de brainstorming** (mockups en navegador aparte):
+  el cliente lo probó y prefirió explícitamente iterar contra su propio
+  servidor de desarrollo corriendo, mirando los cambios él mismo y dando
+  feedback en texto — no capturas de pantalla ni mockups separados.
+
+### Rutas de desarrollo (`/vistaCartel`, `/vistaLista`)
+
+Para iterar sobre el diseño del cartel/tabla sin esperar el timer de
+rotación (`segundosCartel`/`segundosTabla`, hasta 12s cada uno, con
+varias tablas antes de llegar a la de interés), se agregaron dos rutas
+Server Component (`app/vistaCartel/page.tsx`, `app/vistaLista/page.tsx`)
+que reusan `getPantallaData()` y pasan `modoFijo`/`indiceFijo` a
+`PantallaRotativa`. Cuando `modoFijo` está definido, los efectos de
+reload/rotación/heartbeat no corren — la pantalla queda estática en el
+índice pedido. La ruta `/` (cliente final) no pasa esta prop, así que su
+comportamiento no cambia un bit.
+
+Alternativa descartada: parámetro de query en la misma ruta `/`
+(`?vista=cartel&index=2`). El cliente prefirió rutas con nombre simple
+(`/vistaCartel`, `/vistaLista`) en vez de query params.
+
+---
+
 ## 2026-06-24 — Escala de tamaño: rango 55%-120% (permitir exceder el wrapper)
 
 ### Pedido

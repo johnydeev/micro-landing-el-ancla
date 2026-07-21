@@ -25,6 +25,8 @@ export default function Header() {
             <img
               src={negocioConfig.logo}
               alt={negocioConfig.nombre}
+              width={100}
+              height={100}
               style={{ height: 'clamp(50px, 8vh, 100px)', width: 'auto' }}
               onError={() => setImgError(true)}
             />

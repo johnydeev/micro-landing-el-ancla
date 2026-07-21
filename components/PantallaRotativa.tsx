@@ -163,6 +163,7 @@ export default function PantallaRotativa({
   // Mandamos cada HEARTBEAT_INTERVAL_MS = 20s. El SW espera 60s antes
   // de declarar muerto — da 3 oportunidades antes del reload forzado.
   useEffect(() => {
+    if (modoFijo) return // modo dev: sin heartbeat, no hay watchdog que alimentar
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       return
     }
@@ -188,7 +189,7 @@ export default function PantallaRotativa({
       cancelled = true
       window.clearInterval(id)
     }
-  }, [])
+  }, [modoFijo])
 
   // Rotacion entre tabla y cartel. Un solo dispatch por tick — el reducer
   // se encarga de calcular el nuevo estado atomicamente. Sin nested setters.
@@ -375,6 +376,8 @@ function CartelOferta({ oferta }: { oferta: Oferta }) {
           <img
             src={`/ofertas/${slug}.png`}
             alt={oferta.nombre}
+            width={800}
+            height={800}
             onError={() => setImgError(true)}
             className={`${styles.cartelImage} ${styles.pulseImage}`}
             style={imageVars}

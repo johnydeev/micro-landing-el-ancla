@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 24/06/2026 (sesión 14).
+Actualizado al 03/07/2026 (sesión 16).
 
 ---
 
@@ -12,9 +12,12 @@ superoferta**, leyendo los datos en vivo desde Google Sheets (CSV
 publicado). Pensada para correrse en un display dentro del local.
 
 Sin DB ni auth: la única fuente de verdad es la planilla del cliente.
-El servidor cachea los CSVs 60 s vía `fetch({ next: { revalidate: 60 } })`
-y el cliente dispara `router.refresh()` periódicamente para volver a
-renderizar con datos frescos.
+El servidor cachea los CSVs 60 s vía `fetch({ next: { revalidate: 60 } })`.
+Desde sesión 10 no hay polling ni `router.refresh()` client-side: los
+datos llegan solo por props del Server Component, y el único refresh es
+un `window.location.reload()` completo cada 30 min (`RELOAD_INTERVAL_MS`),
+que de paso resetea cualquier acumulación de memoria/estado del browser
+— pensado para correr días sin reiniciar en un Fire TV.
 
 ---
 
@@ -22,9 +25,13 @@ renderizar con datos frescos.
 
 ```
 app/
-  page.tsx                  Server Component. Fetch paralelo de
-                            listas/ofertas/config y pasa todo por props.
-                            export const revalidate = 60.
+  page.tsx                  Server Component. Llama a getPantallaData()
+                            (fetch paralelo de listas/ofertas/config) y
+                            pasa todo por props. export const revalidate = 60.
+  vistaCartel/page.tsx      Ruta de desarrollo: pantalla fija en modo
+                            "cartel" (?index=N), sin rotación. No la usa
+                            el cliente final.
+  vistaLista/page.tsx       Idem para modo "tabla".
   layout.tsx                Root layout, fuente Geist, metadata.
                             Sin clases Tailwind en <body>: el reset vive
                             en globals.css.
@@ -41,13 +48,18 @@ app/
 components/
   PantallaRotativa.tsx      Client Component. Recibe data por props.
                             Maneja rotación tabla<->cartel con
-                            setInterval + setters funcionales.
-                            Dispara router.refresh() cada
-                            minutosActualizacion para revalidar el
-                            Server Component.
+                            useReducer (un dispatch atómico por tick) +
+                            setInterval. Reload completo cada 30 min
+                            (RELOAD_INTERVAL_MS) en vez de refetch
+                            client-side. Heartbeat al Service Worker
+                            cada 20s (watchdog anti-freeze). Soporta
+                            modoFijo/indiceFijo para las rutas de dev.
   Header.tsx                Logo + nombre + eslogan.
   Footer.tsx                WhatsApp / Instagram / horarios. Acepta
                             config remota con fallback a config local.
+  HealthIndicator.tsx       Punto de estado online/offline (useSyncExternalStore).
+  DimOverlay.tsx            Atenuado de pantalla por horario configurable.
+  ServiceWorkerRegistrar.tsx Registra public/sw.js, solo en producción.
   LogoSVG.tsx               Logo SVG.
 config/
   negocio.ts                Defaults locales: colores, tipografía,
@@ -55,10 +67,18 @@ config/
                             si la planilla no define la clave.
 lib/
   sheets.ts                 Parser CSV + lectores tipados de listas,
-                            ofertas y config. server-only.
+                            ofertas y config + getPantallaData() (helper
+                            compartido). server-only.
 types/
   index.ts                  Producto, ListaPrecios, Oferta,
                             ConfigNegocio.
+scripts/
+  optimize-images.mjs       Pipeline de compresión de imágenes (sharp),
+                            corre en "prebuild" antes de cada build.
+public/
+  sw.js                     Service Worker: cache network-first +
+                            watchdog de heartbeat (recovery ante main
+                            thread muerto). Ver docs/decisiones.md.
 ```
 
 ### Flujo de datos
@@ -71,13 +91,63 @@ types/
    round-trip extra).
 4. `PantallaRotativa` rota entre la tabla y los carteles según los
    tiempos `segundosTabla` / `segundosCartel` (configurables remotos).
-5. Cada `minutosActualizacion` el cliente dispara `router.refresh()`,
-   que re-ejecuta el Server Component. Si la cache del `fetch` ya
-   expiró, se re-consulta Sheets.
+5. Cada `RELOAD_INTERVAL_MS` (30 min) el cliente hace un
+   `window.location.reload()` completo, que vuelve a ejecutar el Server
+   Component desde cero (datos frescos si la cache de 60s ya expiró) y de
+   paso resetea cualquier acumulación de memoria/estado del browser. La
+   clave `minutosActualizacion` de la pestaña CONFIG quedó sin uso desde
+   sesión 10 — no hay más polling client-side al que aplicarle esa
+   frecuencia.
 
 ---
 
 ## Completado ✅
+
+- **Sesión 16 (03/07/2026) — Auditoría de rendimiento Fire TV**:
+  - Auditoría completa (arquitectura, React, Next.js, imágenes, recovery)
+    orientada a estabilidad 24/7 en Fire TV. Hallazgo principal: 4
+    imágenes de ofertas agregadas después del pipeline de sesión 9
+    quedaron sin optimizar (7.3 MB sin comprimir), reproduciendo la
+    hipótesis de freeze por presión de memoria ya documentada.
+  - **`scripts/optimize-images.mjs` + `prebuild`**: el pipeline de
+    compresión (`sharp`) ahora corre automáticamente en cada build, no
+    depende de un paso manual que ya se había olvidado dos veces.
+  - Imágenes comprimidas: `rabito-huesito-cuerito.png` 3.2MB→387KB,
+    `mondongo.png` 2.0MB→168KB, `pechitox2.png` 1.6MB→330KB, `rabo.png`
+    762KB→227KB, `logo.png` 991KB→60KB.
+  - `width`/`height` explícitos en `<img>` (cartel + logo).
+  - `public/sw.js` simplificado: eliminado `esRscRequest()` (código muerto
+    desde sesión 10, cuando se sacó el polling client-side). Bump a `v6`.
+  - Guard `modoFijo` en el heartbeat de `PantallaRotativa.tsx`.
+  - Corregidos comentarios desactualizados en `app/page.tsx` y este
+    documento que todavía mencionaban `router.refresh()`/
+    `minutosActualizacion` (removidos en sesión 8/10, pero el comentario
+    había quedado).
+  - **Pendiente, requiere hardware**: validar el watchdog de sesión 11 en
+    el navegador real del Fire TV (Amazon Silk) — el procedimiento de test
+    documentado solo se corrió en Chrome de escritorio.
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓, `next build` ✓ (incluye
+    el `prebuild` corriendo de punta a punta).
+
+- **Sesión 15 (02/07/2026) — Badge de aclaración de oferta + rutas de
+  desarrollo**:
+  - Nueva columna opcional en la pestaña de Ofertas: aclaración/condición
+    corta de la oferta (ej. "Solo efectivo"), **no** una descripción del
+    producto. Se muestra en un badge azul marino con borde blanco debajo
+    de "SUPER OFERTA". Cada coma en la celda es un salto de línea
+    explícito.
+  - **`Oferta.descripcion`** (`types/index.ts`), detectada por header
+    (alias: `descripcion`, `aclaracion`, `condicion`, `detalle`, `nota`)
+    en posición dinámica después de `tamaño` (o de `estado` si `tamaño`
+    no está). Opcional y retrocompatible.
+  - **`app/vistaCartel/page.tsx`** y **`app/vistaLista/page.tsx`**: rutas
+    de desarrollo (`?index=N`) que fijan la pantalla sin rotación, para
+    iterar el diseño sin esperar el timer. No las usa el cliente final.
+  - **`getPantallaData()`** en `lib/sheets.ts`: helper compartido para los
+    3 fetches, reusado por `/`, `/vistaCartel` y `/vistaLista`.
+  - Validado contra el Sheets real de producción (3 tablas RES/CERDO/POLLO
+    extendidas con columna "Nota" + 2 columnas de separación).
+  - Validación: `tsc --noEmit` ✓, `next lint` ✓, `next build` ✓.
 
 - **Sesión 14 (24/06/2026) — Escala de tamaño: rango 55%-120%**:
   - El cliente pidió que el máximo de la escala llegara a 120% (antes
@@ -578,3 +648,14 @@ aparece un caso de uso real:
 - El proyecto usa **Next.js 16** (no es el Next.js anterior — ver
   `AGENTS.md`). Antes de tocar APIs de Next, leer
   `node_modules/next/dist/docs/`.
+- **Imágenes de `public/ofertas/`**: `npm run build` corre
+  `npm run optimize:images` (`prebuild`) automáticamente antes de
+  compilar, así que no hace falta comprimir a mano al subir una imagen
+  nueva. Si una imagen queda por encima de 500 KB tras comprimir, el
+  script solo advierte (no bloquea el build) — revisar manualmente si
+  conviene recortarla.
+- **`minutosActualizacion`** (pestaña CONFIG) quedó sin efecto desde
+  sesión 10: no hay más polling client-side al que aplicarle esa
+  frecuencia. El refresh real es el reload completo cada 30 min
+  (`RELOAD_INTERVAL_MS` en `PantallaRotativa.tsx`). Se puede sacar la
+  clave del Sheets sin romper nada, o dejarla sin usar.
