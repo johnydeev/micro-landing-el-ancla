@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { negocioConfig } from '@/config/negocio'
 import styles from './Header.module.css'
 
-export default function Header() {
+// Sin props: siempre renderiza igual. `memo` evita que el rotador de
+// PantallaRotativa (tick cada 3-12s, horas seguidas) vuelva a ejecutar y
+// reconciliar este subarbol en cada cambio de indice de la rotacion.
+function Header() {
   const [imgError, setImgError] = useState(false)
 
   return (
@@ -40,3 +43,5 @@ export default function Header() {
     </header>
   )
 }
+
+export default memo(Header)

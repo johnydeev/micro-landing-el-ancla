@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { memo, type CSSProperties } from 'react'
 
 import { negocioConfig } from '@/config/negocio'
 import type { ConfigNegocio } from '@/types'
@@ -20,7 +20,10 @@ interface FooterProps {
   config?: ConfigNegocio
 }
 
-export default function Footer({ config }: FooterProps = {}) {
+// `config` (configRemota) llega como la misma referencia en cada tick de la
+// rotacion de PantallaRotativa — solo cambia tras un reload completo. `memo`
+// evita re-ejecutar este componente (2 SVGs inline) en cada tick.
+function Footer({ config }: FooterProps = {}) {
   const footerFontVars = {
     '--footer-font-scale': `${negocioConfig.tipografia.footer / 100}`,
   } as CSSProperties
@@ -78,3 +81,5 @@ export default function Footer({ config }: FooterProps = {}) {
     </footer>
   )
 }
+
+export default memo(Footer)

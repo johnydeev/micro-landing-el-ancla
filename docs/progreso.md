@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 03/07/2026 (sesión 16).
+Actualizado al 27/07/2026 (sesión 17).
 
 ---
 
@@ -32,9 +32,13 @@ app/
                             "cartel" (?index=N), sin rotación. No la usa
                             el cliente final.
   vistaLista/page.tsx       Idem para modo "tabla".
-  layout.tsx                Root layout, fuente Geist, metadata.
-                            Sin clases Tailwind en <body>: el reset vive
-                            en globals.css.
+  layout.tsx                Root layout, fuente Geist, metadata +
+                            viewport (themeColor). Sin clases Tailwind en
+                            <body>: el reset vive en globals.css.
+  manifest.json              PWA manifest (convencion de archivo de Next).
+                            Auto-linkeado, sin tocar layout.tsx.
+  icon.png / apple-icon.png  Iconos (convencion de archivo de Next,
+                            192x192 / 180x180). Auto-linkeados en <head>.
   loading.tsx               Pantalla de carga con branding del local
                             (Server Component).
   error.tsx                 Boundary de errores con datos de contacto
@@ -54,11 +58,16 @@ components/
                             client-side. Heartbeat al Service Worker
                             cada 20s (watchdog anti-freeze). Soporta
                             modoFijo/indiceFijo para las rutas de dev.
-  Header.tsx                Logo + nombre + eslogan.
+  Header.tsx                Logo + nombre + eslogan. `memo` (sin props,
+                            output siempre igual).
   Footer.tsx                WhatsApp / Instagram / horarios. Acepta
                             config remota con fallback a config local.
-  HealthIndicator.tsx       Punto de estado online/offline (useSyncExternalStore).
+                            `memo` (config llega con referencia estable
+                            entre ticks de rotacion).
+  HealthIndicator.tsx       Punto de estado online/offline
+                            (useSyncExternalStore). `memo`.
   DimOverlay.tsx            Atenuado de pantalla por horario configurable.
+                            `memo`.
   ServiceWorkerRegistrar.tsx Registra public/sw.js, solo en producción.
   LogoSVG.tsx               Logo SVG.
 config/
@@ -79,6 +88,10 @@ public/
   sw.js                     Service Worker: cache network-first +
                             watchdog de heartbeat (recovery ante main
                             thread muerto). Ver docs/decisiones.md.
+  icons/                    icon-192.png / icon-512.png para
+                            app/manifest.json (generados desde logo.png
+                            con sharp, a mano — no estan en el pipeline
+                            de prebuild porque el logo casi no cambia).
 ```
 
 ### Flujo de datos
@@ -102,6 +115,43 @@ public/
 ---
 
 ## Completado ✅
+
+- **Sesión 17 (27/07/2026) — Auditoría Fire TV parte 2: PWA + memoización**:
+  - Pedido del cliente: transformar el proyecto en pantalla 24/7 de
+    signage para Fire TV (anti-freeze, PWA, caching, watchdog, imágenes,
+    carrusel, kiosk mode). Auditoría contra el código real mostró que la
+    mayoría ya estaba resuelto en sesiones 6-16 — el delta real fueron dos
+    frentes.
+  - **PWA**: `app/manifest.json` (convención de archivo de Next 16,
+    `display: fullscreen`, `orientation: landscape`), `app/icon.png` +
+    `app/apple-icon.png` (192×192 / 180×180, auto-detectados por Next),
+    `public/icons/icon-192.png` + `icon-512.png` (referenciados desde el
+    manifest). Todos generados con `sharp` desde `public/logo.png`.
+    `app/layout.tsx`: nuevo `export const viewport` con `themeColor:
+    '#E31E24'`.
+  - **Memoización**: `Header`, `Footer`, `DimOverlay`, `HealthIndicator`
+    envueltos en `React.memo` — evita reconciliación innecesaria de estos
+    cuatro subárboles en cada tick de rotación (cada 3-12s, horas
+    seguidas). Seguro con `useSyncExternalStore` interno (`DimOverlay`,
+    `HealthIndicator`): `memo` no bloquea updates disparados por el propio
+    store externo, solo los disparados por el padre con props iguales.
+  - **`CartelOferta` sin tocar**: su remount por `key` es intencional
+    (dispara la animación de entrada), no un descuido.
+  - **Sin cambios**: cleanup de efectos (ya todos correctos), caching de
+    assets (`_next/static` ya inmutable, imágenes de ofertas
+    deliberadamente sin cache largo porque el cliente las reemplaza),
+    `next/image` (sigue descartado por costo, sesión 2), Service Worker
+    (watchdog ya cubre el caso real; no se migró a precache tipo
+    Workbox — complejidad sin problema real que resuelva hoy).
+  - **Pendiente igual que sesión 16**: validar el watchdog contra el
+    navegador Silk de un Fire TV físico.
+  - Validación: `tsc --noEmit` ✓, `npm run lint` ✓, `npm run build` ✓
+    (rutas `/manifest.json`, `/icon.png`, `/apple-icon.png` confirmadas
+    como estáticas en el output). Verificado en dev contra el Sheets
+    real: manifest 200 con el JSON esperado, `<link rel="icon">` /
+    `apple-touch-icon"` / `meta theme-color` presentes en `<head>`,
+    pantalla renderiza igual que antes.
+  - Detalle completo en `docs/decisiones.md`.
 
 - **Sesión 16 (03/07/2026) — Auditoría de rendimiento Fire TV**:
   - Auditoría completa (arquitectura, React, Next.js, imágenes, recovery)

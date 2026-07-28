@@ -5,6 +5,127 @@ motivó y la alternativa descartada.
 
 ---
 
+## 2026-07-27 — Auditoría Fire TV parte 2: PWA manifest + memoización de subárboles estáticos
+
+### Contexto
+
+Pedido explícito del cliente: "transformar y optimizar el proyecto para
+funcionar como pantalla de precios 24/7 en un Fire TV". El pedido traía una
+lista larga de siete frentes (anti-freeze, PWA, caching, watchdog, imágenes,
+carrusel, kiosk mode).
+
+Antes de tocar código se releyó todo este archivo y `docs/progreso.md`: la
+gran mayoría de esos siete frentes **ya estaban resueltos** en sesiones
+anteriores (6, 7, 8, 9, 10, 11, 12, 14, 16) — watchdog vía Service Worker,
+reload preventivo, eliminación de polling/`router.refresh()`,
+`useReducer` para evitar nested setState, pipeline automático de
+optimización de imágenes, `HealthIndicator`, `DimOverlay`. Ver las
+entradas correspondientes más abajo en este archivo para el detalle de
+cada una — no se repite acá.
+
+El delta real de trabajo, tras la auditoría, fue mucho más chico que el
+pedido original: dos frentes.
+
+### 1) PWA: manifest + iconos (frente que faltaba por completo)
+
+No existía ningún `manifest.json` ni set de íconos. Agregado:
+
+- **`app/manifest.json`**: convención de archivo de Next 16
+  (`app/manifest.(json|webmanifest)`, ver
+  `node_modules/next/dist/docs/.../metadata/manifest.md`) — Next lo sirve y
+  lo linkea solo, sin tocar `metadata` en `layout.tsx`. `display:
+  "fullscreen"` (con fallback automático a `standalone` si el navegador no
+  lo soporta) y `orientation: "landscape"`, acorde al layout fijo 16:9.
+  `theme_color`/`background_color` tomados de `config/negocio.ts`.
+- **`app/icon.png`** (192×192) y **`app/apple-icon.png`** (180×180)**:
+  convención de archivo de Next (`app/icon.png`, `app/apple-icon.png`) —
+  se auto-detectan y generan los `<link>` correctos en `<head>`, sin código
+  adicional.
+- **`public/icons/icon-192.png`** y **`public/icons/icon-512.png`**:
+  referenciados desde `manifest.json` (el manifest necesita rutas propias,
+  no puede apuntar a los archivos de convención de `app/`).
+- Todos generados con el mismo pipeline de `sharp` que ya usa
+  `scripts/optimize-images.mjs`, redimensionando `public/logo.png`
+  (400×400 ya optimizado a 60KB). No se agregó un script nuevo porque el
+  logo cambia con frecuencia mucho menor que las imágenes de ofertas — se
+  regeneran a mano si el logo cambia.
+- **`app/layout.tsx`**: agregado `export const viewport: Viewport = {
+  themeColor: '#E31E24' }` — es el único campo de PWA que sí requiere
+  código (Next 14+ lo separó de `metadata` a un export propio, confirmado
+  en la doc de `generateViewport`).
+
+**Por qué esto importa para Fire TV / Fully Kiosk Browser concretamente**:
+Fully Kiosk Browser puede configurarse para verificar/usar el manifest al
+cargar una URL (nombre, ícono, color de tema de la barra de progreso de
+carga). Sin manifest, esos campos quedaban en blanco/genéricos.
+
+**Qué NO se hizo**: no se migró a un Service Worker basado en Workbox con
+precache completo del app shell. El SW actual (network-first +
+watchdog, ver ADR de sesión 6/11) ya cubre el caso real (pantalla ya
+andando + wifi cae). Agregar precaching completo es una complejidad nueva
+(hashes de build, lista de precache) sin un problema real que resuelva hoy
+— se deja señalado, no implementado.
+
+### 2) Memoización de subárboles estáticos con `React.memo`
+
+`Header`, `Footer`, `DimOverlay` y `HealthIndicator` se montan dentro de
+`PantallaRotativa`, que re-renderiza en cada tick de la rotación (cada 3-12s,
+configurable) vía el `dispatchRotation` del reducer. Ninguno de estos cuatro
+componentes cambia su output entre ticks (sus props — cuando las tienen —
+son la misma referencia hasta el próximo reload completo), pero sin `memo`
+React igual volvía a ejecutar la función y reconciliar el subárbol
+(2 SVGs inline en `Footer`) en cada tick, miles de veces a lo largo de una
+jornada de 10+ horas.
+
+Se envolvieron los cuatro con `memo()`. Es seguro para `DimOverlay` y
+`HealthIndicator` a pesar de que internamente usan `useSyncExternalStore`:
+`memo` solo bloquea re-renders disparados por el padre con props iguales,
+no bloquea que el propio hook fuerce un re-render cuando cambia el store
+externo (reloj para `DimOverlay`, eventos `online`/`offline` para
+`HealthIndicator`). Verificado sirviendo la página real contra el Sheets
+de datos reales: la pantalla renderiza idéntico a antes.
+
+**Por qué no se tocó `CartelOferta`**: se remonta a propósito en cada
+cambio de oferta (`key={oferta.nombre}`) para disparar la animación de
+entrada (`pulseScale`). Es un trade-off intencional documentado (sesión 3
+en adelante), no un descuido — cambiarlo rompería la animación. Fuera de
+alcance de este cambio.
+
+### Por qué no se tocó nada más de la lista del cliente
+
+- **Anti-freeze / cleanup de efectos**: revisados los ~9 `useEffect` con
+  timers del proyecto (`PantallaRotativa` ×3, `DimOverlay`, `HealthIndicator`
+  vía suscripción, `error.tsx`, `ServiceWorkerRegistrar`) — todos tienen
+  cleanup correcto (`clearInterval`/`removeEventListener`/flag `cancelled`).
+  No se encontró ningún leak nuevo.
+- **Caching de assets estáticos**: `_next/static/*` ya se sirve
+  inmutable por Next/Vercel por defecto; las imágenes de `public/ofertas/`
+  deliberadamente NO tienen cache largo porque el cliente las reemplaza
+  bajo el mismo slug (cache largo mostraría la imagen vieja). Sin cambios.
+- **`next/image`**: sigue descartado por costo en la capa gratuita de
+  Vercel (decisión de sesión 2, reafirmada en sesión 9/16). No se
+  reconsideró sin pedido explícito del cliente.
+- **Watchdog**: ya implementado (sesión 11). Pendiente real: validarlo
+  contra el navegador Silk de un Fire TV físico — no se puede simular
+  desde este entorno (ver sesión 16, mismo pendiente).
+- **Carrusel**: ya monta un solo modo (tabla o cartel) por vez, no la
+  lista completa — no había desmontaje innecesario que resolver más allá
+  de `CartelOferta` (trade-off intencional, ver arriba).
+- **Kiosk mode**: ya no usa blur/sombras complejas/filtros; las
+  animaciones ya usan `transform`/`opacity` (`pulseScale`, `will-change:
+  transform`). Nada que cambiar.
+
+### Validación
+
+`tsc --noEmit` ✓, `npm run lint` ✓, `npm run build` ✓ (incluye el
+`prebuild` de optimización de imágenes). Servido en dev contra el Sheets
+real: `manifest.json` responde 200 con el JSON esperado, `<link
+rel="icon">`/`<link rel="apple-touch-icon">` presentes en `<head>`,
+`<meta name="theme-color" content="#E31E24">` presente, pantalla renderiza
+igual que antes (Header, tabla con datos reales, Footer).
+
+---
+
 ## 2026-07-03 — Automatizar el pipeline de optimización de imágenes (`prebuild`)
 
 ### Problema

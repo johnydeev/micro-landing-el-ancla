@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { memo, useSyncExternalStore } from 'react'
 
 /*
  * Indicador visual del estado de conectividad de la pantalla.
@@ -56,7 +56,10 @@ function suscribirEventosRed(callback: () => void): () => void {
   }
 }
 
-export default function HealthIndicator() {
+// Sin props. `memo` evita re-ejecutar este componente en cada tick de la
+// rotacion de PantallaRotativa; su propio estado (online/offline) sigue
+// actualizandose via los listeners de useSyncExternalStore, memo no los afecta.
+function HealthIndicator() {
   const estado = useSyncExternalStore(
     suscribirEventosRed,
     obtenerEstadoCliente,
@@ -84,3 +87,5 @@ export default function HealthIndicator() {
     />
   )
 }
+
+export default memo(HealthIndicator)

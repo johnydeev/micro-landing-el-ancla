@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useSyncExternalStore } from 'react'
+import { memo, useCallback, useSyncExternalStore } from 'react'
 
 /*
  * Overlay de atenuado horario.
@@ -83,7 +83,10 @@ interface DimOverlayProps {
   hasta?: string
 }
 
-export default function DimOverlay({ desde, hasta }: DimOverlayProps) {
+// `desde`/`hasta` llegan de configRemota, misma referencia entre ticks de la
+// rotacion. `memo` evita re-evaluar este componente (que ya corre su propio
+// timer de 30s via useSyncExternalStore) en cada tick de PantallaRotativa.
+function DimOverlay({ desde, hasta }: DimOverlayProps) {
   const desdeMin = parseHora(desde)
   const hastaMin = parseHora(hasta)
   const atenuado = useAtenuado(desdeMin, hastaMin)
@@ -103,3 +106,5 @@ export default function DimOverlay({ desde, hasta }: DimOverlayProps) {
     />
   )
 }
+
+export default memo(DimOverlay)
