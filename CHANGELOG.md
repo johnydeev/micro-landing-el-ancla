@@ -5,6 +5,91 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 17 — 2026-07-27 (PWA + memoización de subárboles estáticos)
+
+**Context**: se pidió transformar el proyecto en una pantalla de signage
+24/7 para Fire TV, con una lista de siete frentes (anti-freeze, PWA,
+caching, watchdog, imágenes, carrusel, kiosk mode). La auditoría contra el
+código real mostró que seis de los siete ya estaban resueltos en sesiones
+6-16. El delta real fueron dos: **no existía manifest/iconos de PWA**, y
+había margen de memoización en los subárboles que no cambian entre ticks
+de rotación.
+
+**Added**
+- **`app/manifest.json`**: convención de archivo de Next 16 (Next lo sirve
+  y linkea solo, sin tocar `metadata`). `display: "fullscreen"` con
+  `orientation: "landscape"`, acorde al layout fijo 16:9.
+  `theme_color`/`background_color` derivados de `config/negocio.ts`.
+- **`app/icon.png`** (192×192) y **`app/apple-icon.png`** (180×180):
+  convención de archivo de Next, auto-detectados, generan los `<link>` de
+  `<head>` sin código adicional.
+- **`public/icons/icon-192.png`** y **`icon-512.png`**: referenciados desde
+  `manifest.json` (el manifest necesita rutas propias, no puede apuntar a
+  los archivos de convención de `app/`).
+- **`app/layout.tsx`**: `export const viewport: Viewport = { themeColor:
+  '#E31E24' }` — único campo de PWA que requiere código (Next 14+ lo separó
+  de `metadata` a un export propio).
+
+**Changed**
+- **`Header`, `Footer`, `DimOverlay`, `HealthIndicator`** envueltos en
+  `React.memo`. Los cuatro se montan dentro de `PantallaRotativa`, que
+  re-renderiza en cada tick de rotación (cada 3-12s, 10+ horas por día),
+  pero ninguno cambia su output entre ticks. Seguro con el
+  `useSyncExternalStore` interno de `DimOverlay`/`HealthIndicator`: `memo`
+  solo bloquea re-renders disparados por el padre con props iguales, no los
+  que dispara el propio store externo (reloj / eventos `online`/`offline`).
+
+**Not changed (evaluado y descartado)**
+- **Cleanup de efectos**: revisados los ~9 `useEffect` con timers del
+  proyecto — todos ya tienen cleanup correcto. Sin leaks nuevos.
+- **`CartelOferta` sin memoizar**: su remount por `key={oferta.nombre}` es
+  intencional (dispara la animación de entrada `pulseScale`), no un
+  descuido.
+- **Precache tipo Workbox en el SW**: el SW actual (network-first +
+  watchdog) ya cubre el caso real. Agregar precaching completo es
+  complejidad nueva (lista de hashes de build) sin problema real que
+  resuelva hoy.
+- **`next/image`**: sigue descartado por costo en capa gratuita de Vercel
+  (decisión de sesión 2).
+
+**Validation**
+- `npx tsc --noEmit`: sin errores.
+- `npm run lint`: limpio.
+- `npm run build`: éxito. Rutas `/manifest.json`, `/icon.png` y
+  `/apple-icon.png` confirmadas como estáticas en el output.
+- **Verificado end-to-end contra un build de producción** (`npm start`, no
+  dev — el SW está gateado a `NODE_ENV === 'production'` y en dev no se
+  registra):
+  - Service Worker `activated` y **controlando** la página
+    (`navigator.serviceWorker.controller` poblado).
+  - `manifest.json` responde 200 con el JSON esperado; `<link rel="icon">`,
+    `<link rel="apple-touch-icon">` y `<meta name="theme-color">` presentes.
+  - Criterios de instalabilidad PWA cumplidos: contexto seguro, manifest con
+    `name`/`start_url`/`display`, iconos de 192 y 512, SW con handler
+    `fetch`.
+  - **Prueba de resiliencia real**: con el servidor de producción
+    **apagado**, un reload sirvió la pantalla completa desde el cache del SW
+    (header + tabla de precios con datos reales + footer), la rotación
+    siguió cambiando de vista, y la consola quedó sin errores.
+
+**Hallazgos registrados (no bloqueantes)**
+- **El cache del SW arranca casi vacío en el primer load tras bootear.** El
+  SW toma control *después* de que el HTML/JS/CSS ya se descargaron, así que
+  esos recursos no pasan por su handler `fetch` en la carga inicial —
+  medido: 1 entrada en cache tras el primer load, 14 tras el primer reload.
+  En la práctica el `RELOAD_INTERVAL_MS` de 30 min cierra la ventana solo,
+  pero **durante los primeros ~30 min tras encender la TV la protección
+  offline es parcial**. Es la contracara concreta de la "limitación honesta"
+  ya documentada en el ADR de sesión 6; ahora está medida.
+- **`icon-512.png` está escalado hacia arriba** desde `public/logo.png`, que
+  es 400×400. Cumple el requisito de instalabilidad (512×512 real) pero con
+  algo de pérdida de nitidez. Para corregirlo hace falta un logo fuente de
+  ≥512px, que hoy no existe en el repo.
+- **Las imágenes de `public/ofertas/` se cachean progresivamente**, a medida
+  que la rotación las va mostrando — no todas de entrada.
+
+---
+
 ### Sesión 16 — 2026-07-03 (Auditoría de rendimiento Fire TV)
 
 **Context**: se pidió una auditoría completa de arquitectura/React/Next.js/

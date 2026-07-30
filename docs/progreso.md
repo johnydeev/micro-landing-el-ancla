@@ -147,11 +147,27 @@ public/
     navegador Silk de un Fire TV físico.
   - Validación: `tsc --noEmit` ✓, `npm run lint` ✓, `npm run build` ✓
     (rutas `/manifest.json`, `/icon.png`, `/apple-icon.png` confirmadas
-    como estáticas en el output). Verificado en dev contra el Sheets
-    real: manifest 200 con el JSON esperado, `<link rel="icon">` /
-    `apple-touch-icon"` / `meta theme-color` presentes en `<head>`,
-    pantalla renderiza igual que antes.
-  - Detalle completo en `docs/decisiones.md`.
+    como estáticas en el output).
+  - **Verificado contra un build de producción** (`npm start`), no en dev:
+    `ServiceWorkerRegistrar` está gateado a `NODE_ENV === 'production'`, así
+    que en `npm run dev` el SW no se registra y la PWA no se puede validar.
+    Medido en producción: SW `activated` y controlando la página, manifest
+    200, íconos y `theme-color` en `<head>`, criterios de instalabilidad
+    cumplidos. **Prueba de resiliencia**: con el servidor apagado, un reload
+    sirvió la pantalla completa desde cache (tabla con datos reales), la
+    rotación siguió andando y la consola quedó sin errores.
+  - **Hallazgo medido**: el cache del SW arranca casi vacío tras bootear
+    (1 entrada tras el primer load, 14 tras el primer reload) porque el SW
+    toma control después de que los recursos iniciales ya se descargaron.
+    Consecuencia: durante los primeros ~30 min tras encender la TV la
+    protección offline es parcial; el reload de 30 min cierra la ventana
+    solo. No se cambió nada — el fix (precache del app shell en `install`)
+    es justo la complejidad que el ADR de sesión 6 decidió no asumir.
+    Registrado como siguiente paso si aparece un reporte real.
+  - **`icon-512.png` está escalado hacia arriba** (logo fuente 400×400).
+    Cumple instalabilidad pero con algo de pérdida de nitidez; corregirlo
+    requiere un logo de ≥512px que hoy no existe en el repo.
+  - Detalle completo en `docs/decisiones.md` y `CHANGELOG.md`.
 
 - **Sesión 16 (03/07/2026) — Auditoría de rendimiento Fire TV**:
   - Auditoría completa (arquitectura, React, Next.js, imágenes, recovery)
@@ -704,6 +720,12 @@ aparece un caso de uso real:
   nueva. Si una imagen queda por encima de 500 KB tras comprimir, el
   script solo advierte (no bloquea el build) — revisar manualmente si
   conviene recortarla.
+- **Para probar el Service Worker / la PWA hay que usar un build de
+  producción**, no `npm run dev`: `ServiceWorkerRegistrar` está gateado a
+  `NODE_ENV === 'production'` (a propósito, para no pelear con cache stale
+  en desarrollo), así que en dev el SW simplemente no existe. El flujo es
+  `npm run build` + `npm start`. Hay una config `prod` en
+  `.claude/launch.json` para levantarlo desde Claude Code.
 - **`minutosActualizacion`** (pestaña CONFIG) quedó sin efecto desde
   sesión 10: no hay más polling client-side al que aplicarle esa
   frecuencia. El refresh real es el reload completo cada 30 min

@@ -48,7 +48,15 @@ No existía ningún `manifest.json` ni set de íconos. Agregado:
   `scripts/optimize-images.mjs`, redimensionando `public/logo.png`
   (400×400 ya optimizado a 60KB). No se agregó un script nuevo porque el
   logo cambia con frecuencia mucho menor que las imágenes de ofertas — se
-  regeneran a mano si el logo cambia.
+  regeneran a mano si el logo cambia. `scripts/optimize-images.mjs` no
+  toca `public/icons/` ni `app/icon.png`/`app/apple-icon.png` (solo
+  procesa `public/ofertas/*.png` y `public/logo.png`), así que el
+  `prebuild` no los pisa.
+- **Limitación conocida del ícono de 512**: el logo fuente es 400×400, así
+  que `icon-512.png` está **escalado hacia arriba**. Cumple el requisito de
+  instalabilidad de PWA (el archivo es 512×512 real) pero pierde algo de
+  nitidez. Corregirlo requiere un logo fuente de ≥512px, que hoy no existe
+  en el repo — si aparece uno, regenerar los cuatro íconos desde ahí.
 - **`app/layout.tsx`**: agregado `export const viewport: Viewport = {
   themeColor: '#E31E24' }` — es el único campo de PWA que sí requiere
   código (Next 14+ lo separó de `metadata` a un export propio, confirmado
@@ -118,11 +126,61 @@ alcance de este cambio.
 ### Validación
 
 `tsc --noEmit` ✓, `npm run lint` ✓, `npm run build` ✓ (incluye el
-`prebuild` de optimización de imágenes). Servido en dev contra el Sheets
-real: `manifest.json` responde 200 con el JSON esperado, `<link
-rel="icon">`/`<link rel="apple-touch-icon">` presentes en `<head>`,
-`<meta name="theme-color" content="#E31E24">` presente, pantalla renderiza
-igual que antes (Header, tabla con datos reales, Footer).
+`prebuild` de optimización de imágenes).
+
+**Verificado contra un build de producción** (`npm start`), no contra
+`npm run dev`: `ServiceWorkerRegistrar` está gateado a `NODE_ENV ===
+'production'`, así que **en dev el SW no se registra y la PWA no se puede
+validar**. Esto se pasó por alto en la primera pasada de esta sesión
+(se probó en dev) y se corrigió al re-auditar.
+
+Resultados medidos en producción:
+
+- Service Worker `activated` y **controlando** la página
+  (`navigator.serviceWorker.controller` poblado, scope `/`).
+- `manifest.json` → 200 con el JSON esperado. `<link rel="icon">` (192×192),
+  `<link rel="apple-touch-icon">` (180×180) y `<meta name="theme-color">`
+  presentes en `<head>`.
+- Criterios de instalabilidad de PWA cumplidos: contexto seguro, manifest
+  con `name`/`start_url`/`display`, íconos de 192 y 512, SW con handler
+  `fetch`.
+- **Prueba de resiliencia end-to-end**: con el servidor de producción
+  **apagado**, un reload sirvió la pantalla completa desde el cache del SW
+  (header + tabla de precios con datos reales + footer), la rotación siguió
+  cambiando de vista, y la consola quedó sin errores.
+
+### Hallazgo medido: el cache arranca casi vacío tras bootear
+
+Al instrumentar el cache del SW apareció un dato que hasta ahora era
+teórico. El SW toma control **después** de que el HTML/JS/CSS de la carga
+inicial ya se descargaron, así que esos recursos no pasan por su handler
+`fetch` en el primer load:
+
+| Momento | Entradas en `caches['micro-landing-v6']` |
+|---|---|
+| Después del primer load | **1** (solo `/manifest.json`) |
+| Después del primer reload | **14** (HTML, chunks JS, CSS, fuente, logo) |
+
+Consecuencia práctica para el local: **durante los primeros ~30 minutos
+después de encender la TV, la protección offline es parcial** — si la wifi
+se cae en esa ventana, el SW puede no tener el HTML cacheado todavía. El
+`RELOAD_INTERVAL_MS` de 30 min cierra la ventana solo, sin intervención.
+
+Es la contracara concreta de la "limitación honesta" que ya documentaba el
+ADR de sesión 6 ("el SW se instala después del primer load exitoso") —
+ahora está medida en vez de estimada.
+
+**No se cambió nada por esto.** La solución sería precachear el app shell
+en el evento `install` del SW, pero eso requiere conocer los hashes de los
+chunks de cada build (los genera Turbopack), lo que implica generar la
+lista de precache en build time. Es exactamente la complejidad que el ADR
+de sesión 6 decidió no asumir. Queda registrado como el siguiente paso
+lógico **si** aparece un reporte real de pantalla blanca en los primeros
+minutos tras encender la TV.
+
+Adicional del mismo hallazgo: las imágenes de `public/ofertas/` se cachean
+**progresivamente**, a medida que la rotación las va mostrando — no todas
+de entrada.
 
 ---
 
