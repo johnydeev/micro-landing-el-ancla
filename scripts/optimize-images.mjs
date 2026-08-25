@@ -1,6 +1,7 @@
 import sharp from 'sharp'
 import { readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /*
  * Formaliza el pipeline de compresion que se corrio a mano en la sesion del
@@ -17,23 +18,47 @@ const OFERTAS_DIR = 'public/ofertas'
 const LOGO_PATH = 'public/logo.png'
 const MAX_BYTES = 500 * 1024 // umbral de sesion 9: alertar si algo supera 500 KB
 
-async function optimizar(filePath, resizeWidth) {
+/*
+ * Ahorro minimo para justificar reescribir el archivo.
+ *
+ * Recomprimir un PNG ya comprimido puede seguir raspando unos pocos bytes cada
+ * vez (sharp elige filtros levemente distintos sobre la imagen ya redimensionada).
+ * Sin este umbral el pipeline NO es idempotente: cada pasada produce un archivo
+ * marginalmente distinto, y como el workflow de GitHub Actions commitea el
+ * resultado, eso serian commits y deploys por ahorros de 4 bytes.
+ *
+ * Lo detecto el test "es idempotente" en optimize-images.test.mjs.
+ */
+const MIN_AHORRO_BYTES = 1024
+
+/*
+ * Comprime una imagen in-place y devuelve su peso final en bytes.
+ *
+ * Solo sobreescribe si el resultado es mas liviano que el original. Esa guarda
+ * es lo que hace al pipeline IDEMPOTENTE: una segunda pasada sobre un archivo
+ * ya optimizado no lo toca. De eso depende que el workflow de GitHub Actions no
+ * entre en un loop de commits (ver docs/superpowers/specs/2026-08-09-*).
+ *
+ * Exportada para poder testearla contra un directorio temporal sin tocar
+ * public/ (ver optimize-images.test.mjs).
+ */
+export async function optimizar(filePath, resizeWidth) {
   const before = (await stat(filePath)).size
   const buf = await sharp(filePath)
     .resize({ width: resizeWidth, withoutEnlargement: true })
     .png({ compressionLevel: 9, effort: 10 })
     .toBuffer()
 
-  if (buf.length < before) {
+  if (before - buf.length > MIN_AHORRO_BYTES) {
     await writeFile(filePath, buf)
     console.log(
       `✓ ${filePath}: ${(before / 1024).toFixed(0)}KB -> ${(buf.length / 1024).toFixed(0)}KB`,
     )
-  } else {
-    console.log(`= ${filePath}: ya optimizado (${(before / 1024).toFixed(0)}KB)`)
+    return buf.length
   }
 
-  return buf.length
+  console.log(`= ${filePath}: ya optimizado (${(before / 1024).toFixed(0)}KB)`)
+  return before
 }
 
 async function main() {
@@ -63,4 +88,10 @@ async function main() {
   }
 }
 
-main()
+// Solo corre el pipeline real cuando se invoca directo
+// (`node scripts/optimize-images.mjs`, que es lo que hace el hook `prebuild`).
+// Sin esta guarda, importar el modulo desde un test ejecutaria la compresion
+// sobre public/ como efecto secundario del import.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+}

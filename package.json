@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --test \"scripts/**/*.test.mjs\"",
     "optimize:images": "node scripts/optimize-images.mjs"
   },
   "dependencies": {
