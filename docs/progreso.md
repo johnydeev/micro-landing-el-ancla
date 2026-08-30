@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 27/07/2026 (sesión 17).
+Actualizado al 29/08/2026 (sesión 18).
 
 ---
 
@@ -83,7 +83,17 @@ types/
                             ConfigNegocio.
 scripts/
   optimize-images.mjs       Pipeline de compresión de imágenes (sharp),
-                            corre en "prebuild" antes de cada build.
+                            corre en "prebuild" antes de cada build y en
+                            el workflow de Actions. `optimizar()` esta
+                            exportada para poder testearla.
+  optimize-images.test.mjs  Suite de tests del pipeline (node --test, sin
+                            dependencias nuevas). Trabaja sobre un dir
+                            temporal, nunca toca public/. `npm test`.
+.github/workflows/
+  optimize-images.yml       Comprime y commitea las imagenes en push a
+                            master que toque PNGs (+ boton manual).
+                            Unico workflow del proyecto. Ver
+                            docs/decisiones.md.
 public/
   sw.js                     Service Worker: cache network-first +
                             watchdog de heartbeat (recovery ante main
@@ -115,6 +125,48 @@ public/
 ---
 
 ## Completado ✅
+
+- **Sesión 18 (25/08/2026) — Optimización de imágenes automática en CI +
+  primera suite de tests**:
+  - **Problema**: el pipeline de compresión corría solo en `prebuild`, o sea
+    dentro del contenedor efímero de Vercel — la imagen liviana se servía,
+    pero el resultado nunca volvía al repo. Cada PNG pesado commiteado
+    quedaba pesado en git para siempre.
+  - **`.github/workflows/optimize-images.yml`**: primer workflow del
+    proyecto. Trigger por `push` a `master` que toque
+    `public/ofertas/**.png` o `public/logo.png`, más `workflow_dispatch`.
+    Corre `npm test` → `npm run optimize:images` → commit + push de
+    `public/` si algo cambió. Los tests van **antes** de optimizar: si el
+    pipeline está roto, el job falla sin tocar el repo.
+  - **Cron diario descartado** (era el pedido original): las imágenes solo
+    cambian cuando alguien commitea una, y ese día el trigger por `push` ya
+    lo cubre.
+  - **Commit directo del bot a `master`**, sin PR — decisión explícita del
+    usuario, registrada como consciente porque va contra la regla de que los
+    commits los hace él.
+  - **`scripts/optimize-images.test.mjs`**: primera suite de tests del
+    proyecto. `node --test` (built-in de Node 18+), cero dependencias
+    nuevas. Seis casos, entre ellos el de **idempotencia**, que es la
+    segunda defensa contra el loop de commits (la primera es
+    `if: github.actor != 'github-actions[bot]'`).
+  - **Bug real encontrado por ese test** (`316320 !== 316324`): recomprimir
+    un PNG ya comprimido raspa unos bytes en cada pasada. Con el workflow
+    commiteando en automático eso serían commit + deploy + recarga de las
+    pantallas para ahorrar 4 bytes. Fix: `MIN_AHORRO_BYTES = 1024` — único
+    cambio de lógica del script en la sesión.
+  - **Refactor para testear**: `optimizar()` exportada y `main()` detrás de
+    un guard de entrypoint (sin eso, importar el módulo desde un test
+    correría la compresión sobre `public/`).
+  - **Sin cambios**: parámetros de compresión, hook `prebuild` (queda como
+    segunda línea de defensa), umbral de 500 KB (sigue siendo warning), y
+    sigue descartado WebP/AVIF (rompería el contrato `/ofertas/{slug}.png`).
+  - **Pendiente, sin verificar**: el workflow nunca se probó end-to-end.
+    `cortes-de-cerdo.png` (3,35 MB, sin comprimir) está en `master` sin
+    commit del bot detrás — falta confirmar el permiso
+    `Read and write permissions` en Settings → Actions.
+  - Validación: `npm test` 6/6 ✓ (revalidado el 29/08/2026).
+  - Detalle completo en `docs/decisiones.md`, `CHANGELOG.md` y
+    `docs/superpowers/specs/2026-08-09-optimizacion-imagenes-programada-design.md`.
 
 - **Sesión 17 (27/07/2026) — Auditoría Fire TV parte 2: PWA + memoización**:
   - Pedido del cliente: transformar el proyecto en pantalla 24/7 de
@@ -641,6 +693,22 @@ public/
 No quedan items del análisis inicial sin resolver. El proyecto está
 listo para vender en su estado actual.
 
+### Abierto
+
+- **Verificar el workflow de imágenes end-to-end** (sesión 18). Nunca se
+  confirmó que corra: `cortes-de-cerdo.png` (3,35 MB, sin comprimir) se
+  commiteó a `master` el 25/08 y no hay commit de `github-actions[bot]`
+  detrás. Pasos: mirar la pestaña Actions del repo; si el job falló con
+  `403`, setear Settings → Actions → General → Workflow permissions →
+  `Read and write permissions` y volver a dispararlo con
+  `workflow_dispatch`.
+- **Validar el watchdog en el navegador real del Fire TV** (Amazon Silk).
+  Pendiente desde sesión 11; el procedimiento documentado solo se corrió
+  en Chrome de escritorio. Requiere el hardware.
+- **`icon-512.png` está escalado hacia arriba** desde un logo de 400×400
+  (sesión 17). Cumple instalabilidad, pero con pérdida de nitidez.
+  Corregirlo requiere un logo de ≥512 px que hoy no existe en el repo.
+
 ### Ideas opcionales para iteraciones futuras
 
 Estas no salen del análisis original — son extensiones posibles si
@@ -681,9 +749,10 @@ aparece un caso de uso real:
 - **Pestaña CONFIG con `modoMantenimiento: boolean`** para pantalla
   dedicada. El mapper tipado (sesión 4) ya soporta agregar la clave
   sin riesgo.
-- **CI/CD**: hoy no hay workflow de GitHub Actions. Si el cliente lo
-  pide, agregar `tsc --noEmit` + `next lint` + `next build` en cada
-  PR.
+- **CI/CD de código**: el único workflow que existe es el de imágenes
+  (sesión 18). No hay checks de `tsc --noEmit` + `next lint` +
+  `next build` en push/PR — hoy se corren a mano en cada sesión. Si el
+  cliente lo pide, agregarlos.
 
 ### Resuelto (referencia completa)
 - ✅ Refactor a Server Component + `AutoRefresh` consolidado (sesión 1)
@@ -714,12 +783,25 @@ aparece un caso de uso real:
 - El proyecto usa **Next.js 16** (no es el Next.js anterior — ver
   `AGENTS.md`). Antes de tocar APIs de Next, leer
   `node_modules/next/dist/docs/`.
-- **Imágenes de `public/ofertas/`**: `npm run build` corre
-  `npm run optimize:images` (`prebuild`) automáticamente antes de
-  compilar, así que no hace falta comprimir a mano al subir una imagen
-  nueva. Si una imagen queda por encima de 500 KB tras comprimir, el
-  script solo advierte (no bloquea el build) — revisar manualmente si
-  conviene recortarla.
+- **Imágenes de `public/ofertas/`**: hay dos capas automáticas.
+  1. `npm run build` corre `npm run optimize:images` (`prebuild`) antes de
+     compilar, así que Vercel siempre sirve la versión comprimida. Ese
+     resultado vive solo en el contenedor del build, no vuelve al repo.
+  2. El workflow `.github/workflows/optimize-images.yml` (sesión 18)
+     comprime y **commitea** el resultado cuando se pushea un PNG a
+     `master`. Eso es lo que mantiene liviano el repo.
+  No hace falta comprimir a mano al subir una imagen nueva. Si una imagen
+  queda por encima de 500 KB tras comprimir, el script solo advierte (no
+  bloquea el build) — revisar manualmente si conviene recortarla.
+- **`npm test`**: corre la suite del pipeline de imágenes
+  (`scripts/optimize-images.test.mjs`, runner `node --test`). Es lo único
+  testeado del proyecto; el resto se valida a mano con `tsc --noEmit`,
+  `npm run lint` y `npm run build`.
+- **El workflow de imágenes necesita un permiso seteado a mano una sola
+  vez**: Settings → Actions → General → Workflow permissions →
+  `Read and write permissions`. Sin eso el `git push` del job devuelve
+  `403`. **Hoy no está confirmado que esté seteado** — ver el pendiente de
+  sesión 18.
 - **Para probar el Service Worker / la PWA hay que usar un build de
   producción**, no `npm run dev`: `ServiceWorkerRegistrar` está gateado a
   `NODE_ENV === 'production'` (a propósito, para no pelear con cache stale

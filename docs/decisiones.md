@@ -5,6 +5,133 @@ motivó y la alternativa descartada.
 
 ---
 
+## 2026-08-25 — Optimización de imágenes en CI: trigger por `push`, commit del bot a `master`
+
+### Problema
+
+El pipeline de compresión (ADR 2026-07-03) corre en el hook `prebuild`, o sea
+dentro del contenedor efímero de Vercel. Vercel sirve la imagen liviana ✓, pero
+**el resultado nunca vuelve al repo**. Eso quedó registrado como trade-off
+aceptado en ese ADR ("el objetivo es que el Fire TV nunca sirva la versión sin
+comprimir, no mantener el repo liviano"), y esta sesión revisa esa postura.
+
+El problema es **prospectivo**, no actual: hoy el repo está razonablemente
+liviano porque en sesiones 9 y 16 se corrió el pipeline a mano y se commitearon
+los resultados. Pero la próxima imagen pesada que se commitee queda pesada en la
+historia de git para siempre, y eso ya pasó dos veces por olvido (ver ADR
+2026-07-03). Consecuencias: clonar más lento, cada build recomprime desde el
+original pesado, y en local el dev server sirve el archivo sin comprimir.
+
+Pedido original del cliente: **correr el script una vez por día**.
+
+### Decisión
+
+Un workflow de GitHub Actions (`.github/workflows/optimize-images.yml`, el
+primero del proyecto) que corre el pipeline y **commitea el resultado a
+`master`**. Trigger por `push` a `master` que toque `public/ofertas/**.png` o
+`public/logo.png`, más `workflow_dispatch` para forzar una pasada a mano.
+
+Orden de pasos deliberado: `npm ci` → `npm test` → `npm run optimize:images` →
+commit. Los tests corren **antes** de optimizar: si el pipeline está roto, el job
+falla sin haber tocado un archivo del repo.
+
+### Por qué no un cron diario (el pedido original)
+
+Las imágenes de `public/ofertas/` **solo cambian cuando alguien commitea una
+imagen nueva**: no se suben por panel, no vienen del Sheets, no se generan en
+runtime. Un job diario encontraría trabajo únicamente el día en que se commiteó
+una imagen — y ese día el trigger por `push` ya lo cubre. Las otras 364 corridas
+serían ruido.
+
+### Por qué commit directo y no un PR
+
+Va contra la regla del proyecto de que **los commits los hace el usuario**. Se
+planteó explícitamente la alternativa (abrir un PR para aprobación manual) y el
+usuario eligió el commit directo del bot. Queda registrado como decisión
+consciente, no como descuido.
+
+### El bug que destapó el test de idempotencia
+
+`scripts/optimize-images.mjs` no era testeable: paths hardcodeados y `main()`
+ejecutándose al importar el módulo. El refactor mínimo fue exportar
+`optimizar(filePath, resizeWidth)` y poner `main()` detrás de un guard de
+entrypoint (`import.meta.url === pathToFileURL(process.argv[1]).href`) — sin eso,
+importar el módulo desde un test correría la compresión real sobre `public/`.
+
+Ese refactor no cambiaba comportamiento. El test de idempotencia sí obligó a
+cambiarlo:
+
+```
+316320 !== 316324
+```
+
+Recomprimir un PNG **ya comprimido** sigue raspando unos pocos bytes en cada
+pasada: `sharp` elige filtros levemente distintos sobre la imagen ya
+redimensionada. Con la guarda original (`buf.length < before`), un ahorro de 4
+bytes bastaba para reescribir el archivo — y con el workflow commiteando en
+automático eso significa **commit + deploy de Vercel + recarga de todas las
+pantallas del local para ahorrar 4 bytes**.
+
+Fix: `MIN_AHORRO_BYTES = 1024`. El archivo se reescribe solo si la compresión
+ahorra más de 1 KB. Es el **único cambio de lógica** del script en esta sesión, y
+era condición necesaria para que la automatización sea segura: sin umbral el
+pipeline no es idempotente. Verificado sobre datos reales tras el fix: ninguna de
+las 21 imágenes de entonces se reescribió y `git status` quedó limpio.
+
+### Tests: `node --test`, cero dependencias
+
+Runner incorporado de Node 18+, sin sumar Vitest ni Jest. Decisión deliberada por
+tamaño del proyecto (~1.700 líneas). `scripts/optimize-images.test.mjs` trabaja
+sobre un directorio temporal con imágenes generadas al vuelo — **nunca toca
+`public/`**. Seis casos: comprime una imagen grande, respeta el ancho máximo, es
+idempotente, no agranda una imagen ya chica, no corrompe el PNG, deja intacto lo
+que no es imagen. El test de idempotencia es el que sostiene la segunda defensa
+contra el loop de commits (ver abajo).
+
+### Riesgos aceptados
+
+- **Loop infinito de commits**: el commit del bot es un `push` a `master`, que
+  volvería a disparar el workflow. Dos defensas, ambas necesarias:
+  `if: github.actor != 'github-actions[bot]'` en el job, y la idempotencia del
+  script (cubierta por test). No se depende de una sola.
+- **Deploy automático**: el commit del bot dispara deploy de Vercel, y las
+  pantallas se recargan con el build nuevo dentro de la ventana de 30 min del
+  `location.reload()`. Interrupción visual de 1-2 s. Mitigación: como el trigger
+  es `push` y no un cron nocturno, esto solo ocurre cuando el usuario ya estaba
+  commiteando una imagen — o sea, ya iba a haber deploy igual. El workflow no
+  agrega deploys que no fueran a ocurrir de todos modos.
+
+### Qué no entra
+
+- **`prebuild` se mantiene** como segunda línea de defensa: si Actions se
+  desactiva o el workflow falla, Vercel igual sirve imágenes optimizadas.
+- **Parámetros de compresión intactos** (`resize` 1200px, `compressionLevel: 9`,
+  `effort: 10`).
+- **Umbral de 500 KB sigue siendo warning, no bloqueante**: `costillar.png` (576
+  KB) ya está en ese estado de forma aceptada desde el ADR 2026-07-03, y hacerlo
+  bloqueante rompería deploys por un caso conocido.
+- **WebP/AVIF descartado**: cambiaría el contrato `/ofertas/{slug}.png` que usa
+  el cliente al subir imágenes.
+
+### Configuración requerida en GitHub (una sola vez)
+
+**Settings → Actions → General → Workflow permissions → `Read and write
+permissions`**. Sin eso, el `git push` del job falla con `403`.
+
+### Estado: sin verificar end-to-end
+
+`cortes-de-cerdo.png` (3,35 MB, sin comprimir) se commiteó a `master` el
+2026-08-25 y **no hay commit de `github-actions[bot]` detrás**. O el workflow
+nunca corrió, o falló — la causa más probable es el permiso de escritura de
+arriba sin setear. Pendiente: revisar la pestaña Actions del repo y, si hace
+falta, disparar el workflow a mano (`workflow_dispatch`) para cerrar el paso 4 de
+verificación del diseño.
+
+Diseño completo:
+`docs/superpowers/specs/2026-08-09-optimizacion-imagenes-programada-design.md`.
+
+---
+
 ## 2026-07-27 — Auditoría Fire TV parte 2: PWA manifest + memoización de subárboles estáticos
 
 ### Contexto

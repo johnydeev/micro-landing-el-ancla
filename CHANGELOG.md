@@ -5,6 +5,88 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 18 — 2026-08-25 (optimización de imágenes automática en CI + tests)
+
+**Context**: el pipeline de compresión (`scripts/optimize-images.mjs`) corría
+solo en el hook `prebuild`, o sea dentro del contenedor efímero de Vercel: la
+imagen liviana se servía ✓ pero **el resultado nunca volvía al repo**. Cada PNG
+pesado commiteado quedaba pesado en git para siempre. Pedido original: correr el
+script una vez por día. Se descartó el cron (las imágenes solo cambian cuando
+alguien commitea una) y se eligió trigger por `push`. Diseño completo en
+`docs/superpowers/specs/2026-08-09-optimizacion-imagenes-programada-design.md`.
+
+**Added**
+- **`.github/workflows/optimize-images.yml`**: primer workflow de GitHub Actions
+  del proyecto. Trigger: `push` a `master` que toque `public/ofertas/**.png` o
+  `public/logo.png`, más `workflow_dispatch` (botón manual). Corre `npm test` →
+  `npm run optimize:images` → commit + push de `public/` si algo cambió. Los
+  tests corren **antes** de optimizar: si el pipeline está roto, el job falla sin
+  haber tocado un archivo del repo.
+- **`scripts/optimize-images.test.mjs`**: primera suite de tests del proyecto.
+  Runner `node --test` (built-in de Node 18+), **cero dependencias nuevas** —
+  decisión deliberada: 1.700 líneas de código no justifican sumar Vitest/Jest.
+  Seis casos: comprime una imagen grande, respeta el ancho máximo, **es
+  idempotente**, no agranda una imagen ya chica, no corrompe el PNG, deja
+  intacto lo que no es imagen. Trabaja sobre un directorio temporal, nunca toca
+  `public/`.
+- **`package.json`**: script `"test": "node --test \"scripts/**/*.test.mjs\""`.
+
+**Changed**
+- **`scripts/optimize-images.mjs`**:
+  - `optimizar(filePath, resizeWidth)` ahora es `export` (testeable), y `main()`
+    quedó detrás de un guard de entrypoint (`import.meta.url === pathToFileURL(
+    process.argv[1]).href`) — sin eso, importar el módulo desde un test correría
+    la compresión sobre `public/` como efecto del import.
+  - **`MIN_AHORRO_BYTES = 1024`**: la guarda pasó de `buf.length < before` a
+    `before - buf.length > MIN_AHORRO_BYTES`. Único cambio de lógica de la
+    sesión, y fue forzado por un bug real que destapó el test de idempotencia
+    (`316320 !== 316324`): recomprimir un PNG ya comprimido sigue raspando unos
+    pocos bytes por pasada, porque `sharp` elige filtros levemente distintos. Con
+    el workflow commiteando en automático, eso serían **commit + deploy + recarga
+    de todas las pantallas del local para ahorrar 4 bytes**.
+  - Cuando no reescribe, `optimizar` devuelve `before` en vez de `buf.length`:
+    antes el total de peso reportado por consola contaba el buffer descartado.
+- **`public/ofertas/cortes-de-cerdo.png`**: imagen nueva (commit `43776e5`).
+
+**Not changed (evaluado y descartado)**
+- **Trigger por `schedule`** (el pedido original): las imágenes solo cambian
+  cuando alguien commitea una, y ese día el trigger por `push` ya lo cubre. Las
+  otras 364 corridas no harían nada.
+- **PR en vez de commit directo a `master`**: va contra la regla del proyecto de
+  que los commits los hace el usuario. Se planteó la alternativa y el usuario
+  eligió explícitamente el commit directo del bot. Decisión consciente.
+- **Hook `prebuild`**: se mantiene como segunda línea de defensa. Si Actions se
+  desactiva o el workflow falla, Vercel igual sirve imágenes optimizadas.
+- **Umbral bloqueante de 500 KB**: sigue siendo solo un warning. `costillar.png`
+  (576 KB) ya está en ese estado de forma aceptada y hacerlo bloqueante rompería
+  deploys por un caso conocido.
+- **WebP/AVIF**: cambiaría el contrato `/ofertas/{slug}.png` que usa el cliente
+  al subir imágenes.
+- **Parámetros de compresión** (`resize` 1200px, `compressionLevel: 9`,
+  `effort: 10`): intactos.
+
+**Riesgos aceptados**
+- El bot commitea a `master`, lo que dispara deploy de Vercel y una recarga de
+  las pantallas (1-2 s de interrupción visual) dentro de la ventana de 30 min del
+  reload. Mitigación: como el trigger es `push`, esto solo ocurre cuando el
+  usuario ya estaba commiteando una imagen — o sea, ya iba a haber deploy igual.
+- Loop de commits: dos defensas, `if: github.actor != 'github-actions[bot]'` en
+  el job **y** la idempotencia del script (cubierta por test).
+
+**Validation**
+- `npm test`: 6/6 en verde (verificado el 2026-08-29).
+- `npm run optimize:images` en local tras el fix: ninguna de las 21 imágenes de
+  entonces se reescribió, `git status` limpio (idempotencia sobre datos reales).
+
+**Pendiente de verificar**
+- **El workflow no se verificó end-to-end**. `cortes-de-cerdo.png` (3,35 MB, sin
+  comprimir) está commiteado en `master` y no hay commit de
+  `github-actions[bot]` detrás. O el workflow nunca corrió, o falló — la causa
+  más probable es la configuración que el diseño marca como requerida y de una
+  sola vez: **Settings → Actions → General → Workflow permissions → `Read and
+  write permissions`**. Sin eso el `git push` del job devuelve `403`. Revisar la
+  pestaña Actions del repo.
+
 ### Sesión 17 — 2026-07-27 (PWA + memoización de subárboles estáticos)
 
 **Context**: se pidió transformar el proyecto en una pantalla de signage
