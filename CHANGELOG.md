@@ -5,6 +5,78 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 19 — 2026-08-30 (precios frescos en cada reload: fin del ISR)
+
+**Context**: el cliente preguntó si al corregir un precio en el Sheets y apretar
+"actualizar" en el Fire TV la pantalla toma el cambio en el momento. **No lo
+tomaba.** Había tres capas de cache entre la planilla y la pantalla:
+
+1. **ISR de Next** (`export const revalidate = 60` en `app/page.tsx`): pasados
+   los 60 s, el request siguiente **igual devuelve la página vieja** y recién ahí
+   dispara la regeneración en background (stale-while-revalidate, documentado en
+   `node_modules/next/dist/docs/01-app/02-guides/incremental-static-regeneration.md`).
+   O sea: el precio corregido aparecía en el reload **siguiente**, no en el que
+   apretabas.
+2. **Data cache de `fetch`** (`next: { revalidate: 60 }` en los tres lectores).
+3. **Cache de Google**: el CSV publicado se sirve con
+   `Cache-Control: private, max-age=300` (medido con `curl`).
+
+**Changed**
+- **`app/page.tsx`**: `export const revalidate = 60` → `export const dynamic =
+  'force-dynamic'`. La página se renderiza en cada request.
+- **`app/vistaCartel/page.tsx`** y **`app/vistaLista/page.tsx`**: mismo cambio,
+  por consistencia con la ruta principal.
+- **`lib/sheets.ts`**:
+  - Los tres `fetch` pasan de `next: { revalidate: 60 }` a
+    `cache: 'no-store'` (constante `FETCH_SIN_CACHE`). Esto también hace frescos
+    a `/api/productos`, `/api/ofertas` y `/api/config`.
+  - **`urlSinCache()`**: agrega `&_cb=<timestamp>` a la URL del CSV para que
+    ningún cache intermedio (CDN de Google, proxy del ISP) devuelva una copia
+    vieja. Verificado con `curl`: Google ignora el parámetro y responde 200 con
+    el mismo contenido.
+
+**Not changed**
+- **`RELOAD_INTERVAL_MS` (30 min)**: el reload automático sigue igual. Lo que
+  cambia es que ahora ese reload —y el manual— traen datos del momento en vez de
+  los de la generación anterior.
+- **Service Worker**: ya era network-first, no era parte del problema. Estando
+  online, un reload va a la red; el cache sigue siendo solo el fallback offline.
+
+**Trade-off aceptado**
+- Se pierde la red de contención del ISR: antes, si Google fallaba, Vercel seguía
+  sirviendo la última página buena. Ahora un fallo de Google hace que los
+  lectores devuelvan `[]` y la pantalla muestre el empty state hasta el próximo
+  reload (hasta 30 min). Riesgo bajo (3 requests cada 30 min, muy lejos de
+  cualquier rate limit) pero real. Mitigación posible si llega a pasar:
+  guardar la última data buena en `localStorage` y renderizarla cuando las props
+  vienen vacías.
+
+**Límite que este cambio NO resuelve**
+- La URL configurada es del tipo `/pub?output=csv` (publicar en la web). Ese
+  endpoint tiene su **propio pipeline de publicación** del lado de Google: la
+  edición puede tardar en aparecer en el CSV publicado, y eso no lo controla
+  ninguna cache nuestra. Si tras este cambio sigue habiendo demora, la salida es
+  migrar a `https://docs.google.com/spreadsheets/d/<ID_REAL>/export?format=csv&gid=<GID>`
+  con la planilla compartida como "cualquier persona con el enlace puede ver".
+  Requiere el ID real de la planilla (el de `/pub` es un ID de publicación
+  distinto) y cambiar `GOOGLE_SHEETS_CSV_URL` en Vercel.
+
+**Validation**
+- `npx tsc --noEmit` ✓, `npm run lint` ✓, `npm run build` ✓ — el output confirma
+  `/`, `/vistaCartel`, `/vistaLista` y las tres `/api/*` como `ƒ (Dynamic)`.
+- Contra `npm start` (build de producción, puerto 3100): tres requests seguidos a
+  `/` tardan 1,79 s / 0,61 s / 0,60 s — cada uno vuelve a pedir los CSVs, no hay
+  cache que los sirva instantáneo. Header de la respuesta:
+  `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`.
+  La página renderiza datos reales del Sheets.
+- **Falta la prueba final del lado del cliente**: editar un precio en la planilla
+  y apretar actualizar en el Fire TV.
+
+**Otros**
+- `public/ofertas/cortes-de-cerdo.png`: 3,35 MB → 425 KB, comprimida por el
+  `prebuild` al correr el build de esta sesión. Confirma que el workflow de
+  Actions de sesión 18 **nunca corrió** (ver el pendiente correspondiente).
+
 ### Sesión 18 — 2026-08-25 (optimización de imágenes automática en CI + tests)
 
 **Context**: el pipeline de compresión (`scripts/optimize-images.mjs`) corría

@@ -24,9 +24,11 @@ si se toma esa decisión.
 ## Endpoints
 
 Todos retornan **JSON** y son **GET** públicos (sin autenticación).
-Reusan la cache de `fetch` del Server Component (`revalidate: 60`):
-las llamadas a Google Sheets se hacen como mucho una vez por minuto
-por instancia.
+Desde sesión 19 **no hay cache**: cada llamada relee el CSV de Google
+(`cache: 'no-store'` + parámetro anti-cache en la URL). Antes reusaban la
+cache de `fetch` con `revalidate: 60`. Si alguien monta un consumidor con
+volumen, conviene que cachee del lado de él — acá no hay nada que lo
+proteja de pegarle a Google en cada request. Ver `docs/decisiones.md`.
 
 ### `GET /api/productos`
 

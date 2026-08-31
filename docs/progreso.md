@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 29/08/2026 (sesión 18).
+Actualizado al 30/08/2026 (sesión 19).
 
 ---
 
@@ -12,7 +12,10 @@ superoferta**, leyendo los datos en vivo desde Google Sheets (CSV
 publicado). Pensada para correrse en un display dentro del local.
 
 Sin DB ni auth: la única fuente de verdad es la planilla del cliente.
-El servidor cachea los CSVs 60 s vía `fetch({ next: { revalidate: 60 } })`.
+Desde sesión 19 **no hay cache del lado de la app**: la página es
+`force-dynamic` y los tres `fetch` usan `cache: 'no-store'`, así que cada
+carga trae los precios del momento. Es lo que hace que apretar "actualizar"
+en el Fire TV muestre la corrección al toque.
 Desde sesión 10 no hay polling ni `router.refresh()` client-side: los
 datos llegan solo por props del Server Component, y el único refresh es
 un `window.location.reload()` completo cada 30 min (`RELOAD_INTERVAL_MS`),
@@ -27,7 +30,8 @@ que de paso resetea cualquier acumulación de memoria/estado del browser
 app/
   page.tsx                  Server Component. Llama a getPantallaData()
                             (fetch paralelo de listas/ofertas/config) y
-                            pasa todo por props. export const revalidate = 60.
+                            pasa todo por props.
+                            export const dynamic = 'force-dynamic'.
   vistaCartel/page.tsx      Ruta de desarrollo: pantalla fija en modo
                             "cartel" (?index=N), sin rotación. No la usa
                             el cliente final.
@@ -109,15 +113,17 @@ public/
 1. El cliente edita su planilla de Google Sheets (productos, ofertas,
    config) y publica las pestañas como CSV.
 2. El Server Component `app/page.tsx` hace tres `fetch` en paralelo a
-   los CSVs, cacheados 60 s por la cache de `fetch` de Next.
+   los CSVs, sin cache (`no-store` + un parámetro `_cb` anti-cache en la
+   URL). Cada request al sitio vuelve a leer la planilla.
 3. Los datos llegan al cliente como props del primer render (sin
    round-trip extra).
 4. `PantallaRotativa` rota entre la tabla y los carteles según los
    tiempos `segundosTabla` / `segundosCartel` (configurables remotos).
 5. Cada `RELOAD_INTERVAL_MS` (30 min) el cliente hace un
    `window.location.reload()` completo, que vuelve a ejecutar el Server
-   Component desde cero (datos frescos si la cache de 60s ya expiró) y de
-   paso resetea cualquier acumulación de memoria/estado del browser. La
+   Component desde cero (datos frescos, siempre) y de paso resetea
+   cualquier acumulación de memoria/estado del browser. Un reload manual
+   desde el control del Fire TV hace exactamente lo mismo. La
    clave `minutosActualizacion` de la pestaña CONFIG quedó sin uso desde
    sesión 10 — no hay más polling client-side al que aplicarle esa
    frecuencia.
@@ -125,6 +131,39 @@ public/
 ---
 
 ## Completado ✅
+
+- **Sesión 19 (30/08/2026) — Precios frescos en cada reload (fin del ISR)**:
+  - **Pregunta del cliente**: si corrige un precio en el Sheets y aprieta
+    actualizar en el Fire TV, ¿lo toma? **No lo tomaba.** El `revalidate =
+    60` de la página es stale-while-revalidate: el request que caía después
+    de expirar devolvía la página vieja y recién ahí regeneraba en
+    background. Como la pantalla es el único tráfico del sitio, siempre
+    estaba viendo la generación anterior.
+  - **`app/page.tsx`** (y las dos rutas de dev): `export const dynamic =
+    'force-dynamic'` en lugar de `revalidate = 60`.
+  - **`lib/sheets.ts`**: los tres `fetch` pasan a `cache: 'no-store'`
+    (`FETCH_SIN_CACHE`) — alcanza también a las tres rutas `/api/*` — y
+    `urlSinCache()` agrega `&_cb=<timestamp>` para saltear la cache de
+    Google (`Cache-Control: private, max-age=300`, medido con `curl`).
+  - **Descartado**: bajar el `revalidate` a 5-10 s (no arregla nada, la
+    semántica stale sigue igual) y revalidación on-demand con
+    `revalidatePath` (haría falta un webhook de Apps Script viviendo en la
+    planilla de cada cliente).
+  - **Trade-off**: se pierde la red de contención del ISR. Si Google falla,
+    la pantalla muestra el empty state hasta el reload siguiente en vez de
+    la última página buena. Mitigación disponible (last-known-good en
+    `localStorage`) sin implementar, a la espera de que el caso aparezca.
+  - **Límite fuera de nuestro control**: la URL es `/pub?output=csv`, que
+    tiene el pipeline de publicación propio de Google. Si sigue habiendo
+    demora, migrar a `/export?format=csv&gid=` con la planilla compartida
+    por enlace (requiere el ID real de la planilla).
+  - Validación: `tsc --noEmit` ✓, `npm run lint` ✓, `npm run build` ✓ (`/`,
+    `/vistaCartel`, `/vistaLista` y las 3 `/api/*` figuran como
+    `ƒ (Dynamic)`). Contra `npm start`: 3 requests seguidos tardan 1,79 /
+    0,61 / 0,60 s (cada uno relee los CSVs) y la respuesta sale con
+    `Cache-Control: ... no-store ...`.
+  - **Falta la prueba del lado del cliente**: editar un precio en la
+    planilla y apretar actualizar en el Fire TV.
 
 - **Sesión 18 (25/08/2026) — Optimización de imágenes automática en CI +
   primera suite de tests**:
@@ -695,10 +734,11 @@ listo para vender en su estado actual.
 
 ### Abierto
 
-- **Verificar el workflow de imágenes end-to-end** (sesión 18). Nunca se
-  confirmó que corra: `cortes-de-cerdo.png` (3,35 MB, sin comprimir) se
-  commiteó a `master` el 25/08 y no hay commit de `github-actions[bot]`
-  detrás. Pasos: mirar la pestaña Actions del repo; si el job falló con
+- **Verificar el workflow de imágenes end-to-end** (sesión 18). **Confirmado
+  que no corrió**: `cortes-de-cerdo.png` se commiteó a `master` el 25/08 con
+  3,35 MB y seguía así hasta que el `prebuild` de la sesión 19 la comprimió
+  en local (→ 425 KB). No hay ningún commit de `github-actions[bot]` en la
+  historia. Pasos: mirar la pestaña Actions del repo; si el job falló con
   `403`, setear Settings → Actions → General → Workflow permissions →
   `Read and write permissions` y volver a dispararlo con
   `workflow_dispatch`.

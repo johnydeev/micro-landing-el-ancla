@@ -5,6 +5,102 @@ motivó y la alternativa descartada.
 
 ---
 
+## 2026-08-30 — Render dinámico: el reload manual tiene que traer el precio nuevo
+
+### Problema
+
+Pregunta directa del cliente: "si cambio un precio en el Sheets y aprieto
+actualizar en el Fire TV, ¿toma el cambio?". La respuesta era **no**.
+
+La pantalla es un display de precios de una carnicería. Cuando el cliente corrige
+un precio mal cargado, el ciclo esperable es: edita la planilla, aprieta
+actualizar en la TV, ve el precio nuevo. Lo que pasaba en cambio:
+
+1. **ISR** (`export const revalidate = 60` en `app/page.tsx`): pasados los 60 s,
+   el request siguiente **devuelve igual la página vieja** y recién entonces
+   dispara la regeneración en background. Es el comportamiento documentado de
+   stale-while-revalidate
+   (`node_modules/next/dist/docs/01-app/02-guides/incremental-static-regeneration.md`,
+   "the next request will still return the cached (now stale) page"). Efecto
+   práctico: el precio nuevo aparecía en el reload **siguiente**.
+2. **Data cache de `fetch`**: los tres lectores usaban
+   `next: { revalidate: 60 }`, con la misma lógica de expiración.
+3. **Cache de Google**: el CSV publicado se sirve con
+   `Cache-Control: private, max-age=300` (medido con `curl` sobre la URL real).
+
+Como la pantalla es el único tráfico del sitio (un reload cada 30 min), la
+regeneración en background la disparaba ella misma — y el resultado de esa
+regeneración lo veía recién el reload de 30 minutos después. La percepción del
+cliente ("se actualiza dos veces por día") es consistente con este patrón:
+siempre estaba mirando datos de una generación anterior.
+
+### Decisión
+
+Sacar todo el caching del lado de la app:
+
+- `app/page.tsx` (y las dos rutas de desarrollo): `export const dynamic =
+  'force-dynamic'` en vez de `revalidate = 60`. Render en cada request.
+- `lib/sheets.ts`: los tres `fetch` pasan a `cache: 'no-store'`
+  (`FETCH_SIN_CACHE`). Alcanza también a `/api/productos`, `/api/ofertas` y
+  `/api/config`.
+- `urlSinCache()`: `&_cb=<timestamp>` en la URL del CSV, para que ningún cache
+  intermedio (CDN de Google, proxy del ISP, router del local) responda con una
+  copia vieja. Verificado con `curl`: Google ignora el parámetro y devuelve 200
+  con el mismo contenido.
+
+### Por qué no un `revalidate` más corto
+
+Bajar a 5 o 10 segundos no arregla el problema, solo lo achica: la semántica
+sigue siendo stale-while-revalidate, así que el reload que cae justo después de
+expirar **sigue viendo la versión vieja**. Para que el reload manual sea confiable
+—que es el pedido— hay que sacar la cache, no acortarla.
+
+### Por qué no revalidación on-demand (`revalidatePath`)
+
+Sería lo correcto si el cliente publicara los cambios desde un panel nuestro:
+guardar → invalidar cache. Pero acá la fuente es una planilla de Google que el
+cliente edita directo; para enterarnos de la edición haría falta un webhook desde
+Apps Script, o sea código que vive en la planilla del cliente y hay que mantener
+por cada local. Complejidad desproporcionada para un sitio con un solo lector.
+
+### Costo real de renderizar dinámico
+
+Tres `fetch` a Google por request. El tráfico es una pantalla que se reloadea
+cada 30 min, más los reloads manuales del dueño: del orden de 150 requests
+diarios a Google en el peor caso. Nada cerca de un rate limit, y en Vercel es
+tiempo de función, no ancho de banda. Medido en local contra el build de
+producción: ~600 ms por request.
+
+### Trade-off aceptado: se pierde la red de contención del ISR
+
+Antes, si Google fallaba, Vercel seguía sirviendo la última página buena
+generada. Ahora los lectores devuelven `[]` ante un error y la pantalla muestra
+el empty state hasta el reload siguiente (hasta 30 min con un cartel de "no hay
+precios" en el local).
+
+Se aceptó porque el fallo tiene que ser específico —Vercel arriba pero Google
+caído o rechazando— y porque el caso frecuente que ya está cubierto es otro: si
+se cae la wifi del local, el Service Worker sirve la última pantalla buena desde
+su cache (ADR 2026-05-25).
+
+Mitigación disponible si el caso llega a aparecer: guardar la última data buena
+en `localStorage` y renderizarla cuando las props llegan vacías. No se
+implementó ahora — sería resolver un problema que todavía no se observó.
+
+### Lo que este cambio no puede resolver
+
+La URL configurada es `/pub?output=csv` ("publicar en la web"). Ese endpoint
+tiene un pipeline de publicación propio de Google: la edición tiene que pasar por
+él antes de existir en el CSV, y ninguna cache nuestra interviene ahí. Si tras
+este cambio el cliente sigue viendo demora, el paso siguiente es migrar a
+`/d/<ID_REAL>/export?format=csv&gid=<GID>` con la planilla compartida como
+"cualquier persona con el enlace puede ver" — sirve el estado actual del
+documento, sin publicación intermedia. Requiere el **ID real** de la planilla (el
+que aparece en `/pub` es un ID de publicación distinto, verificado: pedir
+`/export` con ese ID devuelve 404) y cambiar `GOOGLE_SHEETS_CSV_URL` en Vercel.
+
+---
+
 ## 2026-08-25 — Optimización de imágenes en CI: trigger por `push`, commit del bot a `master`
 
 ### Problema

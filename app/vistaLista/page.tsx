@@ -7,7 +7,8 @@ import { getPantallaData } from '@/lib/sheets'
  * usa el cliente final. Acepta ?index=N para fijar una lista puntual
  * (default 0 = la primera lista, ej. "PRECIOS CHURRASCOS").
  */
-export const revalidate = 60
+// Mismo criterio que app/page.tsx: datos frescos en cada request.
+export const dynamic = 'force-dynamic'
 
 export default async function VistaLista({
   searchParams,
