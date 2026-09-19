@@ -229,7 +229,15 @@ Causa: `node --test "scripts/**/*.test.mjs"` — Node 20 (el del workflow) no
 expande globs en `node --test`; en local pasaba porque la máquina corre Node 25.
 Fix en sesión 20: `"test": "node --test"` sin argumentos (descubrimiento por
 convención, funciona en 20/22/25) y `node-version: 22` (20 está EOL desde abril
-2026). Lección: **el CI corre en otra versión de Node que la máquina de
+2026). Prueba completa el mismo día: `pechito.png` entró con 804 KB, el bot
+commiteó la versión de 231 KB y ese commit no re-disparó el workflow.
+
+**Ajuste posterior (misma sesión)**: el commit del bot deja el clon local un
+commit atrás en cada imagen nueva. Se agregó `.githooks/pre-commit` que comprime
+los PNG staged antes de que entren al commit, activado por el script `prepare`
+de `package.json` (`git config core.hooksPath .githooks`). Con eso el caso
+normal es: la imagen ya entra liviana y el workflow no commitea nada. El
+workflow sigue existiendo como red de seguridad para clones sin el hook. Lección: **el CI corre en otra versión de Node que la máquina de
 desarrollo; cuando un workflow "no hace nada", mirar la pestaña Actions antes de
 teorizar.**
 

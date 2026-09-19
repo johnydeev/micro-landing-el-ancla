@@ -114,7 +114,7 @@ docs/              Bitácora de implementación y decisiones técnicas
 ## Desarrollo local
 
 ```bash
-npm install
+npm install                        # también activa el hook pre-commit (.githooks/)
 cp .env.local.example .env.local   # completar con los datos de tu planilla
 npm run dev
 ```

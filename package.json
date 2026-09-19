@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prepare": "git config core.hooksPath .githooks",
     "prebuild": "npm run optimize:images",
     "build": "next build",
     "start": "next start",

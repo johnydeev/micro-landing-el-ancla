@@ -61,21 +61,39 @@ export async function optimizar(filePath, resizeWidth) {
   return before
 }
 
-async function main() {
+// El logo se ve a lo sumo a `clamp(50px, 8vh, 100px)` de alto — 400px de
+// ancho es de sobra y evita cargar un asset de mas de 1MB para un logo.
+const anchoPara = (filePath) =>
+  path.normalize(filePath) === path.normalize(LOGO_PATH) ? 400 : 1200
+
+/*
+ * Sin argumentos: procesa todo public/ofertas/*.png + el logo (lo que hacen
+ * `prebuild` y el workflow). Con rutas como argumentos: solo esas — es lo que
+ * usa el hook pre-commit (.githooks/pre-commit) para tocar unicamente los
+ * archivos staged.
+ */
+async function main(archivos) {
   let huboSobrepeso = false
 
-  const ofertas = (await readdir(OFERTAS_DIR)).filter((f) => f.endsWith('.png'))
-  for (const file of ofertas) {
-    const size = await optimizar(path.join(OFERTAS_DIR, file), 1200)
-    if (size > MAX_BYTES) {
+  const objetivos =
+    archivos.length > 0
+      ? archivos
+      : [
+          ...(await readdir(OFERTAS_DIR))
+            .filter((f) => f.endsWith('.png'))
+            .map((f) => path.join(OFERTAS_DIR, f)),
+          LOGO_PATH,
+        ]
+
+  for (const filePath of objetivos) {
+    const size = await optimizar(filePath, anchoPara(filePath))
+    if (anchoPara(filePath) === 1200 && size > MAX_BYTES) {
       huboSobrepeso = true
-      console.warn(`⚠ ${file} sigue pesando ${(size / 1024).toFixed(0)}KB tras optimizar`)
+      console.warn(
+        `⚠ ${path.basename(filePath)} sigue pesando ${(size / 1024).toFixed(0)}KB tras optimizar`,
+      )
     }
   }
-
-  // El logo se ve a lo sumo a `clamp(50px, 8vh, 100px)` de alto — 400px de
-  // ancho es de sobra y evita cargar un asset de mas de 1MB para un logo.
-  await optimizar(LOGO_PATH, 400)
 
   if (huboSobrepeso) {
     // Advertencia, no bloqueante: fallar el build por esto arriesgaria un
@@ -93,5 +111,5 @@ async function main() {
 // Sin esta guarda, importar el modulo desde un test ejecutaria la compresion
 // sobre public/ como efecto secundario del import.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main()
+  main(process.argv.slice(2))
 }

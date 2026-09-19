@@ -22,6 +22,19 @@ tampoco acepta un directorio como argumento (`Cannot find module '.../scripts'`)
 así que `node --test scripts/` no servía como forma portable.
 
 **Added**
+- **`.githooks/pre-commit`**: comprime los PNG de `public/ofertas/` (y
+  `public/logo.png`) que estén staged **antes** de que entren al commit, y los
+  vuelve a stagear. Motivo: el workflow de Actions commitea como bot en el
+  remoto, y eso deja el clon local un commit atrás en cada imagen nueva. Con
+  el hook la imagen ya entra comprimida, el workflow no encuentra nada y no
+  commitea. El workflow queda como red de seguridad. Se activa con `git config
+  core.hooksPath .githooks`, que corre solo en el nuevo script `prepare` de
+  `package.json` (o sea, en cada `npm install`). Verificado invocándolo por
+  `git hook run pre-commit` (Git 2.46): 16,9 MB → 308 KB y el índice quedó con
+  la versión comprimida.
+- **`scripts/optimize-images.mjs`** acepta rutas como argumentos: con ellas
+  procesa solo esas (lo usa el hook); sin ellas, todo como antes (`prebuild` y
+  workflow). El ancho se decide por ruta (`logo.png` → 400, resto → 1200).
 - **`.github/workflows/ci.yml`**: `tsc --noEmit` + `lint` + `test` + `build` en
   cada push a `master` y en PRs (ignora cambios solo de `.md`/`docs/`). Hasta
   hoy esos cuatro comandos se corrían a mano al cierre de cada sesión
@@ -64,7 +77,9 @@ así que `node --test scripts/` no servía como forma portable.
 **Validation**
 - `npm test`: 6/6 en Node 25 (local) y en Node 20 (`npx -p node@20`).
 - Workflow de imágenes: primera corrida verde (`6c53452`, 7/7 pasos), sin
-  commit del bot porque no había nada que comprimir.
+  commit del bot porque no había nada que comprimir. **Prueba completa** con
+  `pechito.png` en `a441fe9`: el bot commiteó `475b759` (804 KB → 231 KB) y
+  ese commit no volvió a disparar el workflow (0 runs) — guard anti-loop OK.
 - `npm run build` con `GOOGLE_SHEETS_CSV_URL`, `_GID_OFERTAS` y `_GID_CONFIG`
   vacías: exit 0 (simula el entorno de CI).
 - **Pendiente**: la próxima corrida del workflow en GitHub. Con las imágenes ya

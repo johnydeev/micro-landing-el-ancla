@@ -88,8 +88,14 @@ types/
 scripts/
   optimize-images.mjs       Pipeline de compresión de imágenes (sharp),
                             corre en "prebuild" antes de cada build y en
-                            el workflow de Actions. `optimizar()` esta
-                            exportada para poder testearla.
+                            el workflow de Actions. Acepta rutas como
+                            argumentos (solo esas) o nada (todo).
+                            `optimizar()` esta exportada para testearla.
+.githooks/
+  pre-commit                Comprime los PNG staged antes del commit y los
+                            re-stagea. Activado por `npm install` (script
+                            `prepare` -> core.hooksPath). Evita que el bot
+                            del workflow tenga que commitear.
   optimize-images.test.mjs  Suite de tests del pipeline (node --test, sin
                             dependencias nuevas). Trabaja sobre un dir
                             temporal, nunca toca public/. `npm test`.
@@ -146,6 +152,12 @@ public/
     `GOOGLE_SHEETS_API_KEY` (código no las usa).
   - **`.env.local.example` nunca estuvo en el repo**: `.env*` del `.gitignore`
     lo tapaba. Agregado `!.env.local.example`; `.env.local` sigue ignorado.
+  - **`.githooks/pre-commit`** + `prepare` en `package.json`: comprime los
+    PNG staged antes del commit para que el bot no tenga que commitear y el
+    clon local no quede un commit atrás. `optimize-images.mjs` ahora acepta
+    rutas como argumentos.
+  - Prueba completa del workflow: `pechito.png` 804 KB → 231 KB, commit del
+    bot `475b759`, sin loop.
   - **`.github/workflows/ci.yml`**: `tsc` + `lint` + `test` + `build` en
     cada push/PR. Cierra el pendiente de sesión 4. Verificado que el build
     pasa sin las variables de Sheets.
@@ -847,7 +859,12 @@ aparece un caso de uso real:
 - El proyecto usa **Next.js 16** (no es el Next.js anterior — ver
   `AGENTS.md`). Antes de tocar APIs de Next, leer
   `node_modules/next/dist/docs/`.
-- **Imágenes de `public/ofertas/`**: hay dos capas automáticas.
+- **Imágenes de `public/ofertas/`**: hay tres capas automáticas.
+  0. El hook `pre-commit` (`.githooks/`) comprime lo que esté staged antes
+     de que entre al commit. Es la que evita el `git pull` extra: si la
+     imagen ya entra liviana, el bot del workflow no tiene nada que
+     commitear. Si el hook no está activo (clon nuevo sin `npm install`),
+     las dos capas de abajo cubren igual.
   1. `npm run build` corre `npm run optimize:images` (`prebuild`) antes de
      compilar, así que Vercel siempre sirve la versión comprimida. Ese
      resultado vive solo en el contenedor del build, no vuelve al repo.
