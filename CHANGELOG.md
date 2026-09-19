@@ -21,6 +21,28 @@ local pasaba porque la máquina de desarrollo corre Node 25. Además Node 25
 tampoco acepta un directorio como argumento (`Cannot find module '.../scripts'`),
 así que `node --test scripts/` no servía como forma portable.
 
+**Added**
+- **`.github/workflows/ci.yml`**: `tsc --noEmit` + `lint` + `test` + `build` en
+  cada push a `master` y en PRs (ignora cambios solo de `.md`/`docs/`). Hasta
+  hoy esos cuatro comandos se corrían a mano al cierre de cada sesión
+  (pendiente desde sesión 4). Sin secretos: las páginas son `force-dynamic` y
+  los lectores toleran la falta de `GOOGLE_SHEETS_CSV_URL` — verificado en
+  local con las tres variables vacías, build exitoso. `permissions: contents:
+  read`, `concurrency` con `cancel-in-progress`.
+
+**Removed**
+- **`minutosActualizacion`**: de `types/index.ts`, `CONFIG_PARSERS`,
+  `CONFIG_ALIASES` (4 alias), `config/negocio.ts`, `docs/api.md` y README.
+  Sin efecto desde sesión 10 (no hay polling al que aplicarle la frecuencia).
+  Retrocompatible con planillas que todavía tienen la fila: `normalizarClave`
+  devuelve `null` para claves desconocidas y se saltea.
+
+**Decided (no code)**
+- **Fallback `localStorage` descartado.** Se propuso guardar la última data
+  buena en el Fire TV y mostrarla si un reload llega vacío (trade-off abierto
+  desde sesión 19). El cliente eligió explícitamente pantalla vacía antes que
+  un precio potencialmente desactualizado. Queda cerrado, no "pendiente".
+
 **Fixed**
 - **`package.json`**: `"test": "node --test"` sin argumentos. Descubre
   `*.test.mjs` por convención. Verificado 6/6 en Node 20 y Node 25.
@@ -41,6 +63,10 @@ así que `node --test scripts/` no servía como forma portable.
 
 **Validation**
 - `npm test`: 6/6 en Node 25 (local) y en Node 20 (`npx -p node@20`).
+- Workflow de imágenes: primera corrida verde (`6c53452`, 7/7 pasos), sin
+  commit del bot porque no había nada que comprimir.
+- `npm run build` con `GOOGLE_SHEETS_CSV_URL`, `_GID_OFERTAS` y `_GID_CONFIG`
+  vacías: exit 0 (simula el entorno de CI).
 - **Pendiente**: la próxima corrida del workflow en GitHub. Con las imágenes ya
   comprimidas, el resultado esperado es verde sin commit.
 

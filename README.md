@@ -45,7 +45,7 @@ Service Worker  ──  watchdog anti-freeze + cache network-first
 
 El dueño del negocio agrega una fila en la planilla y la oferta aparece en pantalla en la próxima recarga. No toca código, no entra a un panel, no hay deploy.
 
-La planilla no trae solo datos: una pestaña `configuracion` controla el comportamiento de la pantalla — segundos de cartel, segundos de tabla, minutos de actualización, horarios de atención, WhatsApp e Instagram del local. Cambiar el ritmo de la rotación es editar una celda.
+La planilla no trae solo datos: una pestaña `configuracion` controla el comportamiento de la pantalla — segundos de cartel, segundos de tabla, horarios de atenuado, horarios de atención, WhatsApp e Instagram del local. Cambiar el ritmo de la rotación es editar una celda.
 
 ---
 
@@ -106,7 +106,7 @@ config/            Parámetros de la pantalla (tiempos de rotación, etc.)
 scripts/           Optimización de imágenes
 types/             Tipos compartidos
 docs/              Bitácora de implementación y decisiones técnicas
-.github/workflows/ CI: tests y compresión automática de imágenes
+.github/workflows/ CI: tipos + lint + tests + build en cada push; compresión automática de imágenes
 ```
 
 ---

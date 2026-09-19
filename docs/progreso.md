@@ -94,9 +94,10 @@ scripts/
                             dependencias nuevas). Trabaja sobre un dir
                             temporal, nunca toca public/. `npm test`.
 .github/workflows/
+  ci.yml                    tsc + lint + test + build en cada push/PR
+                            (ignora cambios solo de docs). Sin secretos.
   optimize-images.yml       Comprime y commitea las imagenes en push a
-                            master que toque PNGs (+ boton manual).
-                            Unico workflow del proyecto. Ver
+                            master que toque PNGs (+ boton manual). Ver
                             docs/decisiones.md.
 public/
   sw.js                     Service Worker: cache network-first +
@@ -145,6 +146,17 @@ public/
     `GOOGLE_SHEETS_API_KEY` (código no las usa).
   - **`.env.local.example` nunca estuvo en el repo**: `.env*` del `.gitignore`
     lo tapaba. Agregado `!.env.local.example`; `.env.local` sigue ignorado.
+  - **`.github/workflows/ci.yml`**: `tsc` + `lint` + `test` + `build` en
+    cada push/PR. Cierra el pendiente de sesión 4. Verificado que el build
+    pasa sin las variables de Sheets.
+  - Workflow de imágenes: **primera corrida verde** (`6c53452`, 7/7).
+  - **`minutosActualizacion` eliminada** de `types`, `CONFIG_PARSERS`,
+    `CONFIG_ALIASES`, `config/negocio.ts`, `docs/api.md` y README. Muerta
+    desde sesión 10. Si la fila sigue en el Sheets, `normalizarClave`
+    devuelve `null` y se ignora.
+  - **Descartado el fallback `localStorage`** (last-known-good ante fallo
+    de Google): decisión explícita del cliente — prefiere pantalla vacía a
+    un precio potencialmente desactualizado. Consistente con el README.
   - Validación: `npm test` 6/6 en ambas versiones de Node.
 
 - **Sesión 19 (30/08/2026) — Precios frescos en cada reload (fin del ISR)**:
@@ -804,10 +816,6 @@ aparece un caso de uso real:
 - **Pestaña CONFIG con `modoMantenimiento: boolean`** para pantalla
   dedicada. El mapper tipado (sesión 4) ya soporta agregar la clave
   sin riesgo.
-- **CI/CD de código**: el único workflow que existe es el de imágenes
-  (sesión 18). No hay checks de `tsc --noEmit` + `next lint` +
-  `next build` en push/PR — hoy se corren a mano en cada sesión. Si el
-  cliente lo pide, agregarlos.
 
 ### Resuelto (referencia completa)
 - ✅ Refactor a Server Component + `AutoRefresh` consolidado (sesión 1)
@@ -822,6 +830,7 @@ aparece un caso de uso real:
 - ✅ Mapper tipado en `getConfig` con `satisfies` (sesión 4)
 - ✅ Warning en dev por slug mal cargado (sesión 4)
 - ✅ Empty state amable con datos de contacto (sesión 4)
+- ✅ CI de código: `tsc` + `lint` + `test` + `build` en cada push (sesión 20)
 - ❌ `next/image` — **descartado** por costo en capa gratuita (sesión 2)
 
 ---
@@ -850,8 +859,9 @@ aparece un caso de uso real:
   bloquea el build) — revisar manualmente si conviene recortarla.
 - **`npm test`**: corre la suite del pipeline de imágenes
   (`scripts/optimize-images.test.mjs`, runner `node --test`). Es lo único
-  testeado del proyecto; el resto se valida a mano con `tsc --noEmit`,
-  `npm run lint` y `npm run build`.
+  testeado del proyecto. `tsc --noEmit`, `npm run lint`, `npm test` y
+  `npm run build` corren en CI (`.github/workflows/ci.yml`) en cada push;
+  igual conviene correrlos en local antes de commitear.
 - **El workflow de imágenes necesita un permiso seteado a mano una sola
   vez**: Settings → Actions → General → Workflow permissions →
   `Read and write permissions`. Sin eso el `git push` del job devuelve
@@ -863,8 +873,8 @@ aparece un caso de uso real:
   en desarrollo), así que en dev el SW simplemente no existe. El flujo es
   `npm run build` + `npm start`. Hay una config `prod` en
   `.claude/launch.json` para levantarlo desde Claude Code.
-- **`minutosActualizacion`** (pestaña CONFIG) quedó sin efecto desde
-  sesión 10: no hay más polling client-side al que aplicarle esa
-  frecuencia. El refresh real es el reload completo cada 30 min
-  (`RELOAD_INTERVAL_MS` en `PantallaRotativa.tsx`). Se puede sacar la
-  clave del Sheets sin romper nada, o dejarla sin usar.
+- **`minutosActualizacion`** ya no existe en el código (sesión 20). Si
+  la fila sigue en la pestaña CONFIG del Sheets, se ignora como cualquier
+  clave desconocida — no hace falta borrarla. El refresh real es el
+  reload completo cada 30 min (`RELOAD_INTERVAL_MS` en
+  `PantallaRotativa.tsx`).

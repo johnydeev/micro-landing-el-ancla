@@ -1,0 +1,54 @@
+# Checks de codigo en cada push y PR: los mismos cuatro comandos que hasta
+# ahora se corrian a mano al cierre de cada sesion (ver docs/progreso.md).
+#
+# No hay secretos: el build no necesita las variables de Google Sheets.
+# Las paginas son `force-dynamic`, asi que no se ejecutan en build time, y los
+# lectores de lib/sheets.ts devuelven [] si falta GOOGLE_SHEETS_CSV_URL.
+name: CI
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+# Si llegan dos pushes seguidos, cancela el anterior: solo importa el ultimo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      # Corre el `prebuild` (optimize:images) de punta a punta. Si comprime
+      # algo aca, no pasa nada: este job no commitea (permissions: read).
+      - name: Build
+        run: npm run build

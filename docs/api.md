@@ -141,7 +141,6 @@ GOOGLE_SHEETS_GID_CONFIG`.
 {
   "segundosCartel": 6,
   "segundosTabla": 3,
-  "minutosActualizacion": 1,
   "horarios": "MAR a SAB: 8:15 a 13hs y 16:30 a 20:15hs",
   "whatsapp": "11 6000 7394",
   "instagram": "@granja_elancla"
@@ -153,9 +152,12 @@ GOOGLE_SHEETS_GID_CONFIG`.
 - Cualquier clave puede faltar — la pantalla principal hace
   `configRemota.x ?? negocioConfig.x` y cae al default local
   (`config/negocio.ts`).
-- Las claves numéricas (`segundosCartel`, `segundosTabla`,
-  `minutosActualizacion`) se parsean a número. Si el CSV trae un
-  string no numérico para esas claves, se ignoran.
+- Las claves numéricas (`segundosCartel`, `segundosTabla`) se parsean
+  a número. Si el CSV trae un string no numérico para esas claves, se
+  ignoran.
+- `minutosActualizacion` **ya no existe** (removida en sesión 20; sin
+  efecto desde sesión 10). Si la planilla todavía tiene la fila, se
+  ignora como cualquier clave desconocida.
 - Las claves se aceptan con varias variantes (mayúsculas, con
   acentos, sinónimos en español). Ver `CONFIG_ALIASES` en
   `lib/sheets.ts`.

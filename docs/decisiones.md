@@ -87,6 +87,10 @@ Mitigación disponible si el caso llega a aparecer: guardar la última data buen
 en `localStorage` y renderizarla cuando las props llegan vacías. No se
 implementó ahora — sería resolver un problema que todavía no se observó.
 
+> **2026-09-19 — descartada definitivamente.** Se le propuso al cliente y la
+> rechazó: prefiere pantalla vacía a un precio potencialmente desactualizado.
+> No es un pendiente, es una decisión de producto.
+
 ### Lo que este cambio no puede resolver
 
 La URL configurada es `/pub?output=csv` ("publicar en la web"). Ese endpoint

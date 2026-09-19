@@ -352,7 +352,6 @@ const parseStr = (raw: string): string | undefined => (raw === '' ? undefined : 
 const CONFIG_PARSERS = {
   segundosCartel: parseNum,
   segundosTabla: parseNum,
-  minutosActualizacion: parseNum,
   horarios: parseStr,
   whatsapp: parseStr,
   instagram: parseStr,
@@ -375,10 +374,6 @@ const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
   'segundos x lista': 'segundosTabla',
   'frecuencia tabla': 'segundosTabla',
   'frecuencia tablas': 'segundosTabla',
-  'minutosactualizacion': 'minutosActualizacion',
-  'minutos actualizacion': 'minutosActualizacion',
-  'minutos de actualizacion': 'minutosActualizacion',
-  'minutos x actualizacion': 'minutosActualizacion',
   'horarios': 'horarios',
   'horario': 'horarios',
   'horarios de atencion': 'horarios',

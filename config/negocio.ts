@@ -22,7 +22,6 @@ export const negocioConfig = {
   // Slides
   segundosCartel: 3,
   segundosTabla: 3,
-  minutosActualizacion: 1,
 
   colores: {
     primario: '#E31E24',    // rojo

@@ -36,7 +36,6 @@ export interface Oferta {
 export interface ConfigNegocio {
   segundosCartel?: number
   segundosTabla?: number
-  minutosActualizacion?: number
   horarios?: string
   whatsapp?: string
   instagram?: string
