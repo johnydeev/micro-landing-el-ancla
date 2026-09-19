@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 30/08/2026 (sesión 19).
+Actualizado al 19/09/2026 (sesión 20).
 
 ---
 
@@ -131,6 +131,21 @@ public/
 ---
 
 ## Completado ✅
+
+- **Sesión 20 (19/09/2026) — El workflow de imágenes corría y fallaba**:
+  - La sospecha de sesiones 18-19 (permiso `Read and write` sin setear) era
+    falsa. La API pública de GitHub mostró 3 corridas en `failure`, todas en
+    el paso de tests. **Causa**: `node --test "scripts/**/*.test.mjs"` — Node
+    20 no expande globs. Reproducido con `npx -p node@20`. En local pasaba
+    por correr Node 25.
+  - **Fix**: `"test": "node --test"` sin argumentos (6/6 en Node 20 y 25) y
+    `node-version: 22` en el workflow (20 está EOL).
+  - `picada-cerdo.png` 2948 KB → 283 KB en local.
+  - README y `.env.local.example`: sacadas `GOOGLE_SHEET_ID` y
+    `GOOGLE_SHEETS_API_KEY` (código no las usa).
+  - **`.env.local.example` nunca estuvo en el repo**: `.env*` del `.gitignore`
+    lo tapaba. Agregado `!.env.local.example`; `.env.local` sigue ignorado.
+  - Validación: `npm test` 6/6 en ambas versiones de Node.
 
 - **Sesión 19 (30/08/2026) — Precios frescos en cada reload (fin del ISR)**:
   - **Pregunta del cliente**: si corrige un precio en el Sheets y aprieta
@@ -734,11 +749,11 @@ listo para vender en su estado actual.
 
 ### Abierto
 
-- **Verificar el workflow de imágenes end-to-end** (sesión 18). **Confirmado
-  que no corrió**: `cortes-de-cerdo.png` se commiteó a `master` el 25/08 con
-  3,35 MB y seguía así hasta que el `prebuild` de la sesión 19 la comprimió
-  en local (→ 425 KB). No hay ningún commit de `github-actions[bot]` en la
-  historia. Pasos: mirar la pestaña Actions del repo; si el job falló con
+- **Confirmar la primera corrida verde del workflow de imágenes.** Sesión 20
+  encontró y arregló la causa de que fallara siempre (`node --test` + glob en
+  Node 20). Falta ver la próxima corrida en la pestaña Actions: esperado
+  verde sin commit (las imágenes ya están comprimidas). Prueba completa:
+  commitear un PNG pesado y ver el commit del bot. Pasos: mirar la pestaña Actions del repo; si el job falló con
   `403`, setear Settings → Actions → General → Workflow permissions →
   `Read and write permissions` y volver a dispararlo con
   `workflow_dispatch`.

@@ -5,6 +5,45 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 20 — 2026-09-19 (el workflow de imágenes corría y fallaba: `node --test` + glob en Node 20)
+
+**Context**: desde sesión 18 se asumía que el workflow de Actions "nunca
+corrió" y se sospechaba del permiso `Read and write`. Ambas cosas eran falsas.
+El permiso ya estaba seteado, y la API pública de GitHub mostró **3 corridas,
+las 3 en `failure`** (25/08, 31/08, 14/09), siempre en el paso "Tests del
+pipeline de imágenes". Por eso `cortes-de-cerdo.png` y `picada-cerdo.png`
+entraron pesadas a `master` y nunca hubo commit del bot.
+
+**Causa raíz**: `"test": "node --test \"scripts/**/*.test.mjs\""`. En Node 20
+(el del workflow) `node --test` **no expande globs**: reproducido en local con
+`npx -p node@20`, falla con `Could not find '.../scripts/**/*.test.mjs'`. En
+local pasaba porque la máquina de desarrollo corre Node 25. Además Node 25
+tampoco acepta un directorio como argumento (`Cannot find module '.../scripts'`),
+así que `node --test scripts/` no servía como forma portable.
+
+**Fixed**
+- **`package.json`**: `"test": "node --test"` sin argumentos. Descubre
+  `*.test.mjs` por convención. Verificado 6/6 en Node 20 y Node 25.
+- **`.github/workflows/optimize-images.yml`**: `node-version: 20` → `22`. Node
+  20 llegó a EOL en abril de 2026.
+
+**Changed**
+- **`public/ofertas/picada-cerdo.png`**: 2948 KB → 283 KB, comprimida en local
+  con `npm run optimize:images` (el workflow no lo hizo por lo de arriba).
+- **`README.md`** y **`.env.local.example`**: sacadas `GOOGLE_SHEET_ID` y
+  `GOOGLE_SHEETS_API_KEY` — ningún código las usa, el proyecto solo lee
+  `GOOGLE_SHEETS_CSV_URL` + los dos GIDs. En el example también se quitó
+  `minutosActualizacion` (sin efecto desde sesión 10) y se agregó `atenuar
+  desde/hasta`.
+- **`.gitignore`**: `!.env.local.example`. El patrón `.env*` lo tapaba, así que
+  el archivo **nunca estuvo en el repo** aunque el README lo linkea. `.env.local`
+  (el real) sigue ignorado — verificado con `git check-ignore`.
+
+**Validation**
+- `npm test`: 6/6 en Node 25 (local) y en Node 20 (`npx -p node@20`).
+- **Pendiente**: la próxima corrida del workflow en GitHub. Con las imágenes ya
+  comprimidas, el resultado esperado es verde sin commit.
+
 ### Sesión 19 — 2026-08-30 (precios frescos en cada reload: fin del ISR)
 
 **Context**: el cliente preguntó si al corregir un precio en el Sheets y apretar

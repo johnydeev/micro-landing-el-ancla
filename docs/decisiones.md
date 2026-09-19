@@ -214,14 +214,20 @@ contra el loop de commits (ver abajo).
 **Settings → Actions → General → Workflow permissions → `Read and write
 permissions`**. Sin eso, el `git push` del job falla con `403`.
 
-### Estado: sin verificar end-to-end
+### Estado: fallaba en cada corrida (resuelto el 2026-09-19)
 
 `cortes-de-cerdo.png` (3,35 MB, sin comprimir) se commiteó a `master` el
-2026-08-25 y **no hay commit de `github-actions[bot]` detrás**. O el workflow
-nunca corrió, o falló — la causa más probable es el permiso de escritura de
-arriba sin setear. Pendiente: revisar la pestaña Actions del repo y, si hace
-falta, disparar el workflow a mano (`workflow_dispatch`) para cerrar el paso 4 de
-verificación del diseño.
+2026-08-25 y no hubo commit de `github-actions[bot]` detrás. La sospecha inicial
+(permiso de escritura sin setear) **era falsa**: el permiso estaba bien. La API
+de GitHub mostró 3 corridas, las 3 en `failure` en el paso de tests.
+
+Causa: `node --test "scripts/**/*.test.mjs"` — Node 20 (el del workflow) no
+expande globs en `node --test`; en local pasaba porque la máquina corre Node 25.
+Fix en sesión 20: `"test": "node --test"` sin argumentos (descubrimiento por
+convención, funciona en 20/22/25) y `node-version: 22` (20 está EOL desde abril
+2026). Lección: **el CI corre en otra versión de Node que la máquina de
+desarrollo; cuando un workflow "no hace nada", mirar la pestaña Actions antes de
+teorizar.**
 
 Diseño completo:
 `docs/superpowers/specs/2026-08-09-optimizacion-imagenes-programada-design.md`.

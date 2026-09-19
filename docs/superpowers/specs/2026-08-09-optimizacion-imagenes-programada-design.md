@@ -139,6 +139,10 @@ temporal con imágenes generadas al vuelo — **nunca toca `public/`**.
 Nuevo script en `package.json`:
 `"test": "node --test \"scripts/**/*.test.mjs\""`.
 
+> **Corrección 2026-09-19**: ese glob no funciona en Node 20 (el del workflow)
+> y hizo fallar las 3 primeras corridas. Quedó `"test": "node --test"` sin
+> argumentos. Ver `CHANGELOG.md` sesión 20.
+
 ### Bug encontrado por el test de idempotencia
 
 El test falló en la primera corrida y destapó un problema real:

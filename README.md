@@ -123,8 +123,6 @@ Variables de entorno (ver [`.env.local.example`](.env.local.example)):
 
 | Variable | Para qué |
 |---|---|
-| `GOOGLE_SHEET_ID` | ID de la planilla |
-| `GOOGLE_SHEETS_API_KEY` | API key de Google Sheets |
 | `GOOGLE_SHEETS_CSV_URL` | CSV público de la pestaña de productos |
 | `GOOGLE_SHEETS_GID_OFERTAS` | GID de la pestaña de ofertas |
 | `GOOGLE_SHEETS_GID_CONFIG` | GID de la pestaña de configuración |

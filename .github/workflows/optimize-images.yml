@@ -34,7 +34,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22: Node 20 llego a EOL en abril 2026. Ademas `node --test` en 20
+          # no expande globs: las 3 primeras corridas del workflow fallaron con
+          # "Could not find 'scripts/**/*.test.mjs'". El script de test ahora
+          # corre `node --test` sin argumentos (descubrimiento por convencion
+          # *.test.mjs), que funciona igual en 20, 22 y 25.
+          node-version: 22
           cache: npm
 
       - run: npm ci
