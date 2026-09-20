@@ -1,7 +1,7 @@
 import { memo, type CSSProperties } from 'react'
 
-import { negocioConfig } from '@/config/negocio'
 import type { ConfigNegocio } from '@/types'
+import type { Tenant } from '@/types/tenant'
 import styles from './Footer.module.css'
 
 const iconStyle: CSSProperties = {
@@ -17,23 +17,24 @@ const itemStyle: CSSProperties = {
 }
 
 interface FooterProps {
+  tenant: Tenant
   config?: ConfigNegocio
 }
 
 // `config` (configRemota) llega como la misma referencia en cada tick de la
 // rotacion de PantallaRotativa — solo cambia tras un reload completo. `memo`
 // evita re-ejecutar este componente (2 SVGs inline) en cada tick.
-function Footer({ config }: FooterProps = {}) {
+function Footer({ tenant, config }: FooterProps) {
   const footerFontVars = {
-    '--footer-font-scale': `${negocioConfig.tipografia.footer / 100}`,
+    '--footer-font-scale': `${tenant.tipografia.footer / 100}`,
   } as CSSProperties
 
-  const whatsapp = config?.whatsapp ?? negocioConfig.whatsapp ?? negocioConfig.telefono
-  const instagram = config?.instagram ?? negocioConfig.instagram
-  const horarios = config?.horarios ?? negocioConfig.horarios
+  const whatsapp = config?.whatsapp ?? tenant.defaults.whatsapp
+  const instagram = config?.instagram ?? tenant.defaults.instagram
+  const horarios = config?.horarios ?? tenant.defaults.horarios
 
   return (
-    <footer className={styles.footer} style={{ background: negocioConfig.colores.primario }}>
+    <footer className={styles.footer} style={{ background: tenant.paleta.primario }}>
       <div className={styles.content} style={footerFontVars}>
         <span style={itemStyle}>
           <svg viewBox="0 0 24 24" fill="#25D366" style={iconStyle}>

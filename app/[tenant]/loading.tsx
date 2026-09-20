@@ -1,8 +1,11 @@
-import { negocioConfig } from '@/config/negocio'
-
-// Pantalla de carga inicial mientras se resuelven los fetch a Google Sheets
-// en el Server Component. Mantiene el branding del local en vez de mostrar
-// un placeholder generico.
+// Pantalla de carga mientras se resuelven los fetch a Google Sheets. Es
+// generica (sin nombre ni paleta): loading.tsx no recibe params en Next, asi
+// que no puede saber el tenant. Dura ~1s al arrancar.
+//
+// Solo existe en este segmento, no en app/: un loading.tsx en la raiz crea un
+// boundary de Suspense que hace que el notFound() de [tenant]/layout.tsx
+// responda 200 en vez de 404 (la respuesta ya empezo a streamear). Verificado
+// en sesion 21.
 export default function Loading() {
   return (
     <main
@@ -24,7 +27,7 @@ export default function Loading() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: negocioConfig.colores.primario,
+          background: '#222',
           color: '#fff',
           gap: '2vh',
           padding: '4vh',
@@ -39,7 +42,7 @@ export default function Loading() {
             textTransform: 'uppercase',
           }}
         >
-          {negocioConfig.nombre}
+          Precios
         </span>
         <span
           style={{
@@ -47,7 +50,7 @@ export default function Loading() {
             opacity: 0.9,
           }}
         >
-          Cargando ofertas…
+          Cargando…
         </span>
         <div
           aria-hidden

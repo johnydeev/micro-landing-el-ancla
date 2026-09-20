@@ -1,6 +1,9 @@
 import 'server-only'
 
 import { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
+import type { Tenant } from '@/types/tenant'
+import { normalizarPlantilla } from '@/lib/plantillas'
+import { csvUrlDe, envKeyCsv } from '@/lib/tenant-env'
 
 function parseCsvRows(text: string): string[][] {
   const sanitizedText = text.replace(/^\uFEFF/, '')
@@ -173,6 +176,18 @@ function esHeaderDescripcion(headerNormalizado: string): boolean {
   return DESCRIPCION_OFERTA_KEYWORDS.some((keyword) => headerNormalizado.includes(keyword))
 }
 
+/*
+ * Palabras clave de la columna OPCIONAL "plantilla": que diseno de cartel
+ * usa esta oferta. Misma deteccion tolerante que tamano/descripcion. A
+ * diferencia de esas dos, su posicion es libre: se busca en las 4 celdas
+ * que siguen a "estado" (hasta el proximo bloque de tabla).
+ */
+const PLANTILLA_OFERTA_KEYWORDS = ['plantilla', 'diseno', 'template']
+
+function esHeaderPlantilla(headerNormalizado: string): boolean {
+  return PLANTILLA_OFERTA_KEYWORDS.some((keyword) => headerNormalizado.includes(keyword))
+}
+
 interface OfertasTableHeader {
   offset: number
   /** true si la 5ta columna (offset+4) es un header de tamano. */
@@ -183,6 +198,8 @@ interface OfertasTableHeader {
    * seguir soportando el caso en que el cliente no cargo la columna tamano).
    */
   tieneDescripcion: boolean
+  /** Indice absoluto de la columna "plantilla", o null si no esta. */
+  offsetPlantilla: number | null
 }
 
 function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
@@ -211,7 +228,19 @@ function findOfertasTableOffsets(headerRow: string[]): OfertasTableHeader[] {
       const columnaDescripcion = quitarAcentos((headerRow[offsetDescripcion] ?? '').trim().toLowerCase())
       const tieneDescripcion = esHeaderDescripcion(columnaDescripcion)
 
-      result.push({ offset: i, tieneTamano, tieneDescripcion })
+      // Plantilla: posicion libre entre estado+1 y estado+4, sin pisar un
+      // header de otra tabla pegada al costado ("titulo").
+      let offsetPlantilla: number | null = null
+      for (let c = i + 4; c <= i + 7 && c < headerRow.length; c += 1) {
+        const celda = quitarAcentos((headerRow[c] ?? '').trim().toLowerCase())
+        if (celda === 'titulo') break
+        if (esHeaderPlantilla(celda)) {
+          offsetPlantilla = c
+          break
+        }
+      }
+
+      result.push({ offset: i, tieneTamano, tieneDescripcion, offsetPlantilla })
     }
   }
 
@@ -228,7 +257,7 @@ function parseTamanoOferta(raw: string): number {
 function mapRowToOfertas(columns: string[], headers: OfertasTableHeader[]): Oferta[] {
   const ofertas: Oferta[] = []
 
-  for (const { offset, tieneTamano, tieneDescripcion } of headers) {
+  for (const { offset, tieneTamano, tieneDescripcion, offsetPlantilla } of headers) {
     const [nombre = '', precio = '', imagen = '', estado = ''] = columns
       .slice(offset, offset + 4)
       .map((column) => (column ?? '').trim())
@@ -244,17 +273,26 @@ function mapRowToOfertas(columns: string[], headers: OfertasTableHeader[]): Ofer
     const offsetDescripcion = tieneTamano ? offset + 5 : offset + 4
     const descripcion = tieneDescripcion ? (columns[offsetDescripcion] ?? '').trim() : ''
 
-    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado, tamano, descripcion })
+    const plantillaRaw = offsetPlantilla === null ? '' : (columns[offsetPlantilla] ?? '')
+    const plantilla = normalizarPlantilla(plantillaRaw)
+    if (process.env.NODE_ENV !== 'production' && plantillaRaw.trim() && !plantilla) {
+      console.warn(
+        `[ofertas] plantilla "${plantillaRaw}" no existe en el catalogo; ` +
+          `"${nombre}" usa la default del tenant.`,
+      )
+    }
+
+    ofertas.push({ nombre, precio, imagen, estado: estadoNormalizado, tamano, descripcion, plantilla })
   }
 
   return ofertas
 }
 
-export async function getListasPrecios(): Promise<ListaPrecios[]> {
-  const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
+export async function getListasPrecios(tenant: Tenant): Promise<ListaPrecios[]> {
+  const csvUrl = csvUrlDe(tenant.slug)
 
   if (!csvUrl) {
-    console.error('Falta la variable de entorno GOOGLE_SHEETS_CSV_URL')
+    console.error(`Falta la variable de entorno ${envKeyCsv(tenant.slug)}`)
     return []
   }
 
@@ -418,9 +456,9 @@ function asignarConfig<K extends keyof ConfigNegocio>(
   config[clave] = parsed as ConfigNegocio[K]
 }
 
-export async function getConfig(): Promise<ConfigNegocio> {
-  const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
-  const gidConfig = process.env.GOOGLE_SHEETS_GID_CONFIG
+export async function getConfig(tenant: Tenant): Promise<ConfigNegocio> {
+  const csvUrl = csvUrlDe(tenant.slug)
+  const gidConfig = tenant.sheets.gidConfig
 
   if (!csvUrl || !gidConfig) {
     return {}
@@ -454,29 +492,29 @@ export async function getConfig(): Promise<ConfigNegocio> {
   }
 }
 
-export async function getPantallaData(): Promise<{
+export async function getPantallaData(tenant: Tenant): Promise<{
   listas: ListaPrecios[]
   ofertas: Oferta[]
   configRemota: ConfigNegocio
 }> {
   const [listas, ofertas, configRemota] = await Promise.all([
-    getListasPrecios(),
-    getOfertas(),
-    getConfig(),
+    getListasPrecios(tenant),
+    getOfertas(tenant),
+    getConfig(tenant),
   ])
   return { listas, ofertas, configRemota }
 }
 
-export async function getOfertas(): Promise<Oferta[]> {
-  const csvUrl = process.env.GOOGLE_SHEETS_CSV_URL
-  const gidOfertas = process.env.GOOGLE_SHEETS_GID_OFERTAS
+export async function getOfertas(tenant: Tenant): Promise<Oferta[]> {
+  const csvUrl = csvUrlDe(tenant.slug)
+  const gidOfertas = tenant.sheets.gidOfertas
 
   if (!csvUrl) {
-    console.error('Falta GOOGLE_SHEETS_CSV_URL')
+    console.error(`Falta la variable de entorno ${envKeyCsv(tenant.slug)}`)
     return []
   }
   if (!gidOfertas) {
-    console.error('Falta GOOGLE_SHEETS_GID_OFERTAS')
+    console.error(`Tenant ${tenant.slug} sin sheets.gidOfertas`)
     return []
   }
 

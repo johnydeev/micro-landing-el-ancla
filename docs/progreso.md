@@ -1,17 +1,22 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 19/09/2026 (sesión 20).
+Actualizado al 20/09/2026 (sesión 21).
 
 ---
 
 ## Estado general
 
-Micro-landing en Next.js 16 + React 19 para Granja El Ancla. Muestra
-una pantalla que rota entre **tabla de precios** y **carteles de
-superoferta**, leyendo los datos en vivo desde Google Sheets (CSV
-publicado). Pensada para correrse en un display dentro del local.
+Cartelería de precios en Next.js 16 + React 19. Un solo deploy sirve N
+comercios, cada uno en `/<slug>`: muestra una pantalla que rota entre
+**tabla de precios** y **carteles de oferta**, leyendo los datos en vivo
+desde la planilla de Google Sheets del comercio (CSV publicado) y las
+imágenes desde un catálogo universal en Cloudinary. Pensada para correrse en
+un Fire TV dentro del local. Primer cliente: Granja El Ancla
+(`/granja-elancla`, también servido en `/`).
 
-Sin DB ni auth: la única fuente de verdad es la planilla del cliente.
+Sin DB ni auth: la única fuente de verdad es la planilla de cada cliente. La
+configuración del comercio (nombre, paleta, textos, GIDs) vive en
+`tenants/<slug>.ts`; la URL de su CSV, en la env `TENANT_<SLUG>_CSV_URL`.
 Desde sesión 19 **no hay cache del lado de la app**: la página es
 `force-dynamic` y los tres `fetch` usan `cache: 'no-store'`, así que cada
 carga trae los precios del momento. Es lo que hace que apretar "actualizar"
@@ -28,116 +33,133 @@ que de paso resetea cualquier acumulación de memoria/estado del browser
 
 ```
 app/
-  page.tsx                  Server Component. Llama a getPantallaData()
-                            (fetch paralelo de listas/ofertas/config) y
-                            pasa todo por props.
-                            export const dynamic = 'force-dynamic'.
-  vistaCartel/page.tsx      Ruta de desarrollo: pantalla fija en modo
-                            "cartel" (?index=N), sin rotación. No la usa
-                            el cliente final.
-  vistaLista/page.tsx       Idem para modo "tabla".
-  layout.tsx                Root layout, fuente Geist, metadata +
-                            viewport (themeColor). Sin clases Tailwind en
-                            <body>: el reset vive en globals.css.
-  manifest.json              PWA manifest (convencion de archivo de Next).
-                            Auto-linkeado, sin tocar layout.tsx.
-  icon.png / apple-icon.png  Iconos (convencion de archivo de Next,
-                            192x192 / 180x180). Auto-linkeados en <head>.
-  loading.tsx               Pantalla de carga con branding del local
-                            (Server Component).
-  error.tsx                 Boundary de errores con datos de contacto
-                            fijos + boton "Reintentar" (Client
-                            Component, por contrato de Next).
-  api/
-    productos/route.ts      GET listas de precios (API publica). Ver
-                            docs/api.md.
-    ofertas/route.ts        GET ofertas activas (API publica).
-    config/route.ts         GET config remota (API publica).
+  page.tsx                  "/" renderiza el tenant DEFAULT_TENANT (no
+                            redirige: la TV de El Ancla apunta a "/" y el
+                            SW no cachea un 307). force-dynamic.
+  layout.tsx                Root layout: fuente Geist, reset CSS, metadata
+                            genérica. Sin manifest ni viewport (son por
+                            tenant).
+  icon.png / apple-icon.png Favicon genérico (convención de Next).
+  error.tsx                 Boundary de "/": copia del de [tenant], resuelve
+                            el tenant con NEXT_PUBLIC_DEFAULT_TENANT.
+  [tenant]/
+    layout.tsx              Resuelve el tenant (getTenantOr404) → 404 si el
+                            slug no existe. generateMetadata (title,
+                            manifest) y generateViewport (themeColor).
+    page.tsx                Pantalla principal. getPantallaData(tenant).
+    loading.tsx             Genérico ("Cargando…"): Next no le pasa params.
+                            NO existe en app/: ahí rompe el 404 (ver ADR).
+    error.tsx               Client; tenant vía useParams + registro.
+    vistaCartel/page.tsx    Rutas de desarrollo (?index=N), sin rotación.
+    vistaLista/page.tsx
+    manifest.webmanifest/route.ts
+                            Manifest PWA por tenant: nombre, colores,
+                            start_url=/<slug>, íconos desde Cloudinary.
+  api/[tenant]/
+    productos|ofertas|config/route.ts
+                            API pública por tenant. Ver docs/api.md.
+tenants/
+  index.ts                  Registro TENANTS + getTenant(slug).
+  granja-elancla.ts         Config de El Ancla (ex config/negocio.ts).
+  registro.test.ts          Slug = clave, slug URL-safe, plantilla default
+                            existe.
+templates/
+  index.ts                  CATALOGO_CARTELES tipado contra los ids.
+  tabla/Clasica.tsx         Único diseño de tabla. Sin colores fijos.
+  cartel/Clasico.tsx        Cartel de hoy (ex CartelOferta). Foto desde
+                            Cloudinary, badge desde tenant.textos.
 components/
-  PantallaRotativa.tsx      Client Component. Recibe data por props.
-                            Maneja rotación tabla<->cartel con
-                            useReducer (un dispatch atómico por tick) +
-                            setInterval. Reload completo cada 30 min
-                            (RELOAD_INTERVAL_MS) en vez de refetch
-                            client-side. Heartbeat al Service Worker
-                            cada 20s (watchdog anti-freeze). Soporta
-                            modoFijo/indiceFijo para las rutas de dev.
-  Header.tsx                Logo + nombre + eslogan. `memo` (sin props,
-                            output siempre igual).
-  Footer.tsx                WhatsApp / Instagram / horarios. Acepta
-                            config remota con fallback a config local.
-                            `memo` (config llega con referencia estable
-                            entre ticks de rotacion).
-  HealthIndicator.tsx       Punto de estado online/offline
-                            (useSyncExternalStore). `memo`.
-  DimOverlay.tsx            Atenuado de pantalla por horario configurable.
-                            `memo`.
-  ServiceWorkerRegistrar.tsx Registra public/sw.js, solo en producción.
-  LogoSVG.tsx               Logo SVG.
-config/
-  negocio.ts                Defaults locales: colores, tipografía,
-                            duraciones, contactos. Usado como fallback
-                            si la planilla no define la clave.
+  PantallaRotativa.tsx      Client. Recibe tenant + data. Inyecta la paleta
+                            como CSS vars en .screen; elige
+                            CATALOGO_CARTELES[oferta.plantilla ?? default].
+                            Rotación con useReducer, reload cada 30 min,
+                            heartbeat al SW cada 20s. modoFijo para dev.
+  Header.tsx / Footer.tsx   Reciben tenant. Logo desde Cloudinary. `memo`.
+  HealthIndicator.tsx       Punto online/offline. `memo`.
+  DimOverlay.tsx            Atenuado por horario. `memo`.
+  ServiceWorkerRegistrar.tsx
 lib/
-  sheets.ts                 Parser CSV + lectores tipados de listas,
-                            ofertas y config + getPantallaData() (helper
-                            compartido). server-only.
+  sheets.ts                 Parser CSV + lectores por tenant + columna
+                            "plantilla". server-only.
+  plantillas.ts             PLANTILLAS_CARTEL, slugificarPlantilla,
+                            normalizarPlantilla. Sin React (testeable).
+  cloudinary.ts             urlOferta / urlLogo / urlIcono. Solo strings.
+  tenant-env.ts             envKeyCsv, csvUrlDe.
+  tenant-route.ts           getTenantOr404, getDefaultTenantOr404.
+  precio.ts                 formatPrecio (formato AR).
+  *.test.ts                 node --test, type stripping, imports relativos
+                            con extensión .ts.
 types/
-  index.ts                  Producto, ListaPrecios, Oferta,
+  index.ts                  Producto, ListaPrecios, Oferta (+plantilla),
                             ConfigNegocio.
-scripts/
-  optimize-images.mjs       Pipeline de compresión de imágenes (sharp),
-                            corre en "prebuild" antes de cada build y en
-                            el workflow de Actions. Acepta rutas como
-                            argumentos (solo esas) o nada (todo).
-                            `optimizar()` esta exportada para testearla.
-.githooks/
-  pre-commit                Comprime los PNG staged antes del commit y los
-                            re-stagea. Activado por `npm install` (script
-                            `prepare` -> core.hooksPath). Evita que el bot
-                            del workflow tenga que commitear.
-  optimize-images.test.mjs  Suite de tests del pipeline (node --test, sin
-                            dependencias nuevas). Trabaja sobre un dir
-                            temporal, nunca toca public/. `npm test`.
-.github/workflows/
-  ci.yml                    tsc + lint + test + build en cada push/PR
-                            (ignora cambios solo de docs). Sin secretos.
-  optimize-images.yml       Comprime y commitea las imagenes en push a
-                            master que toque PNGs (+ boton manual). Ver
-                            docs/decisiones.md.
+  tenant.ts                 Tenant.
 public/
-  sw.js                     Service Worker: cache network-first +
-                            watchdog de heartbeat (recovery ante main
-                            thread muerto). Ver docs/decisiones.md.
-  icons/                    icon-192.png / icon-512.png para
-                            app/manifest.json (generados desde logo.png
-                            con sharp, a mano — no estan en el pipeline
-                            de prebuild porque el logo casi no cambia).
+  sw.js                     Service Worker v7: network-first + watchdog.
+                            Cachea same-origin y res.cloudinary.com.
+.github/workflows/
+  ci.yml                    tsc + lint + test + build en cada push/PR.
 ```
+
+Ya no existen: `config/`, `scripts/`, `.githooks/`, `public/ofertas/`,
+`public/logo.png`, `public/icons/`, `app/manifest.json`, el workflow de
+imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
 
 ### Flujo de datos
 
 1. El cliente edita su planilla de Google Sheets (productos, ofertas,
-   config) y publica las pestañas como CSV.
-2. El Server Component `app/page.tsx` hace tres `fetch` en paralelo a
-   los CSVs, sin cache (`no-store` + un parámetro `_cb` anti-cache en la
-   URL). Cada request al sitio vuelve a leer la planilla.
+   config) y publica las pestañas como CSV. En ofertas, `slug imagen` es un
+   id del catálogo universal de Cloudinary y `plantilla` (opcional) el id
+   de un diseño de cartel; ambos con desplegable.
+2. `app/[tenant]/page.tsx` resuelve el tenant por el path y hace tres
+   `fetch` en paralelo a los CSVs (URL de `TENANT_<SLUG>_CSV_URL`, GIDs de
+   `tenant.sheets`), sin cache (`no-store` + parámetro `_cb`). Cada request
+   vuelve a leer la planilla.
 3. Los datos llegan al cliente como props del primer render (sin
-   round-trip extra).
+   round-trip extra), junto con el `tenant`.
 4. `PantallaRotativa` rota entre la tabla y los carteles según los
-   tiempos `segundosTabla` / `segundosCartel` (configurables remotos).
+   tiempos `segundosTabla` / `segundosCartel` (configurables remotos, con
+   fallback a `tenant.defaults`). Para cada oferta usa
+   `CATALOGO_CARTELES[oferta.plantilla ?? tenant.plantillaCartelDefault]`;
+   la foto es `urlOferta(slug)` en Cloudinary (`f_auto,q_auto,w_1200`,
+   placeholder si el slug no existe).
 5. Cada `RELOAD_INTERVAL_MS` (30 min) el cliente hace un
    `window.location.reload()` completo, que vuelve a ejecutar el Server
    Component desde cero (datos frescos, siempre) y de paso resetea
    cualquier acumulación de memoria/estado del browser. Un reload manual
-   desde el control del Fire TV hace exactamente lo mismo. La
-   clave `minutosActualizacion` de la pestaña CONFIG quedó sin uso desde
-   sesión 10 — no hay más polling client-side al que aplicarle esa
-   frecuencia.
+   desde el control del Fire TV hace exactamente lo mismo.
 
 ---
 
 ## Completado ✅
+
+- **Sesión 21 (20/09/2026) — Multitenant por path + imágenes en Cloudinary**:
+  - Brainstorming → spec → plan (todo en `docs/superpowers/`). Decisiones:
+    un deploy con N comercios por path (no SaaS), registro tipado en
+    `tenants/`, URLs de CSV en env, catálogo de plantillas con paleta por
+    comercio, columna `plantilla` en la planilla elegible por oferta, rubro
+    genérico, **todas las imágenes en Cloudinary** con catálogo universal.
+  - Rutas `app/[tenant]/…` y `app/api/[tenant]/…`; `/` renderiza
+    `DEFAULT_TENANT` sin redirect (el SW no cachea 307; la TV apunta a `/`).
+  - `templates/` (tabla y cartel extraídos de `PantallaRotativa`, sin
+    cambios visuales), `lib/plantillas|cloudinary|tenant-env|tenant-route|precio`.
+  - `lib/sheets.ts` por tenant; parseo de `plantilla` con posición libre.
+  - Manifest PWA por tenant con íconos derivados del logo en Cloudinary.
+  - SW v7: cachea `res.cloudinary.com`; `<img crossorigin="anonymous">`.
+  - **Eliminado**: pipeline de imágenes completo (script, test, hook,
+    workflow, `sharp`), `public/ofertas|logo|icons`, `app/manifest.json`,
+    `config/negocio.ts`, `app/loading.tsx` de la raíz.
+  - **Hallazgo en validación**: con `loading.tsx` en la raíz, un slug
+    desconocido respondía 200 (Suspense streamea antes del `notFound()`).
+    Sin él, 404. Se sacó; `/` muestra ~0,6 s en blanco al recargar.
+  - Tests: 16/16 en 4 archivos `.ts` (type stripping; verificado en Node
+    22 y 25). `tsc` ✓, lint ✓, build ✓ (rutas dinámicas nuevas, sin
+    `/manifest.json`), build con env vacías ✓. HTTP contra `npm start`:
+    200/200/404/404, JSON, manifest, `crossorigin` en las `<img>`.
+  - **Pendiente**: subir las 22 imágenes + logo + placeholder a Cloudinary
+    (Tarea 0 del plan), check visual/offline, y el **cutover** (Tarea 14:
+    env en Vercel, dominio nuevo, push fuera de horario, rollback = Instant
+    Rollback de Vercel).
+  - Docs: CHANGELOG, dos ADRs, README reescrito, `api.md`.
 
 - **Sesión 20 (19/09/2026) — El workflow de imágenes corría y fallaba**:
   - La sospecha de sesiones 18-19 (permiso `Read and write` sin setear) era
@@ -773,20 +795,21 @@ listo para vender en su estado actual.
 
 ### Abierto
 
-- **Confirmar la primera corrida verde del workflow de imágenes.** Sesión 20
-  encontró y arregló la causa de que fallara siempre (`node --test` + glob en
-  Node 20). Falta ver la próxima corrida en la pestaña Actions: esperado
-  verde sin commit (las imágenes ya están comprimidas). Prueba completa:
-  commitear un PNG pesado y ver el commit del bot. Pasos: mirar la pestaña Actions del repo; si el job falló con
-  `403`, setear Settings → Actions → General → Workflow permissions →
-  `Read and write permissions` y volver a dispararlo con
-  `workflow_dispatch`.
+- **Cutover multitenant (sesión 21, Tarea 14 del plan).** Código listo y
+  validado en local, **sin pushear**. Antes del push: 22 imágenes + logo +
+  `placeholder.png` en Cloudinary, env nuevas en Vercel, dominio nuevo
+  agregado sin borrar el viejo. El push, fuera del horario de atención.
+  Rollback: Vercel → Instant Rollback.
 - **Validar el watchdog en el navegador real del Fire TV** (Amazon Silk).
   Pendiente desde sesión 11; el procedimiento documentado solo se corrió
   en Chrome de escritorio. Requiere el hardware.
-- **`icon-512.png` está escalado hacia arriba** desde un logo de 400×400
-  (sesión 17). Cumple instalabilidad, pero con pérdida de nitidez.
-  Corregirlo requiere un logo de ≥512 px que hoy no existe en el repo.
+- **Latencia del `/pub` de Google — medida el 20/09/2026: ~4-5 min.**
+  Se editó una celda (`patamuslo` → `pata-muslo`) y el CSV publicado la
+  expuso 208 s después de empezar a pollear (más ~1 min previo). Coincide
+  con la republicación periódica de Google. Es el techo real del F5 en la
+  TV; nuestro lado ya no cachea nada. Si molesta: migrar a
+  `/export?format=csv` con la planilla compartida por enlace (ADR sesión
+  19). Sin acción por ahora.
 
 ### Ideas opcionales para iteraciones futuras
 
@@ -859,31 +882,20 @@ aparece un caso de uso real:
 - El proyecto usa **Next.js 16** (no es el Next.js anterior — ver
   `AGENTS.md`). Antes de tocar APIs de Next, leer
   `node_modules/next/dist/docs/`.
-- **Imágenes de `public/ofertas/`**: hay tres capas automáticas.
-  0. El hook `pre-commit` (`.githooks/`) comprime lo que esté staged antes
-     de que entre al commit. Es la que evita el `git pull` extra: si la
-     imagen ya entra liviana, el bot del workflow no tiene nada que
-     commitear. Si el hook no está activo (clon nuevo sin `npm install`),
-     las dos capas de abajo cubren igual.
-  1. `npm run build` corre `npm run optimize:images` (`prebuild`) antes de
-     compilar, así que Vercel siempre sirve la versión comprimida. Ese
-     resultado vive solo en el contenedor del build, no vuelve al repo.
-  2. El workflow `.github/workflows/optimize-images.yml` (sesión 18)
-     comprime y **commitea** el resultado cuando se pushea un PNG a
-     `master`. Eso es lo que mantiene liviano el repo.
-  No hace falta comprimir a mano al subir una imagen nueva. Si una imagen
-  queda por encima de 500 KB tras comprimir, el script solo advierte (no
-  bloquea el build) — revisar manualmente si conviene recortarla.
-- **`npm test`**: corre la suite del pipeline de imágenes
-  (`scripts/optimize-images.test.mjs`, runner `node --test`). Es lo único
-  testeado del proyecto. `tsc --noEmit`, `npm run lint`, `npm test` y
-  `npm run build` corren en CI (`.github/workflows/ci.yml`) en cada push;
+- **Imágenes**: viven en Cloudinary, no en el repo. Catálogo universal en
+  `catalogo/<slug>`; el `slug` es lo que va en la columna `slug imagen` de
+  la planilla. Logo de cada comercio en `logos/<slug>`. Si un slug no
+  existe, Cloudinary sirve `placeholder.png` (raíz del cloud). No hay
+  nada que comprimir ni commitear.
+- **`npm test`**: `node --test` sobre `lib/**/*.test.ts` y
+  `tenants/**/*.test.ts` (type stripping, Node ≥ 22.18; imports relativos
+  con extensión `.ts`, sin alias `@/` en módulos testeados). `tsc --noEmit`,
+  `npm run lint`, `npm test` y `npm run build` corren en CI en cada push;
   igual conviene correrlos en local antes de commitear.
-- **El workflow de imágenes necesita un permiso seteado a mano una sola
-  vez**: Settings → Actions → General → Workflow permissions →
-  `Read and write permissions`. Sin eso el `git push` del job devuelve
-  `403`. **Hoy no está confirmado que esté seteado** — ver el pendiente de
-  sesión 18.
+- **Alta de un cliente**: checklist en el README ("Alta de un cliente").
+  Resumen: `tenants/<slug>.ts` + registro, logo en Cloudinary, env
+  `TENANT_<SLUG>_CSV_URL` en Vercel, desplegables en su planilla, push
+  fuera de horario, URL `<dominio>/<slug>` para la TV.
 - **Para probar el Service Worker / la PWA hay que usar un build de
   producción**, no `npm run dev`: `ServiceWorkerRegistrar` está gateado a
   `NODE_ENV === 'production'` (a propósito, para no pelear con cache stale

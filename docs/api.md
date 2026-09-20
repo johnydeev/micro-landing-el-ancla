@@ -1,9 +1,8 @@
 # API HTTP — micro-landing-el-ancla
 
 Estos handlers existen como **API pública del proyecto**. La página
-principal (`app/page.tsx`) ya no los consume — desde el refactor de
-sesión 1 lee los CSVs directamente vía `lib/sheets.ts` en el Server
-Component. Los handlers se mantienen para que terceros puedan reusar
+principal (`app/[tenant]/page.tsx`) no los consume — lee los CSVs
+directamente vía `lib/sheets.ts` en el Server Component. Los handlers se mantienen para que terceros puedan reusar
 los datos sin reimplementar el parser CSV.
 
 Casos de uso esperados:
@@ -23,6 +22,11 @@ si se toma esa decisión.
 
 ## Endpoints
 
+Todos van bajo **`/api/<tenant>/…`**, donde `<tenant>` es el slug del
+comercio en `tenants/index.ts` (ej. `/api/granja-elancla/ofertas`). Slug
+desconocido → **404**. Cada tenant lee su propia planilla
+(`TENANT_<SLUG>_CSV_URL` + los GIDs de `tenants/<slug>.ts`).
+
 Todos retornan **JSON** y son **GET** públicos (sin autenticación).
 Desde sesión 19 **no hay cache**: cada llamada relee el CSV de Google
 (`cache: 'no-store'` + parámetro anti-cache en la URL). Antes reusaban la
@@ -30,7 +34,7 @@ cache de `fetch` con `revalidate: 60`. Si alguien monta un consumidor con
 volumen, conviene que cachee del lado de él — acá no hay nada que lo
 proteja de pegarle a Google en cada request. Ver `docs/decisiones.md`.
 
-### `GET /api/productos`
+### `GET /api/<tenant>/productos`
 
 Devuelve las listas de precios parseadas desde la pestaña principal
 del Sheets.
@@ -57,7 +61,7 @@ del Sheets.
 
 **Notas:**
 
-- El array está vacío (`[]`) si falta `GOOGLE_SHEETS_CSV_URL`, si el
+- El array está vacío (`[]`) si falta `TENANT_<SLUG>_CSV_URL`, si el
   CSV está mal formado, o si no se encuentran filas de encabezado con
   el patrón esperado (`nombre`, `precio`, `unidad`).
 - `precio` es siempre **string**, tal como vino del Sheets. El
@@ -67,10 +71,10 @@ del Sheets.
 - Se soportan múltiples listas por hoja, detectadas por bloques de
   encabezado repetidos.
 
-### `GET /api/ofertas`
+### `GET /api/<tenant>/ofertas`
 
 Devuelve las ofertas activas desde la pestaña con `gid =
-GOOGLE_SHEETS_GID_OFERTAS`.
+tenant.sheets.gidOfertas`.
 
 **Response:**
 
@@ -82,7 +86,8 @@ GOOGLE_SHEETS_GID_OFERTAS`.
     "imagen": "asado",
     "estado": "ACTIVO",
     "tamano": 3,
-    "descripcion": "Solo efectivo"
+    "descripcion": "Solo efectivo",
+    "plantilla": "clasico"
   }
 ]
 ```
@@ -91,8 +96,10 @@ GOOGLE_SHEETS_GID_OFERTAS`.
 
 - Solo se devuelven ofertas con `estado === "ACTIVO"`. Las
   `"INACTIVO"` se filtran en el servidor.
-- `imagen` es el **slug del PNG** dentro de `public/ofertas/`. La
-  pantalla principal lo usa como `/ofertas/{slug}.png`.
+- `imagen` es el **id de la imagen en el catálogo de Cloudinary**
+  (`catalogo/<slug>`), compartido por todos los comercios. La pantalla lo
+  usa como `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo/<slug>`.
+  Si el slug no existe, Cloudinary sirve una imagen placeholder.
 - `tamano` es un entero **1-10** que controla el tamaño de la imagen
   dentro del cartel (1 = más chica = 55%, 10 = más grande = 120%).
   Default `6` (=91%). Es opcional en el Sheets: si falta la columna o
@@ -109,11 +116,20 @@ GOOGLE_SHEETS_GID_OFERTAS`.
   existe, o después de `estado` si no. Si falta o está vacía, el string
   es `""` y el badge no se renderiza. Cada coma en el valor se muestra
   como salto de línea explícito en el cartel.
-- Si falta `GOOGLE_SHEETS_GID_OFERTAS` o el CSV no contiene la fila de
+- `plantilla` es el **id del diseño de cartel** elegido para esa oferta
+  (columna opcional; alias aceptados: `plantilla`, `diseño`, `diseno`,
+  `template`; posición libre en las 4 celdas después de `estado`). El
+  valor se normaliza (minúsculas, sin acentos, espacios → guiones) y se
+  valida contra `PLANTILLAS_CARTEL` en `lib/plantillas.ts` (hoy solo
+  `clasico`). Si falta la columna, está vacía o el valor no existe, la
+  clave **se omite** del JSON y la pantalla usa
+  `tenant.plantillaCartelDefault`.
+- Si falta `TENANT_<SLUG>_CSV_URL` o el CSV no contiene la fila de
   encabezado esperada (`titulo`, `precio`, `slug imagen`, `estado`),
-  devuelve `[]`. Las columnas `tamaño`/`escala`/`size` y
-  `descripcion`/`aclaracion`/`condicion`/`detalle`/`nota` son
-  **opcionales** — ver `docs/decisiones.md` para los nombres aceptados.
+  devuelve `[]`. Las columnas `tamaño`/`escala`/`size`,
+  `descripcion`/`aclaracion`/`condicion`/`detalle`/`nota` y
+  `plantilla`/`diseño`/`template` son **opcionales** — ver
+  `docs/decisiones.md` para los nombres aceptados.
 
 ### Atenuado de pantalla por horario (config)
 
@@ -130,10 +146,10 @@ atenuación queda **desactivada**. Soporta rangos que cruzan
 medianoche (ej. `23` a `6`). Ver `components/DimOverlay.tsx` y la
 nota sobre ahorro de energía en `docs/decisiones.md`.
 
-### `GET /api/config`
+### `GET /api/<tenant>/config`
 
 Devuelve la configuración remota desde la pestaña con `gid =
-GOOGLE_SHEETS_GID_CONFIG`.
+tenant.sheets.gidConfig`.
 
 **Response:**
 
@@ -150,8 +166,8 @@ GOOGLE_SHEETS_GID_CONFIG`.
 **Notas:**
 
 - Cualquier clave puede faltar — la pantalla principal hace
-  `configRemota.x ?? negocioConfig.x` y cae al default local
-  (`config/negocio.ts`).
+  `configRemota.x ?? tenant.defaults.x` y cae al default del comercio
+  (`tenants/<slug>.ts`).
 - Las claves numéricas (`segundosCartel`, `segundosTabla`) se parsean
   a número. Si el CSV trae un string no numérico para esas claves, se
   ignoran.
@@ -161,8 +177,8 @@ GOOGLE_SHEETS_GID_CONFIG`.
 - Las claves se aceptan con varias variantes (mayúsculas, con
   acentos, sinónimos en español). Ver `CONFIG_ALIASES` en
   `lib/sheets.ts`.
-- Si faltan `GOOGLE_SHEETS_CSV_URL` o `GOOGLE_SHEETS_GID_CONFIG`,
-  devuelve `{}`.
+- Si falta `TENANT_<SLUG>_CSV_URL` o `tenant.sheets.gidConfig`, devuelve
+  `{}`.
 
 ---
 

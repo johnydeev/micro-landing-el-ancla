@@ -18,6 +18,12 @@
  * version, el SW borra todas las caches que no coincidan.
  */
 
+// v7: sesion 21 (multitenant + Cloudinary). Las imagenes ya no son
+// same-origin: se agrega res.cloudinary.com a los origenes cacheables. Sin
+// esto, con la wifi caida el cartel mostraria precio sin foto. Las <img>
+// llevan crossorigin="anonymous", asi que la respuesta es CORS (no opaca) y
+// se cachea sin el padding de cuota de Chrome.
+//
 // v6: auditoria de rendimiento Fire TV. Se elimino esRscRequest() y la
 // rama de manejo de RSC en handleFetch(). Ese codigo protegia contra
 // router.refresh() (sesion 7-8), pero desde sesion 10 la app no hace NINGUN
@@ -28,7 +34,9 @@
 //
 // v5/v4: sesion 10. Se elimino el polling de /api/* y se agrego reload
 // completo cada 1 hora + HealthIndicator.
-const CACHE_VERSION = 'micro-landing-v6'
+const CACHE_VERSION = 'micro-landing-v7'
+
+const ORIGENES_CACHEABLES = new Set([self.location.origin, 'https://res.cloudinary.com'])
 
 /*
  * WATCHDOG (sesion 11) — recupera la pantalla cuando el main thread del
@@ -136,10 +144,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url)
 
-  // Solo same-origin — no nos metemos con fonts externas, beacons de
-  // analytics, etc. (en este proyecto basicamente no hay, pero
-  // defensivo). Vercel sirve _next/* desde el mismo origen.
-  if (url.origin !== self.location.origin) return
+  // Same-origin + Cloudinary. Fonts externas, beacons, etc. pasan sin
+  // interferencia (en este proyecto basicamente no hay, pero defensivo).
+  if (!ORIGENES_CACHEABLES.has(url.origin)) return
 
   event.respondWith(handleFetch(req))
 })
@@ -163,9 +170,10 @@ async function handleFetch(req) {
     const cached = await cache.match(req)
     if (cached) return cached
 
-    // Para navegaciones HTML reales (full page load), el / cacheado es
-    // un buen ultimo recurso. Solo se llega aca si la URL pedida nunca
-    // se cacheo antes — situacion rara en una pantalla 16:9 con una sola ruta.
+    // Para navegaciones HTML reales (full page load), el "/" cacheado es un
+    // ultimo recurso: "/" renderiza el tenant por defecto (no redirige), asi
+    // que sigue siendo HTML valido para la TV que todavia apunta ahi. Solo se
+    // llega aca si la URL pedida nunca se cacheo antes.
     if (req.mode === 'navigate') {
       const homepage = await cache.match('/')
       if (homepage) return homepage

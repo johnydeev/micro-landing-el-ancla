@@ -1,24 +1,19 @@
 import PantallaRotativa from '@/components/PantallaRotativa'
 import { getPantallaData } from '@/lib/sheets'
+import { getDefaultTenantOr404 } from '@/lib/tenant-route'
 
-// Render dinamico en cada request: sin ISR y sin cache de fetch (ver
-// FETCH_SIN_CACHE en lib/sheets.ts). Es lo que hace que apretar "actualizar"
-// en el Fire TV muestre los precios nuevos en ESE reload.
-//
-// Con el `revalidate = 60` anterior, el primer request despues de expirar
-// devolvia la pagina vieja y recien ahi regeneraba en background
-// (stale-while-revalidate) — o sea, el precio corregido aparecia recien en el
-// reload siguiente. Ver docs/decisiones.md.
-//
-// El cliente igual hace un reload completo cada RELOAD_INTERVAL_MS (ver
-// PantallaRotativa.tsx) para volver a ejecutar este Server Component.
+// "/" renderiza el tenant DEFAULT_TENANT (hoy granja-elancla) porque la TV
+// del local apunta a "/" y no se puede cambiar sin ir fisicamente. No es un
+// redirect a proposito: ver getDefaultTenantOr404.
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  const { listas, ofertas, configRemota } = await getPantallaData()
+  const tenant = getDefaultTenantOr404()
+  const { listas, ofertas, configRemota } = await getPantallaData(tenant)
 
   return (
     <PantallaRotativa
+      tenant={tenant}
       listas={listas}
       ofertas={ofertas}
       configRemota={configRemota}

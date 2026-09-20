@@ -15,10 +15,9 @@ const eslintConfig = defineConfig([
   ]),
   {
     // Decision del proyecto: no usar `next/image` porque el optimizador de
-    // imagenes de Vercel consume cuota en la capa gratuita. El logo es un
-    // asset chico y las imagenes de oferta son PNGs servidos desde /public,
-    // ya optimizados manualmente por el cliente. Ver
-    // docs/decisiones.md ("Mantener <img> en vez de next/image").
+    // imagenes de Vercel consume cuota en la capa gratuita. Las imagenes
+    // vienen de Cloudinary ya transformadas (f_auto,q_auto,w_*), asi que
+    // <img> alcanza. Ver docs/decisiones.md.
     rules: {
       "@next/next/no-img-element": "off",
     },

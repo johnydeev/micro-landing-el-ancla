@@ -1,20 +1,22 @@
 'use client'
 
-import { useEffect, useReducer, useState, type CSSProperties } from 'react'
+import { useEffect, useReducer, type CSSProperties } from 'react'
 
 import DimOverlay from '@/components/DimOverlay'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
 import HealthIndicator from '@/components/HealthIndicator'
-import { negocioConfig } from '@/config/negocio'
+import TablaClasica from '@/templates/tabla/Clasica'
+import { CATALOGO_CARTELES } from '@/templates'
 import type { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
+import type { Tenant } from '@/types/tenant'
 import styles from '@/app/page.module.css'
 
 /*
  * Cada cuanto la pantalla se reloadea completa. El reload completo es
  * nuestro mecanismo unico de actualizacion de datos (no hay polling).
- * Cada reload re-ejecuta el Server Component que va a Sheets (cache de
- * 60s en lib/sheets.ts) y obtiene la version mas fresca. Ademas resetea
+ * Cada reload re-ejecuta el Server Component que va a Sheets (sin cache
+ * desde sesion 19) y obtiene la version mas fresca. Ademas resetea
  * cualquier acumulacion de memoria/estado del browser — funciona como
  * PREVENCION del freeze del Stick TV.
  *
@@ -81,23 +83,8 @@ const ROTATION_INITIAL: RotationState = {
   cartelIndex: 0,
 }
 
-function formatPrecio(precio: string): string {
-  // El cliente carga precios en Sheets, y puede usar formato AR ("1.500,50",
-  // con punto de miles y coma decimal) o formato JS/US ("1500.50"). Si lo
-  // pasaramos directo a Number() perderiamos los miles: Number("1.500") === 1.5.
-  // Convencion: si hay coma, asumimos formato AR y reemplazamos puntos por
-  // nada (miles) y la coma por punto (decimal). Si no hay coma, lo dejamos
-  // como esta — funciona igual para "1500" y para "1500.50".
-  const limpio = precio.trim()
-  const normalizado = limpio.includes(',')
-    ? limpio.replace(/\./g, '').replace(',', '.')
-    : limpio
-  const num = Number(normalizado)
-  if (Number.isNaN(num)) return `$${precio}`
-  return `$${num.toLocaleString('es-AR')}`
-}
-
 interface PantallaRotativaProps {
+  tenant: Tenant
   listas: ListaPrecios[]
   ofertas: Oferta[]
   configRemota: ConfigNegocio
@@ -114,6 +101,7 @@ interface PantallaRotativaProps {
 }
 
 export default function PantallaRotativa({
+  tenant,
   listas,
   ofertas,
   configRemota,
@@ -138,8 +126,8 @@ export default function PantallaRotativa({
         : initial,
   )
 
-  const segundosCartel = configRemota.segundosCartel ?? negocioConfig.segundosCartel
-  const segundosTabla = configRemota.segundosTabla ?? negocioConfig.segundosTabla
+  const segundosCartel = configRemota.segundosCartel ?? tenant.defaults.segundosCartel
+  const segundosTabla = configRemota.segundosTabla ?? tenant.defaults.segundosTabla
 
   // Reload completo periodico (cada RELOAD_INTERVAL_MS = 30 min).
   // Refresca datos via SSR y resetea cualquier acumulacion del browser.
@@ -210,184 +198,43 @@ export default function PantallaRotativa({
     return () => window.clearInterval(intervalId)
   }, [modoFijo, modo, listas.length, ofertas.length, segundosCartel, segundosTabla])
 
-  // Inyectamos los colores de marca y el factor de tipografia como CSS custom
-  // properties en el contenedor `.screen`. El CSS module los consume via
-  // `var(--c-*)`. Asi el JSX no carga inline styles y el CSS queda estatico.
+  // Paleta del tenant como CSS custom properties en `.screen`. Los templates
+  // y el CSS module consumen `var(--c-*)`: mismo template, otra paleta =
+  // otro cliente, sin tocar componentes.
   const screenVars = {
-    '--c-primario': negocioConfig.colores.primario,
-    '--c-secundario': negocioConfig.colores.secundario,
-    '--c-fondo': negocioConfig.colores.fondo,
-    '--c-texto-primario': negocioConfig.colores.textoPrimario,
-    '--c-texto-secundario': negocioConfig.colores.textoSecundario,
-    '--c-fila-impar': negocioConfig.colores.filaImpar,
-    '--table-font-scale': `${negocioConfig.tipografia.tabla / 100}`,
+    '--c-primario': tenant.paleta.primario,
+    '--c-secundario': tenant.paleta.secundario,
+    '--c-fondo': tenant.paleta.fondo,
+    '--c-texto-primario': tenant.paleta.textoPrimario,
+    '--c-texto-secundario': tenant.paleta.textoSecundario,
+    '--c-fila-impar': tenant.paleta.filaImpar,
+    '--table-font-scale': `${tenant.tipografia.tabla / 100}`,
   } as CSSProperties
 
   const ofertaActual = modo === 'cartel' ? ofertas[cartelIndex] : null
   const listaActual = listas[listaIndex] ?? null
-  const productosActuales = listaActual?.productos ?? []
+  const Cartel = ofertaActual
+    ? CATALOGO_CARTELES[ofertaActual.plantilla ?? tenant.plantillaCartelDefault]
+    : null
 
   return (
     <main className={styles.pageShell}>
       <div className={styles.screen} style={screenVars}>
         <DimOverlay desde={configRemota.atenuarDesde} hasta={configRemota.atenuarHasta} />
         <HealthIndicator />
-        <Header />
-        {ofertaActual ? (
-          <CartelOferta key={ofertaActual.nombre} oferta={ofertaActual} />
+        <Header tenant={tenant} />
+        {ofertaActual && Cartel ? (
+          // key por nombre: el remount dispara la animacion de entrada.
+          <Cartel key={ofertaActual.nombre} oferta={ofertaActual} textos={tenant.textos} />
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr className={styles.headRow}>
-                  <th className={styles.superHeadCell} colSpan={2}>
-                    {listaActual?.titulo ?? 'Lista de Precios'}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {productosActuales.length > 0 ? (
-                  productosActuales.map((producto, i) => (
-                    <tr key={`${producto.nombre}-${i}`} className={styles.row}>
-                      <td className={`${styles.cellBase} ${styles.descriptionCell}`}>
-                        {producto.nombre}
-                      </td>
-                      <td className={`${styles.cellBase} ${styles.priceCell}`}>
-                        <div className={styles.priceInline}>
-                          <span className={styles.priceValue}>{formatPrecio(producto.precio)}</span>
-                          {producto.unidad && (
-                            <span className={styles.unitValue}>por {producto.unidad}</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={2} className={`${styles.cellBase} ${styles.emptyState}`}>
-                      <div>Estamos actualizando la lista de precios.</div>
-                      <div className={styles.emptyStateContact}>
-                        Consultá por {configRemota.whatsapp ?? negocioConfig.whatsapp ?? negocioConfig.telefono}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <TablaClasica
+            lista={listaActual}
+            textoSinDatos={tenant.textos.sinDatos}
+            whatsapp={configRemota.whatsapp ?? tenant.defaults.whatsapp}
+          />
         )}
-        <Footer config={configRemota} />
+        <Footer tenant={tenant} config={configRemota} />
       </div>
     </main>
-  )
-}
-
-/*
- * Mapeo de la escala 1-10 de la columna "tamano" del Sheets a un porcentaje
- * del wrapper de la imagen. Lineal: rango 55%-120%, paso de ~7,22% entre
- * niveles (redondeado a entero). El default es el nivel 6 (= 91%).
- * Ampliado a rango 55-120% en sesion 14 (antes 55-100%) porque el cliente
- * queria que las imagenes mas grandes pudieran exceder el wrapper.
- *
- * OJO: niveles 8-10 (>100%) hacen que la imagen sea mas grande que su
- * contenedor y pueda solaparse con el titulo o el circulo de precio del
- * cartel. Es intencional (el cliente lo pidio) pero hay que usar esos
- * valores altos solo en imagenes que visualmente lo toleren.
- *
- * Este es el unico lugar a tocar si se quieren ajustar los porcentajes.
- */
-const TAMANO_OFERTA_A_ESCALA: Record<number, string> = {
-  1: '55%',
-  2: '62%',
-  3: '69%',
-  4: '77%',
-  5: '84%',
-  6: '91%',
-  7: '98%',
-  8: '106%',
-  9: '113%',
-  10: '120%',
-}
-
-const TAMANO_OFERTA_ESCALA_DEFAULT = TAMANO_OFERTA_A_ESCALA[6]
-
-function CartelOferta({ oferta }: { oferta: Oferta }) {
-  const [imgError, setImgError] = useState(false)
-
-  // La columna del CSV ya se llama "slug imagen" — el contrato con el cliente
-  // es cargar un slug, no un nombre con espacios o mayusculas. Aun asi
-  // re-slugificamos para que la pantalla del local no se rompa si el cliente
-  // se equivoca. Lo loguearmos solo en dev para detectar el patron sin
-  // ensuciar la consola en produccion.
-  const slug = oferta.imagen
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-  if (process.env.NODE_ENV !== 'production' && slug !== oferta.imagen) {
-    console.warn(
-      `[ofertas] "${oferta.imagen}" se re-slugify como "${slug}". ` +
-        `Cargar el slug correcto en la planilla (columna "slug imagen").`,
-    )
-  }
-
-  // Tamano por-oferta via CSS variable. El parser de lib/sheets.ts ya
-  // garantiza que `tamano` esta en el rango 1-10, asi que el fallback
-  // solo se usaria si alguien rompe el contrato.
-  const escalaImagen = TAMANO_OFERTA_A_ESCALA[oferta.tamano] ?? TAMANO_OFERTA_ESCALA_DEFAULT
-  const imageVars = { '--cartel-image-scale': escalaImagen } as CSSProperties
-
-  // Todo el layout vive en page.module.css. Los colores entran via CSS vars
-  // inyectadas en `.screen`, por lo que aca solo manejamos:
-  //   1. el slug dinamico de la imagen,
-  //   2. el fallback cuando la imagen no existe (imgError),
-  //   3. la escala por-oferta via CSS variable,
-  //   4. las clases combinadas para sumar animaciones de entrada.
-  return (
-    <div className={styles.cartel}>
-      <div className={styles.cartelDiagonal} />
-
-      <div className={`${styles.cartelBadge} ${styles.pulseSuperOferta}`}>
-        SUPER
-        <br />
-        OFERTA
-      </div>
-
-      {oferta.descripcion && (
-        <div className={styles.cartelAclaracion}>
-          {/* Cada coma en la celda "Nota" del Sheets es un salto de linea
-              explicito, para que el cliente controle el corte sin depender
-              del wrap automatico del CSS. */}
-          {oferta.descripcion
-            .split(',')
-            .map((linea) => linea.trim())
-            .filter(Boolean)
-            .map((linea, i) => (
-              <div key={i}>{linea}</div>
-            ))}
-        </div>
-      )}
-
-      <div className={styles.cartelTitleWrap}>
-        <div className={styles.cartelTitle}>{oferta.nombre}</div>
-      </div>
-
-      {!imgError && (
-        <div className={styles.cartelImageWrap}>
-          <img
-            src={`/ofertas/${slug}.png`}
-            alt={oferta.nombre}
-            width={800}
-            height={800}
-            onError={() => setImgError(true)}
-            className={`${styles.cartelImage} ${styles.pulseImage}`}
-            style={imageVars}
-          />
-        </div>
-      )}
-
-      <div className={`${styles.cartelPrice} ${styles.pulsePrice}`}>
-        <span className={styles.cartelPriceText}>{formatPrecio(oferta.precio)}</span>
-      </div>
-    </div>
   )
 }

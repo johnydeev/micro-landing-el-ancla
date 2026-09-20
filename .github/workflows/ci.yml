@@ -48,7 +48,5 @@ jobs:
       - name: Tests
         run: npm test
 
-      # Corre el `prebuild` (optimize:images) de punta a punta. Si comprime
-      # algo aca, no pasa nada: este job no commitea (permissions: read).
       - name: Build
         run: npm run build

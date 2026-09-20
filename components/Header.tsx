@@ -1,17 +1,24 @@
 'use client'
 
 import { memo, useState } from 'react'
-import { negocioConfig } from '@/config/negocio'
+
+import type { Tenant } from '@/types/tenant'
+import { urlLogo } from '@/lib/cloudinary'
 import styles from './Header.module.css'
 
-// Sin props: siempre renderiza igual. `memo` evita que el rotador de
-// PantallaRotativa (tick cada 3-12s, horas seguidas) vuelva a ejecutar y
-// reconciliar este subarbol en cada cambio de indice de la rotacion.
-function Header() {
+interface HeaderProps {
+  tenant: Tenant
+}
+
+// `tenant` llega con la misma referencia en cada tick de la rotacion (solo
+// cambia tras un reload completo). `memo` evita que el rotador de
+// PantallaRotativa (tick cada 3-12s, horas seguidas) vuelva a reconciliar
+// este subarbol en cada cambio de indice.
+function Header({ tenant }: HeaderProps) {
   const [imgError, setImgError] = useState(false)
 
   return (
-    <header className={styles.header} style={{ background: negocioConfig.colores.primario }}>
+    <header className={styles.header} style={{ background: tenant.paleta.primario }}>
       <div className={styles.brandRow}>
         <div
           style={{
@@ -26,18 +33,19 @@ function Header() {
         >
           {imgError ? null : (
             <img
-              src={negocioConfig.logo}
-              alt={negocioConfig.nombre}
+              src={urlLogo(tenant.logo)}
+              alt={tenant.nombre}
               width={100}
               height={100}
+              crossOrigin="anonymous"
               style={{ height: 'clamp(50px, 8vh, 100px)', width: 'auto' }}
               onError={() => setImgError(true)}
             />
           )}
         </div>
         <div className={styles.brandCopy}>
-          <span className={styles.brandName}>{negocioConfig.nombre}</span>
-          <span className={styles.brandTagline}>{negocioConfig.eslogan}</span>
+          <span className={styles.brandName}>{tenant.nombre}</span>
+          <span className={styles.brandTagline}>{tenant.eslogan}</span>
         </div>
       </div>
     </header>

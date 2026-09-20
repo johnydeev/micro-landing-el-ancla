@@ -5,6 +5,153 @@ motivó y la alternativa descartada.
 
 ---
 
+## 2026-09-20 — Multitenant por path: un deploy, N comercios
+
+### Problema
+
+El proyecto era single-tenant: nombre, paleta, textos y contactos en
+`config/negocio.ts`, planilla en tres variables de entorno, imágenes en
+`public/ofertas/`. Vender la pantalla a un segundo comercio implicaba clonar el
+repo o un deploy separado con su propia config, y cada mejora habría que
+replicarla a mano.
+
+El cliente pidió "que esto sea multitenant". En julio se había explorado
+convertirlo en un SaaS y se pausó en la primera pregunta de discovery.
+
+### Decisión
+
+**Un solo deploy, N comercios identificados por path** (`/<slug>`):
+
+- `app/[tenant]/…` resuelve el comercio desde un **registro tipado en el repo**
+  (`tenants/<slug>.ts` + `tenants/index.ts`). Slug desconocido → 404.
+- La **URL del CSV de cada planilla va en una variable de entorno de Vercel**
+  (`TENANT_<SLUG>_CSV_URL`), no en el archivo del tenant: el repo es público y
+  esa URL da acceso a todas las pestañas de la planilla del cliente.
+- Los diseños son un **catálogo de plantillas** (`templates/`) sin colores
+  fijos: la paleta del comercio entra como CSS variables en `.screen`. Cada
+  oferta elige su plantilla de cartel desde una columna `plantilla` en la
+  planilla (desplegable); vacío = default del comercio.
+- `/` **renderiza** el comercio `DEFAULT_TENANT`, no redirige.
+- Sin auth, sin base de datos, sin panel.
+
+### Por qué no un SaaS
+
+Registro self-serve, panel, cobranza con Mercado Pago, soporte: meses de
+trabajo y un producto distinto. El cuello de botella real para vender a
+comercios de barrio es logístico (instalar la TV, configurar la planilla por
+WhatsApp), no técnico. Con 5-20 clientes, "alta = un archivo + una env" es más
+barato que cualquier panel.
+
+### Por qué no un deploy por comercio
+
+Sería el cambio de código más chico (parametrizar `config/negocio.ts` por env),
+pero cada cliente es un proyecto de Vercel que hay que crear, configurar y
+redeployar en cada mejora. Con path, agregar un cliente no toca Vercel salvo
+una variable.
+
+### Por qué path y no subdominio
+
+`el-ancla.tuapp.com` necesita dominio propio con DNS wildcard. `tuapp.vercel.app/el-ancla`
+funciona hoy con el dominio gratis. Quien ve la URL es un Fire TV, no una
+persona. Migrar a subdominio después no toca el código de tenants.
+
+### Por qué `/` renderiza y no redirige
+
+La TV de El Ancla apunta a `/` y cambiarla requiere ir al local. El Service
+Worker solo cachea respuestas `ok`; un 307 no lo es. Con redirect, la TV
+perdería el fallback offline —justo el caso para el que existe el SW— hasta que
+alguien le cambie la URL. Renderizando, `/` sigue siendo HTML cacheable. El
+redirect queda como limpieza futura.
+
+### Por qué el registro en el repo y no en una planilla maestra o DB
+
+Tipado: si un tenant olvida un campo, no compila; `tenants/registro.test.ts`
+valida slug y plantilla default. Cero infra. El logo y las imágenes ya no están
+en el repo (ver ADR siguiente), así que el commit del alta es un archivo de 40
+líneas.
+
+### Trade-offs
+
+- Un slug desconocido responde 404 **solo si no hay `loading.tsx` en la raíz**:
+  ese boundary de Suspense hace que Next empiece a streamear con 200 antes de
+  que el `notFound()` del layout corra (verificado: con el archivo 200, sin él
+  404). Se sacó `app/loading.tsx`; `/` muestra ~0,6 s en blanco en cada reload
+  en vez de "Cargando…". `app/[tenant]/loading.tsx` sí existe.
+- `loading.tsx` de `[tenant]` es genérico (sin nombre ni paleta): Next no le
+  pasa `params`.
+- El desplegable de `plantilla` y el del catálogo de imágenes se configuran a
+  mano en cada planilla al dar de alta. Es un paso del checklist, no código.
+
+Spec: `docs/superpowers/specs/2026-09-20-multitenant-cloudinary-design.md`.
+
+---
+
+## 2026-09-20 — Imágenes en Cloudinary; se elimina el pipeline de `sharp`
+
+### Problema
+
+Las fotos de producto vivían en `public/ofertas/` y el logo en `public/`. Para
+que no entraran pesadas al repo (causa documentada de freeze en el Fire TV,
+ADR 2026-06-19) se construyó entre las sesiones 16 y 20 un pipeline de
+compresión: `scripts/optimize-images.mjs` con `sharp` en `prebuild`, un hook
+`pre-commit`, un workflow de GitHub Actions que commiteaba como bot, y una
+suite de tests para que el bot no entrara en loop.
+
+Con varios comercios eso no escala: cada cliente subiendo PNGs al repo, cada
+uno con su carpeta, y el mismo corte fotografiado N veces. El cliente ya estaba
+armando en Cloudinary un **catálogo con nomenclatura universal**
+(`asado-de-tira`, `asado-completo`) para que todos los comercios usen la misma
+imagen y elijan por desplegable, sin errores de tipeo.
+
+### Decisión
+
+**Todas las imágenes en Cloudinary; el repo no tiene PNGs salvo el favicon.**
+
+- La planilla trae `imagen = asado-de-tira`; la app arma
+  `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo/asado-de-tira`.
+  `f_auto,q_auto` entrega WebP/AVIF comprimido al ancho justo — mejor que lo
+  que hacía `sharp`, sin código propio. `d_placeholder.png` sirve una imagen
+  genérica si el slug no existe.
+- Logo: public_id `logos/<slug>` en `tenants/<slug>.ts`, servido con `w_400`.
+- Íconos PWA: derivados del logo con `f_png,w_192,h_192,c_pad,b_white` (y 512)
+  desde el manifest por tenant. Sin archivos.
+- `<img crossorigin="anonymous">`: Cloudinary responde CORS, la respuesta no es
+  opaca y el Service Worker la cachea sin el padding de cuota que Chrome aplica
+  a respuestas opacas. `sw.js` v7 agrega `res.cloudinary.com` a los orígenes
+  cacheables; sin eso, con la wifi caída el cartel mostraría precio sin foto.
+- **Se elimina**: script, test, hook, workflow, scripts de npm, `sharp`,
+  `public/ofertas/`, `public/logo.png`, `public/icons/`, `app/manifest.json`.
+
+### Por qué borrar lo que se acababa de arreglar
+
+En sesión 20 se encontró y arregló la causa de que el workflow fallara, se
+probó de punta a punta y se agregó el hook. Dos días después se borra todo.
+No fue en vano: destapó que el CI corría en otra versión de Node (arreglado
+para el CI de código, que sigue) y dejó claro que el problema de fondo era
+tener imágenes en el repo. Mantener cuatro mecanismos para cero archivos sería
+peor que haberlos escrito.
+
+### Qué no se hace
+
+- **Leer el catálogo maestro desde la app.** El desplegable en la planilla del
+  cliente se alimenta del catálogo maestro por `IMPORTRANGE`; la app confía en
+  el slug que llega en la fila. Es configuración de Sheets, no código.
+- **Migrar los slugs de El Ancla a la nomenclatura universal en el cutover.**
+  Las 22 imágenes se suben a Cloudinary con los nombres que ya usa su planilla
+  (`pechito`, `pata-muslo`, …). Renombrar después, de a una. Un cambio de
+  producción por vez.
+- **Imágenes propias por comercio fuera del catálogo.** Si aparece el caso:
+  carpeta `clientes/<slug>/` y un prefijo en el slug.
+
+### Costo y cuota
+
+Cloudinary free: 25 créditos/mes (~25 GB de transferencia). Una pantalla
+recarga cada 30 min, ~20 ofertas, y el browser cachea las imágenes por su
+`Cache-Control` largo: consumo despreciable. Vercel deja de servir PNGs de
+`/public`.
+
+---
+
 ## 2026-08-30 — Render dinámico: el reload manual tiene que traer el precio nuevo
 
 ### Problema
@@ -92,6 +239,9 @@ implementó ahora — sería resolver un problema que todavía no se observó.
 > No es un pendiente, es una decisión de producto.
 
 ### Lo que este cambio no puede resolver
+
+> **Medido el 2026-09-20:** una edición de celda tardó ~4-5 min en aparecer en
+> el CSV publicado (208 s de poll + el rato previo). Es el techo del F5 hoy.
 
 La URL configurada es `/pub?output=csv` ("publicar en la web"). Ese endpoint
 tiene un pipeline de publicación propio de Google: la edición tiene que pasar por

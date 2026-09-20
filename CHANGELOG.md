@@ -5,6 +5,119 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 21 — 2026-09-20 (multitenant por path + imágenes en Cloudinary)
+
+**Context**: pedido del cliente: "necesito que esto sea multitenant". Brainstorming
+cerró alcance en la opción "un deploy, N comercios por path" (no SaaS, no un
+deploy por cliente), catálogo de plantillas con paleta por comercio, y —a mitad
+del diseño— imágenes en Cloudinary con un catálogo de nombres universal que el
+cliente ya estaba armando. Spec:
+`docs/superpowers/specs/2026-09-20-multitenant-cloudinary-design.md`. Plan:
+`docs/superpowers/plans/2026-09-20-multitenant-cloudinary.md`.
+
+**Added**
+- **`app/[tenant]/`**: `layout.tsx` (resuelve el tenant, 404 si no existe,
+  `generateMetadata` con `manifest` y `generateViewport` con `themeColor` del
+  comercio), `page.tsx`, `loading.tsx` (genérico), `error.tsx` (tenant vía
+  `useParams`), `vistaCartel/`, `vistaLista/`,
+  `manifest.webmanifest/route.ts` (manifest PWA por comercio, íconos derivados
+  del logo en Cloudinary).
+- **`app/api/[tenant]/productos|ofertas|config`**: la API pública pasa a
+  `/api/<slug>/…`.
+- **`tenants/`**: `granja-elancla.ts` (migración 1:1 de `config/negocio.ts` +
+  GIDs), `index.ts` (registro + `getTenant`), `registro.test.ts`.
+  **`types/tenant.ts`**: interface `Tenant`.
+- **`templates/`**: `tabla/Clasica.tsx` y `cartel/Clasico.tsx` extraídos de
+  `PantallaRotativa` sin cambios visuales; `index.ts` con `CATALOGO_CARTELES`
+  tipado contra los ids.
+- **`lib/plantillas.ts`**: `PLANTILLAS_CARTEL = ['clasico']`,
+  `slugificarPlantilla`, `normalizarPlantilla`. Sin React ni `server-only` para
+  que lo usen `lib/sheets.ts` y los tests.
+- **`lib/cloudinary.ts`**: `urlImagen`, `urlOferta` (`f_auto,q_auto,w_1200,
+  d_placeholder.png`), `urlLogo` (`w_400`), `urlIcono` (`f_png,w_N,h_N,c_pad,
+  b_white`). Solo strings, sin SDK.
+- **`lib/tenant-env.ts`**: `envKeyCsv('granja-elancla')` →
+  `TENANT_GRANJA_ELANCLA_CSV_URL`; `csvUrlDe(slug)`.
+- **`lib/tenant-route.ts`**: `getTenantOr404(params)`,
+  `getDefaultTenantOr404()`.
+- **`lib/precio.ts`**: `formatPrecio` movido de `PantallaRotativa` para que lo
+  usen los dos templates.
+- **Columna `plantilla` en la planilla de ofertas** (alias `plantilla`,
+  `diseño`, `diseno`, `template`; posición libre entre `estado`+1 y +4).
+  `Oferta.plantilla?: PlantillaCartelId`. Valor desconocido → default del
+  tenant + warning en dev.
+- **Tests**: 16 casos en 4 archivos (`lib/plantillas`, `lib/cloudinary`,
+  `lib/tenant-env`, `tenants/registro`). `node --test` corre `.ts` directo
+  (type stripping, Node ≥ 22.18); los tests usan imports relativos con
+  extensión `.ts` porque Node no lee el alias `@/`. `tsconfig`:
+  `allowImportingTsExtensions: true`. Verificado en Node 22 y 25.
+
+**Changed**
+- **`lib/sheets.ts`**: `getListasPrecios`, `getOfertas`, `getConfig` y
+  `getPantallaData` reciben `tenant: Tenant`. La URL del CSV sale de
+  `csvUrlDe(tenant.slug)`; los GIDs de `tenant.sheets`. Ya no se lee ninguna
+  `GOOGLE_SHEETS_*`.
+- **`components/PantallaRotativa.tsx`**: recibe `tenant`; inyecta
+  `tenant.paleta` en las CSS vars de `.screen`; renderiza `<TablaClasica>` o
+  `CATALOGO_CARTELES[oferta.plantilla ?? tenant.plantillaCartelDefault]`.
+  Rotación, reload, heartbeat, `DimOverlay`, `HealthIndicator`: sin cambios.
+  393 → 240 líneas.
+- **`components/Header.tsx`** y **`Footer.tsx`**: reciben `tenant` por props;
+  logo desde Cloudinary con `crossOrigin="anonymous"`.
+- **`app/page.tsx`**: `/` **renderiza** `DEFAULT_TENANT` (no redirige: un 307
+  no es cacheable por el SW y la TV que apunta a `/` perdería el fallback
+  offline).
+- **`app/layout.tsx`**: metadata genérica; `viewport` y `manifest` pasan al
+  layout del tenant.
+- **`public/sw.js`**: `v7`; `ORIGENES_CACHEABLES = {self.origin,
+  res.cloudinary.com}`; fallback a `/` se mantiene (sigue siendo HTML).
+- **`.env.local.example`**: `DEFAULT_TENANT`, `NEXT_PUBLIC_DEFAULT_TENANT`,
+  `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `NEXT_PUBLIC_CLOUDINARY_CATALOGO`,
+  `TENANT_GRANJA_ELANCLA_CSV_URL`.
+- **`package.json`**: `"test": "node --test \"lib/**/*.test.ts\"
+  \"tenants/**/*.test.ts\""`.
+- **`README.md`**: reescrito para el producto multitenant, con checklist de
+  alta de cliente.
+
+**Removed**
+- **Pipeline de imágenes completo** (sesiones 16-20): `scripts/optimize-images.mjs`
+  + test, `.githooks/pre-commit`, `.github/workflows/optimize-images.yml`,
+  scripts `prepare`/`prebuild`/`optimize:images`, devDependency `sharp`. Cuatro
+  mecanismos para cuidar PNGs que ya no viven en el repo.
+- **`public/ofertas/`** (22 PNG), `public/logo.png`, `public/icons/`,
+  `app/manifest.json`, `config/negocio.ts`, `app/loading.tsx` (raíz).
+- `telefono` de la config: era igual a `whatsapp`.
+
+**Decisiones tomadas durante la implementación (no estaban en el spec)**
+- **Sin `loading.tsx` en la raíz.** Con él, `/no-existe` respondía **200** con
+  la página 404: el boundary de Suspense hace que la respuesta empiece a
+  streamear antes de que el `notFound()` del layout corra. Verificado
+  experimentalmente (con el archivo: 200; sin él: 404). Costo: la TV que apunta
+  a `/` ve ~0,6 s en blanco en cada reload en vez de "Cargando…".
+  `/granja-elancla` conserva su `loading.tsx`.
+- `Oferta.plantilla` es `undefined` cuando la columna no está; `Response.json`
+  omite la clave. `/api/<slug>/ofertas` la incluye solo si la fila la tiene.
+
+**Validation**
+- `npm test` 16/16, `npx tsc --noEmit` ✓, `npm run lint` ✓.
+- `npm run build` ✓ con rutas `ƒ /`, `ƒ /[tenant]`,
+  `ƒ /[tenant]/manifest.webmanifest`, `ƒ /[tenant]/vistaCartel|vistaLista`,
+  `ƒ /api/[tenant]/*`. Sin `/manifest.json`.
+- Build con `DEFAULT_TENANT`, cloud name y CSV vacíos: exit 0 (lo que corre el
+  CI).
+- Contra `npm start`: `/granja-elancla` 200, `/` 200 (mismo contenido),
+  `/no-existe` 404, `/api/no-existe/ofertas` 404, `/api/granja-elancla/ofertas`
+  19 ofertas, manifest con nombre/colores/`start_url` de El Ancla, HTML del
+  cartel con badge `SUPER<br/>OFERTA` y `crossorigin="anonymous"` en las dos
+  `<img>`.
+- **Pendiente hasta tener las imágenes en Cloudinary** (Tarea 0 del plan): check
+  visual de fotos y logo, y check offline con entradas de `res.cloudinary.com`
+  en la cache `micro-landing-v7`.
+
+**Cutover**: Tarea 14 del plan. Push fuera del horario de atención, con las
+env nuevas ya cargadas en Vercel y el dominio nuevo agregado. Rollback:
+Instant Rollback de Vercel.
+
 ### Sesión 20 — 2026-09-19 (el workflow de imágenes corría y fallaba: `node --test` + glob en Node 20)
 
 **Context**: desde sesión 18 se asumía que el workflow de Actions "nunca

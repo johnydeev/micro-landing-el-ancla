@@ -20,8 +20,11 @@ export default function Error({ error, reset }: ErrorProps) {
   // Client Component: el tenant se resuelve del path. Si por algun motivo el
   // slug no esta en el registro (no deberia: el layout ya hizo 404), se cae a
   // valores neutros para no romper el boundary de errores.
+  // Copia de app/[tenant]/error.tsx para la ruta "/": ahi useParams no trae
+  // tenant, asi que se cae al DEFAULT_TENANT (expuesto como NEXT_PUBLIC_).
   const params = useParams<{ tenant?: string }>()
-  const tenant = params?.tenant ? getTenant(params.tenant) : undefined
+  const slugDefault = process.env.NEXT_PUBLIC_DEFAULT_TENANT
+  const tenant = getTenant(params?.tenant ?? slugDefault ?? '')
   const primario = tenant?.paleta.primario ?? '#222'
   const nombre = tenant?.nombre ?? 'Precios'
   const whatsapp = tenant?.defaults.whatsapp ?? ''

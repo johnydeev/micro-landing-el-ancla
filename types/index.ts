@@ -1,3 +1,5 @@
+import type { PlantillaCartelId } from '@/lib/plantillas'
+
 export interface Producto {
   nombre: string
   precio: string
@@ -31,6 +33,13 @@ export interface Oferta {
    * lib/sheets.ts -> findOfertasTableOffsets / mapRowToOfertas.
    */
   descripcion: string
+  /**
+   * Plantilla de cartel elegida por el cliente para ESTA oferta, desde la
+   * columna opcional "plantilla" del Sheets (desplegable). undefined = usar
+   * tenant.plantillaCartelDefault. Parseo en lib/sheets.ts ->
+   * findOfertasTableOffsets / mapRowToOfertas; ids en lib/plantillas.ts.
+   */
+  plantilla?: PlantillaCartelId
 }
 
 export interface ConfigNegocio {

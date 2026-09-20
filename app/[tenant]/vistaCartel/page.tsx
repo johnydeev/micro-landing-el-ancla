@@ -1,5 +1,6 @@
 import PantallaRotativa from '@/components/PantallaRotativa'
 import { getPantallaData } from '@/lib/sheets'
+import { getTenantOr404, type TenantParams } from '@/lib/tenant-route'
 
 /*
  * Ruta de desarrollo: pantalla fija en modo "cartel", sin rotacion, para
@@ -11,15 +12,19 @@ import { getPantallaData } from '@/lib/sheets'
 export const dynamic = 'force-dynamic'
 
 export default async function VistaCartel({
+  params,
   searchParams,
 }: {
+  params: TenantParams
   searchParams: Promise<{ index?: string }>
 }) {
+  const tenant = await getTenantOr404(params)
   const { index } = await searchParams
-  const { listas, ofertas, configRemota } = await getPantallaData()
+  const { listas, ofertas, configRemota } = await getPantallaData(tenant)
 
   return (
     <PantallaRotativa
+      tenant={tenant}
       listas={listas}
       ofertas={ofertas}
       configRemota={configRemota}
