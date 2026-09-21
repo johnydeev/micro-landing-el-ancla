@@ -20,18 +20,20 @@ function Header({ tenant }: HeaderProps) {
   return (
     <header className={styles.header} style={{ background: tenant.paleta.primario }}>
       <div className={styles.brandRow}>
-        <div
-          style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '2px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          {imgError ? null : (
+        {/* Sin logo (no subido a Cloudinary, o URL vacia): se oculta el
+            recuadro blanco entero, no solo la imagen. */}
+        {imgError ? null : (
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '8px',
+              padding: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
             <img
               src={urlLogo(tenant.logo)}
               alt={tenant.nombre}
@@ -41,8 +43,8 @@ function Header({ tenant }: HeaderProps) {
               style={{ height: 'clamp(50px, 8vh, 100px)', width: 'auto' }}
               onError={() => setImgError(true)}
             />
-          )}
-        </div>
+          </div>
+        )}
         <div className={styles.brandCopy}>
           <span className={styles.brandName}>{tenant.nombre}</span>
           <span className={styles.brandTagline}>{tenant.eslogan}</span>

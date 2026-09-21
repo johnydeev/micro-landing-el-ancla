@@ -17,7 +17,7 @@ function cloudName(): string {
 }
 
 function carpetaCatalogo(): string {
-  return process.env.NEXT_PUBLIC_CLOUDINARY_CATALOGO ?? 'catalogo'
+  return process.env.NEXT_PUBLIC_CLOUDINARY_CATALOGO ?? 'catalogo-comun'
 }
 
 /*
@@ -33,8 +33,10 @@ export function urlImagen(publicId: string, transformaciones: string): string {
 /*
  * Imagen de una oferta. `slug` es lo que el cliente escribe en la columna
  * "slug imagen" de su planilla (ej. "asado-de-tira"), sin carpeta ni
- * extension. `d_placeholder.png`: si el slug no existe en Cloudinary, sirve
- * la imagen `placeholder.png` de la raiz del cloud en vez de 404.
+ * extension. El catalogo es plano (`catalogo-comun/<slug>`); el rubro va
+ * como tag en Cloudinary, no en la ruta. `d_placeholder.png`: si el slug no
+ * existe en Cloudinary, sirve la imagen `placeholder.png` de la raiz del
+ * cloud en vez de 404.
  */
 export function urlOferta(slug: string): string {
   return urlImagen(`${carpetaCatalogo()}/${slug}`, 'f_auto,q_auto,w_1200,d_placeholder.png')

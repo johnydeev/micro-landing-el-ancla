@@ -2,12 +2,14 @@
   "name": "micro-landing-el-ancla",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test \"lib/**/*.test.ts\" \"tenants/**/*.test.ts\""
+    "test": "node --test \"lib/**/*.test.ts\" \"tenants/**/*.test.ts\"",
+    "alta": "node --env-file=.env.local scripts/alta.mts"
   },
   "dependencies": {
     "next": "^16.2.6",

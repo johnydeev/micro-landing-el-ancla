@@ -115,7 +115,8 @@ app/
 tenants/             un archivo por comercio + registro
 templates/           catálogo de diseños: tabla/ y cartel/
 components/          PantallaRotativa (rotación, reload, watchdog), Header, Footer, overlays
-lib/                 lectura y parseo de los CSV, URLs de Cloudinary, helpers testeados
+lib/                 lectura y parseo de los CSV, URLs de Cloudinary, helpers del alta; todo testeado
+scripts/             `npm run alta`: alta de cliente desde la terminal
 types/               tipos compartidos (Oferta, Tenant, …)
 docs/                bitácora de implementación, decisiones técnicas, specs y planes
 .github/workflows/   CI
@@ -138,7 +139,7 @@ Variables de entorno (ver [`.env.local.example`](.env.local.example)):
 | `DEFAULT_TENANT` | Slug del comercio que se sirve en `/` |
 | `NEXT_PUBLIC_DEFAULT_TENANT` | Mismo valor, para el error boundary de `/` |
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloud name de Cloudinary |
-| `NEXT_PUBLIC_CLOUDINARY_CATALOGO` | Carpeta base del catálogo (`catalogo`) |
+| `NEXT_PUBLIC_CLOUDINARY_CATALOGO` | Carpeta base del catálogo (`catalogo-comun`, plana; el rubro va como tag) |
 | `TENANT_<SLUG>_CSV_URL` | Una por comercio: URL del CSV publicado de su planilla |
 
 Scripts:
@@ -148,6 +149,7 @@ npm run dev     # desarrollo
 npm run build   # build de producción
 npm test        # node --test sobre lib/ y tenants/
 npm run lint
+npm run alta    # alta de un cliente (ver abajo)
 ```
 
 Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N` fijan la pantalla en un modo sin rotación.
@@ -156,14 +158,32 @@ Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N
 
 ## Alta de un cliente
 
-1. Crear `tenants/<slug>.ts` (copiar `granja-elancla.ts`: nombre, eslogan, textos, paleta, GIDs de sus pestañas de ofertas y config) y registrarlo en `tenants/index.ts`. El test `tenants/registro.test.ts` valida el slug y la plantilla default.
-2. Subir el logo a Cloudinary como `logos/<slug>`.
-3. Vercel → Environment Variables: `TENANT_<SLUG_EN_MAYUSCULAS_CON_GUION_BAJO>_CSV_URL`.
-4. Planilla del cliente: pestañas de productos, ofertas y config con los headers esperados (ver [`docs/api.md`](docs/api.md)); en ofertas, desplegable en `slug imagen` con el catálogo maestro (vía `IMPORTRANGE`) y en `plantilla` con los ids del catálogo de diseños; publicar en la web como CSV.
-5. Commit + push. Si el cliente ya está en producción, fuera de su horario de atención: cada push deploya al instante.
-6. URL para la TV: `<dominio>/<slug>`.
+Tres pasos, un solo lugar para los datos:
 
----
+1. **Planilla.** Abrí el link "hacer una copia" de la planilla modelo, cargá
+   productos/ofertas/config, y Archivo → Compartir → Publicar en la web → CSV.
+   Copiá esa URL (la de `…/pub?output=csv`, sin gid).
+2. **`npm run alta`** y contestá: nombre, slug (sugerido), eslogan, dos
+   colores, badge, contactos, la URL de la planilla y la ruta del logo. El
+   script:
+   - lee `/pubhtml` de la planilla y **resuelve los gids solo** (busca las
+     pestañas "ofertas" y "config" por nombre);
+   - sube el logo a Cloudinary como `logos/<slug>`;
+   - escribe `tenants/<slug>.ts` y lo registra en `tenants/index.ts`;
+   - crea `TENANT_<SLUG>_CSV_URL` en Vercel (y en tu `.env.local`);
+   - corre `npm test`.
+3. **Commit + push.** Si otro comercio ya está en producción, fuera de su
+   horario de atención: cada push deploya para todos.
+
+URL para la TV: `<dominio>/<slug>`.
+
+Requiere, solo en tu `.env.local`: `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`,
+`VERCEL_TOKEN`, `VERCEL_PROJECT_ID` (ver `.env.local.example`). Flags:
+`--force` (sobreescribir un tenant), `--sin-logo`, `--sin-vercel`. También
+acepta las respuestas por pipe, una por línea: `npm run alta < cliente.txt`.
+
+La paleta completa se deriva de los dos colores; `tenants/<slug>.ts` queda
+editable a mano para afinar cualquier cosa.
 
 ## Estado
 

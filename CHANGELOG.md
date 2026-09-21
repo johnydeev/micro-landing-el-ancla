@@ -110,9 +110,50 @@ cliente ya estaba armando. Spec:
   19 ofertas, manifest con nombre/colores/`start_url` de El Ancla, HTML del
   cartel con badge `SUPER<br/>OFERTA` y `crossorigin="anonymous"` en las dos
   `<img>`.
-- **Pendiente hasta tener las imágenes en Cloudinary** (Tarea 0 del plan): check
-  visual de fotos y logo, y check offline con entradas de `res.cloudinary.com`
-  en la cache `micro-landing-v7`.
+- **Cloudinary (cloud `do69wumj1`)**: 25/25 slugs de `catalogo-comun/`
+  responden 200; logo `logos/granja-elancla` 200; íconos PWA 192/512 derivados
+  del logo 200; `d_placeholder.png` entrega el placeholder para un slug
+  inexistente (verificado el contenido). CORS: `Access-Control-Allow-Origin: *`.
+- **Check visual** (Chrome headless 1920×1080 contra `npm start`): cartel
+  idéntico al de producción, con foto y logo desde Cloudinary.
+- **Check offline**: con el SW `v7` activo y dos cargas online, se apagó el
+  servidor (`curl` no conecta) y se recargó: página desde cache, hidratada,
+  rotando, cartel con la foto de `catalogo-comun/costillitas` cargada desde la
+  cache (1200 px). Las fotos entran a la cache a medida que se muestran; las no
+  vistas dependen de Cloudinary, igual que antes dependían de `/public`.
+- Planilla de El Ancla ya alineada con `catalogo-comun` (el cliente actualizó
+  los slugs). Única fila sin imagen: `pechitox2`, INACTIVA.
+
+**Added (segunda parte de la sesión) — `npm run alta`**
+- Pedido: "hay muchos pasos, necesito algo más simple y automatizable desde
+  un lugar […] sin tener que sacar el GID". Spec:
+  `docs/superpowers/specs/2026-09-20-alta-de-cliente-design.md`.
+- **`scripts/alta.mts`**: CLI interactivo (o por pipe, una respuesta por
+  línea). Pide nombre, slug, eslogan, 2 colores, badge, contactos, URL
+  publicada y logo. Resuelve los **gids desde `/pubhtml`** de la planilla
+  (Google lista las pestañas con `items.push({name, gid})`), sube el logo a
+  Cloudinary (upload firmado, sin SDK), escribe `tenants/<slug>.ts`, lo
+  registra en `index.ts`, crea `TENANT_<SLUG>_CSV_URL` en Vercel
+  (`POST /v10/projects/:id/env?upsert=true`) y en `.env.local`, y corre
+  `npm test`. Flags `--force`, `--sin-logo`, `--sin-vercel`.
+- **`lib/alta.ts`** + **`lib/alta.test.ts`** (10 tests): `slugificar`,
+  `camelCase`, `pubhtmlUrl`, `csvUrlBase`, `parsearPestanas`, `elegirGids`,
+  `derivarPaleta` (fila impar = tinte 92 % blanco del primario),
+  `generarTenantTs`, `insertarEnRegistro` (idempotente, ordenado),
+  `firmaCloudinary`, `upsertEnv`.
+- **`package.json`**: script `alta` (`node --env-file=.env.local`), y
+  `"type": "module"` — saca el warning `MODULE_TYPELESS_PACKAGE_JSON` que Node
+  imprimía por cada `.ts`; todo el repo ya era ESM.
+- **`.env.local.example`**: bloque de secretos del alta (Cloudinary API
+  key/secret, Vercel token/project/team).
+- **`components/Header.tsx`**: sin logo, se oculta el recuadro blanco entero
+  (antes quedaba un cuadrado vacío al lado del nombre).
+- Verificado con un tenant de prueba (`carniceria-prueba`, verde/negro,
+  apuntando a la planilla de El Ancla, `--sin-logo --sin-vercel`): gids
+  resueltos (`2121126279` / `1038483630`), archivo y registro generados, 26/26
+  tests, build ok, `/carniceria-prueba/vistaCartel` renderiza el cartel
+  clásico con la paleta nueva y el badge "OFERTA" en una línea. Tenant de
+  prueba borrado después. Total tests: **26**.
 
 **Cutover**: Tarea 14 del plan. Push fuera del horario de atención, con las
 env nuevas ya cargadas en Vercel y el dominio nuevo agregado. Rollback:

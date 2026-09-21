@@ -108,7 +108,7 @@ imagen y elijan por desplegable, sin errores de tipeo.
 **Todas las imágenes en Cloudinary; el repo no tiene PNGs salvo el favicon.**
 
 - La planilla trae `imagen = asado-de-tira`; la app arma
-  `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo/asado-de-tira`.
+  `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo-comun/asado-de-tira`.
   `f_auto,q_auto` entrega WebP/AVIF comprimido al ancho justo — mejor que lo
   que hacía `sharp`, sin código propio. `d_placeholder.png` sirve una imagen
   genérica si el slug no existe.

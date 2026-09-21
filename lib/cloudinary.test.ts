@@ -5,7 +5,7 @@ import { urlImagen, urlOferta, urlLogo, urlIcono } from './cloudinary.ts'
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'demo-cloud'
-  process.env.NEXT_PUBLIC_CLOUDINARY_CATALOGO = 'catalogo'
+  process.env.NEXT_PUBLIC_CLOUDINARY_CATALOGO = 'catalogo-comun'
 })
 
 test('urlImagen arma la URL base de Cloudinary con transformaciones', () => {
@@ -18,7 +18,7 @@ test('urlImagen arma la URL base de Cloudinary con transformaciones', () => {
 test('urlOferta prefija la carpeta del catalogo y usa placeholder', () => {
   assert.equal(
     urlOferta('asado-de-tira'),
-    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo/asado-de-tira',
+    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo-comun/asado-de-tira',
   )
 })
 

@@ -13,9 +13,8 @@
 **Estado (2026-09-20):** Tareas 1-13 ejecutadas inline y validadas (16/16 tests,
 tsc, lint, build, checks HTTP contra `npm start`). Desviación: se eliminó
 `app/loading.tsx` de la raíz (rompía el 404 de slugs desconocidos, ver
-CHANGELOG sesión 21). **Pendientes del usuario:** Tarea 0 (Cloudinary), pasos
-6-7 de la Tarea 12 (check visual y offline, necesitan Cloudinary) y Tarea 14
-(cutover).
+CHANGELOG sesión 21). Tarea 0 y Tarea 12 completas (catálogo en `catalogo-comun/`, check visual y
+offline OK). **Pendiente: Tarea 14 (cutover).**
 
 **Reglas del proyecto que aplican a este plan:**
 - Los commits los hace el usuario con GitLens. Cada tarea termina en "listo para commitear", nunca en `git commit`.

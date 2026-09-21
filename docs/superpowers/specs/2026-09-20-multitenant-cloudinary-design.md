@@ -179,13 +179,13 @@ https://res.cloudinary.com/<NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME>/image/upload/<tra
 
 | Uso | publicId | Transformaciones |
 |---|---|---|
-| Oferta | `${NEXT_PUBLIC_CLOUDINARY_CATALOGO}/${oferta.imagen}` | `f_auto,q_auto,w_1200,d_placeholder.png` |
+| Oferta | `${NEXT_PUBLIC_CLOUDINARY_CATALOGO}/${oferta.imagen}` (hoy `catalogo-comun/…`) | `f_auto,q_auto,w_1200,d_placeholder.png` |
 | Logo (header) | `tenant.logo` | `f_auto,q_auto,w_400` |
 | Ícono PWA 192 | `tenant.logo` | `f_png,w_192,h_192,c_pad,b_white` |
 | Ícono PWA 512 | `tenant.logo` | `f_png,w_512,h_512,c_pad,b_white` |
 
 - Env globales: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`,
-  `NEXT_PUBLIC_CLOUDINARY_CATALOGO` (carpeta base, ej. `catalogo`). Prefijo
+  `NEXT_PUBLIC_CLOUDINARY_CATALOGO` (carpeta base: `catalogo-comun`). Prefijo
   `NEXT_PUBLIC_` porque las URLs se arman en componentes que también renderizan
   en el cliente. No son secretos: las URLs resultantes son públicas de todos
   modos.
@@ -236,7 +236,7 @@ https://res.cloudinary.com/<NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME>/image/upload/<tra
 
 **Antes del push (a cualquier hora, no toca producción):**
 1. Subir a Cloudinary: las 22 imágenes de `public/ofertas/` con **sus nombres
-   actuales** como public_id bajo `catalogo/`; `public/logo.png` como
+   actuales** como public_id bajo `catalogo-comun/`; `public/logo.png` como
    `logos/granja-elancla`; un `placeholder.png` en la raíz.
 2. Vercel → env: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`,
    `NEXT_PUBLIC_CLOUDINARY_CATALOGO`, `DEFAULT_TENANT=granja-elancla`,

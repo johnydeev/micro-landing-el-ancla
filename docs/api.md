@@ -97,8 +97,8 @@ tenant.sheets.gidOfertas`.
 - Solo se devuelven ofertas con `estado === "ACTIVO"`. Las
   `"INACTIVO"` se filtran en el servidor.
 - `imagen` es el **id de la imagen en el catálogo de Cloudinary**
-  (`catalogo/<slug>`), compartido por todos los comercios. La pantalla lo
-  usa como `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo/<slug>`.
+  (`catalogo-comun/<slug>`), compartido por todos los comercios. La pantalla lo
+  usa como `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo-comun/<slug>`.
   Si el slug no existe, Cloudinary sirve una imagen placeholder.
 - `tamano` es un entero **1-10** que controla el tamaño de la imagen
   dentro del cartel (1 = más chica = 55%, 10 = más grande = 120%).

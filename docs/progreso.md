@@ -78,7 +78,12 @@ components/
   HealthIndicator.tsx       Punto online/offline. `memo`.
   DimOverlay.tsx            Atenuado por horario. `memo`.
   ServiceWorkerRegistrar.tsx
+scripts/
+  alta.mts                  `npm run alta`: alta de cliente interactiva
+                            (gids desde /pubhtml, logo a Cloudinary,
+                            tenants/<slug>.ts, env en Vercel).
 lib/
+  alta.ts                   Helpers puros del alta (testeados).
   sheets.ts                 Parser CSV + lectores por tenant + columna
                             "plantilla". server-only.
   plantillas.ts             PLANTILLAS_CARTEL, slugificarPlantilla,
@@ -160,6 +165,10 @@ imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
     env en Vercel, dominio nuevo, push fuera de horario, rollback = Instant
     Rollback de Vercel).
   - Docs: CHANGELOG, dos ADRs, README reescrito, `api.md`.
+  - **`npm run alta`** (`scripts/alta.mts` + `lib/alta.ts`, 10 tests): alta
+    de cliente desde la terminal. Resuelve gids desde `/pubhtml`, sube logo,
+    escribe y registra el tenant, crea la env en Vercel. Probado con un
+    tenant de prueba end-to-end. `"type": "module"` en `package.json`.
 
 - **Sesión 20 (19/09/2026) — El workflow de imágenes corría y fallaba**:
   - La sospecha de sesiones 18-19 (permiso `Read and write` sin setear) era
@@ -883,7 +892,7 @@ aparece un caso de uso real:
   `AGENTS.md`). Antes de tocar APIs de Next, leer
   `node_modules/next/dist/docs/`.
 - **Imágenes**: viven en Cloudinary, no en el repo. Catálogo universal en
-  `catalogo/<slug>`; el `slug` es lo que va en la columna `slug imagen` de
+  `catalogo-comun/<slug>`; el `slug` es lo que va en la columna `slug imagen` de
   la planilla. Logo de cada comercio en `logos/<slug>`. Si un slug no
   existe, Cloudinary sirve `placeholder.png` (raíz del cloud). No hay
   nada que comprimir ni commitear.
@@ -892,10 +901,9 @@ aparece un caso de uso real:
   con extensión `.ts`, sin alias `@/` en módulos testeados). `tsc --noEmit`,
   `npm run lint`, `npm test` y `npm run build` corren en CI en cada push;
   igual conviene correrlos en local antes de commitear.
-- **Alta de un cliente**: checklist en el README ("Alta de un cliente").
-  Resumen: `tenants/<slug>.ts` + registro, logo en Cloudinary, env
-  `TENANT_<SLUG>_CSV_URL` en Vercel, desplegables en su planilla, push
-  fuera de horario, URL `<dominio>/<slug>` para la TV.
+- **Alta de un cliente**: copiar la planilla modelo y publicarla →
+  `npm run alta` (hace todo lo demás) → commit + push fuera de horario.
+  Detalle en el README. Secretos del alta solo en `.env.local`.
 - **Para probar el Service Worker / la PWA hay que usar un build de
   producción**, no `npm run dev`: `ServiceWorkerRegistrar` está gateado a
   `NODE_ENV === 'production'` (a propósito, para no pelear con cache stale
