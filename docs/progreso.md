@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 20/09/2026 (sesión 21).
+Actualizado al 21/09/2026 (sesión 21, cutover hecho).
 
 ---
 
@@ -160,10 +160,9 @@ imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
     22 y 25). `tsc` ✓, lint ✓, build ✓ (rutas dinámicas nuevas, sin
     `/manifest.json`), build con env vacías ✓. HTTP contra `npm start`:
     200/200/404/404, JSON, manifest, `crossorigin` en las `<img>`.
-  - **Pendiente**: subir las 22 imágenes + logo + placeholder a Cloudinary
-    (Tarea 0 del plan), check visual/offline, y el **cutover** (Tarea 14:
-    env en Vercel, dominio nuevo, push fuera de horario, rollback = Instant
-    Rollback de Vercel).
+  - **Cutover hecho el 21/09 ~00:15** (local cerrado). El push salió antes
+    que las env: ~1 h con 404 en producción, sin impacto. Env cargadas +
+    Redeploy, verificado. Detalle en CHANGELOG.
   - Docs: CHANGELOG, dos ADRs, README reescrito, `api.md`.
   - **`npm run alta`** (`scripts/alta.mts` + `lib/alta.ts`, 10 tests): alta
     de cliente desde la terminal. Resuelve gids desde `/pubhtml`, sube logo,
@@ -804,11 +803,11 @@ listo para vender en su estado actual.
 
 ### Abierto
 
-- **Cutover multitenant (sesión 21, Tarea 14 del plan).** Código listo y
-  validado en local, **sin pushear**. Antes del push: 22 imágenes + logo +
-  `placeholder.png` en Cloudinary, env nuevas en Vercel, dominio nuevo
-  agregado sin borrar el viejo. El push, fuera del horario de atención.
-  Rollback: Vercel → Instant Rollback.
+- **Dominio genérico `.vercel.app`** para los próximos clientes (hoy todo
+  vive en `precios-el-ancla.vercel.app`, que sigue funcionando). Se agrega
+  en Vercel → Domains cuando haya un segundo cliente; no requiere código.
+- **Planilla modelo** para el alta de clientes (copia de la de El Ancla
+  vaciada, con desplegables de `slug imagen` y `plantilla`). Sin código.
 - **Validar el watchdog en el navegador real del Fire TV** (Amazon Silk).
   Pendiente desde sesión 11; el procedimiento documentado solo se corrió
   en Chrome de escritorio. Requiere el hardware.

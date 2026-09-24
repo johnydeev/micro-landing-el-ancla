@@ -14,7 +14,9 @@
 tsc, lint, build, checks HTTP contra `npm start`). Desviación: se eliminó
 `app/loading.tsx` de la raíz (rompía el 404 de slugs desconocidos, ver
 CHANGELOG sesión 21). Tarea 0 y Tarea 12 completas (catálogo en `catalogo-comun/`, check visual y
-offline OK). **Pendiente: Tarea 14 (cutover).**
+offline OK). **Tarea 14 (cutover) hecha el 2026-09-21** — con el orden
+invertido (push antes que env; ver CHANGELOG). Dominio nuevo: no agregado,
+opcional. Plan cerrado.
 
 **Reglas del proyecto que aplican a este plan:**
 - Los commits los hace el usuario con GitLens. Cada tarea termina en "listo para commitear", nunca en `git commit`.

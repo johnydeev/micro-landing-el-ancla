@@ -155,7 +155,19 @@ cliente ya estaba armando. Spec:
   clásico con la paleta nueva y el badge "OFERTA" en una línea. Tenant de
   prueba borrado después. Total tests: **26**.
 
-**Cutover**: Tarea 14 del plan. Push fuera del horario de atención, con las
+**Cutover (2026-09-21, ~00:15, local cerrado)**
+- El push de `8349141` salió **antes** de cargar las env en Vercel: durante
+  ~1 h producción sirvió la página 404 en `/` (sin `DEFAULT_TENANT`) y el
+  empty state en `/granja-elancla` (sin `TENANT_GRANJA_ELANCLA_CSV_URL`).
+  Sin impacto en el local (cerrado hasta el martes). Lección: **el orden del
+  plan era env primero, push después**; se pusheó junto con el commit.
+- Fix: las 5 env cargadas en Vercel (Production) + Redeploy. Verificado con
+  `curl`: `/` y `/granja-elancla` con precios, logo desde Cloudinary,
+  manifest por tenant. `DEFAULT_TENANT` quedó como tipo Secret (Vercel no
+  permite pasarla a Config); funciona, solo no muestra el valor.
+- Las tres `GOOGLE_SHEETS_*` viejas se borran de Vercel.
+- Dominio nuevo `.vercel.app`: **no se agregó todavía**. La TV sigue en
+  `precios-el-ancla.vercel.app/`, que renderiza El Ancla. Opcional. Push fuera del horario de atención, con las
 env nuevas ya cargadas en Vercel y el dominio nuevo agregado. Rollback:
 Instant Rollback de Vercel.
 
