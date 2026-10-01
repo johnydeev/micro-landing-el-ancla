@@ -2,7 +2,7 @@
 
 Cartelería digital para comercios de barrio: una pantalla que rota entre la lista de precios y los carteles de ofertas, corriendo 24/7 en un Fire TV colgado en el local. Un solo deploy sirve a varios comercios, cada uno en su propia URL, con su paleta, sus textos y su planilla.
 
-**[Ver la pantalla en vivo →](https://precios-el-ancla.vercel.app/)** (Granja El Ancla, el primer cliente)
+**[Ver la pantalla en vivo →](https://precios-el-ancla.vercel.app/)** (Granja El Ancla, el primer cliente) · **[Demo →](https://precios-el-ancla.vercel.app/demo)** (comercio ficticio, para mostrar el producto)
 
 ![Pantalla de precios: tabla de precios y cartel de oferta](docs/img/pantalla.png)
 
@@ -158,41 +158,97 @@ Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N
 
 ## Alta de un cliente
 
-Tres pasos, un solo lugar para los datos:
+Probado de punta a punta el 01/10/2026 con el comercio de muestra (`/demo`).
+Lleva unos 20 minutos. Los pasos 1 a 4 son manuales; el 5 lo hace el script.
 
-1. **Planilla.** Abrí el link "hacer una copia" de la planilla modelo, cargá
-   productos/ofertas/config, y Archivo → Compartir → Publicar en la web → CSV.
-   Copiá esa URL (la de `…/pub?output=csv`, sin gid).
-2. **`npm run alta`** y contestá: nombre, slug (sugerido), eslogan, dos
-   colores, badge, contactos, la URL de la planilla y la ruta del logo. El
-   script:
-   - lee `/pubhtml` de la planilla y **resuelve los gids solo** (busca las
-     pestañas "ofertas" y "config" por nombre);
-   - sube el logo a Cloudinary como `logos/<slug>`;
-   - escribe `tenants/<slug>.ts` y lo registra en `tenants/index.ts`;
-   - crea `TENANT_<SLUG>_CSV_URL` en Vercel (y en tu `.env.local`);
-   - corre `npm test`.
-3. **Commit + push.** Si otro comercio ya está en producción, fuera de su
-   horario de atención: cada push deploya para todos.
+### 1. La planilla del cliente
 
-URL para la TV: `<dominio>/<slug>`.
+1. Abrir el link de copia de la planilla modelo y nombrarla "Precios \<Comercio>".
+2. Cargar las 4 pestañas: `Tablas de Precios`, `Ofertas`, `Configuracion`,
+   `Precios`. Si tenés los datos en archivos, es más rápido
+   **Archivo → Importar → Subir → Reemplazar hoja actual**, una pestaña por vez
+   (ojo: pararse en la pestaña correcta antes de importar, porque reemplaza la
+   que esté a la vista). Google filtra por `.csv` en ese diálogo: si tenés
+   `.tsv`, convertilos antes.
+3. En `_catalogo`, pegar el `IMPORTRANGE` al catálogo maestro y apretar
+   "Permitir acceso". Ocultar esa hoja.
+4. **Archivo → Compartir → Publicar en la web → Todo el documento → CSV →
+   Publicar.** Copiar la URL (`…/pub?output=csv`).
 
-Requiere, solo en tu `.env.local`: `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`,
-`VERCEL_TOKEN`, `VERCEL_PROJECT_ID` (ver `.env.local.example`). Flags:
-`--force` (sobreescribir un tenant), `--sin-logo`, `--sin-vercel`. También
-acepta las respuestas por pipe, una por línea: `npm run alta < cliente.txt`.
+### 2. Verificar los slugs de imagen
+
+Cada valor de `slug imagen` tiene que existir en Cloudinary. **No alcanza con
+abrir la URL de la imagen**: por `d_placeholder` y por la caché del CDN, un slug
+inexistente o borrado puede devolver 200 igual. Se verifica con la Admin API
+(`npm run verificar` en el repo del catálogo).
+
+Si un slug no existe, el cartel sale con el placeholder gris — no rompe nada,
+pero se ve mal en una demo.
+
+### 3. El logo
+
+Subirlo a Cloudinary como `logos/<slug>`. Dos cosas que confunden:
+
+- La **carpeta** de la Media Library (`asset_folder`) no forma parte del
+  `public_id`. Mover el archivo a la carpeta `logos` no alcanza.
+- El **Display name** tampoco es el `public_id`. Hay que editar el public_id
+  propiamente dicho.
+
+Verificar: `https://res.cloudinary.com/<cloud>/image/upload/logos/<slug>` tiene
+que dar 200.
+
+### 4. Secretos en `.env.local` (una sola vez, no por cliente)
+
+`CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `VERCEL_TOKEN`,
+`VERCEL_PROJECT_ID` (ver `.env.local.example`). Sin comillas, como el resto del
+archivo. El token de Vercel conviene con expiración larga: con 1 día hay que
+rehacerlo en cada alta.
+
+### 5. `npm run alta`
+
+Pregunta nombre, slug, eslogan, dos colores, badge, contactos, la URL de la
+planilla y la ruta del logo (vacío si ya lo subiste). Con eso:
+
+- lee `/pubhtml` de la planilla y **resuelve los gids solo** (busca las pestañas
+  "ofertas" y "config" por nombre);
+- sube el logo a Cloudinary como `logos/<slug>`;
+- escribe `tenants/<slug>.ts` y lo registra en `tenants/index.ts`;
+- crea `TENANT_<SLUG>_CSV_URL` en Vercel y en tu `.env.local`;
+- corre `npm test`.
+
+Flags: `--force` (sobreescribir un tenant), `--sin-logo`, `--sin-vercel`.
+Acepta respuestas por pipe: `npm run alta < cliente.txt`.
 
 La paleta completa se deriva de los dos colores; `tenants/<slug>.ts` queda
-editable a mano para afinar cualquier cosa.
+editable a mano.
+
+### 6. Commit y push
+
+**Fuera del horario de atención de los comercios que ya están en producción**:
+el push redeploya para todos, y sus pantallas recargan dentro de los 30 minutos.
+Son 1-2 segundos de interrupción, pero mejor evitarlos con público en el local.
+
+Después del deploy, verificar `<dominio>/<slug>`. Si no ves el cambio en tu
+navegador, **Ctrl+F5**: el CSS y el HTML viejos quedan cacheados.
+
+### Si cambiás el slug de un tenant existente
+
+El nombre de la variable de entorno se deriva del slug, así que cambia también
+(`TENANT_<SLUG_NUEVO>_CSV_URL`). **Primero la variable en Vercel, después el
+push.** Al revés, la ruta nueva queda sin datos hasta que la cargues.
+
+Un **Redeploy** en Vercel no trae código nuevo: solo rehace el build del commit
+que ya estaba desplegado. Para que salga un cambio del repo hay que pushear.
 
 ## Estado
 
-En producción desde mayo de 2026 con Granja El Ancla, corriendo todos los días en el local.
+En producción desde mayo de 2026 con Granja El Ancla, corriendo todos los días en el local. Desde octubre de 2026 el mismo deploy sirve también el comercio de muestra en `/demo`.
 
 Pendientes conocidos:
 
 - Validar el watchdog en el navegador Silk real del Fire TV (hoy probado en Chrome de escritorio).
 - Medir la latencia de publicación del CSV de Google (`/pub`) si el cliente nota demora al actualizar precios.
+- Dominio genérico: todo vive bajo `precios-el-ancla.vercel.app`, que es el nombre del primer cliente. Se agrega uno nuevo en Vercel → Domains cuando entre el primer cliente pago, **sin borrar el viejo** (la TV de El Ancla apunta ahí).
 
 ---
 

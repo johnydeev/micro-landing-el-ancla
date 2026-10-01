@@ -47,6 +47,16 @@ export function urlLogo(publicId: string): string {
   return urlImagen(publicId, 'f_auto,q_auto,w_400')
 }
 
+/*
+ * Imagen de preview para cuando se comparte el link (WhatsApp, Telegram, redes).
+ * 1200x630 es la relacion que esperan: el logo va centrado sobre fondo blanco.
+ * Sin esto, WhatsApp cae al apple-touch-icon del sitio — y ese era global, asi
+ * que mostraba el logo del primer comercio en el link de cualquier otro.
+ */
+export function urlOg(publicId: string): string {
+  return urlImagen(publicId, 'f_png,w_1200,h_630,c_pad,b_white')
+}
+
 /* Icono PWA derivado del logo: cuadrado, con padding blanco, siempre PNG. */
 export function urlIcono(publicId: string, lado: 192 | 512): string {
   return urlImagen(publicId, `f_png,w_${lado},h_${lado},c_pad,b_white`)

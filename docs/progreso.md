@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 21/09/2026 (sesión 21, cutover hecho).
+Actualizado al 01/10/2026 (sesión 22, dos comercios en producción).
 
 ---
 
@@ -136,6 +136,29 @@ imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
 ---
 
 ## Completado ✅
+
+- **Sesión 22 (01/10/2026) — Primer alta real (`/demo`) y alineación de precios**:
+  - **`npm run alta` usado por primera vez de verdad**, con un comercio
+    ficticio de muestra ("Carnicería San Martín"). Vive en **`/demo`**: la URL
+    se comparte con prospectos y conviene que se lea como muestra. Paleta
+    verde/negro, logo propio, planilla propia con 6 listas y 15 ofertas, todas
+    reusando el catálogo de imágenes compartido.
+  - **Planilla modelo terminada** (fuera del repo), con `_catalogo` conectada
+    al catálogo maestro por `IMPORTRANGE` y los desplegables de `imagen`,
+    `estado` y `plantilla`. Es el molde de los clientes que vengan.
+  - **Precios alineados por el `$`** (`app/page.module.css`): la columna estaba
+    centrada y el ancho del número y de la unidad movían cada fila. Se probó
+    primero alineando a la derecha; el cliente pidió lo contrario. Medido sobre
+    píxeles: dispersión 0 px en los dos comercios.
+  - **Documentadas dos trampas de Cloudinary** en `docs/decisiones.md`: el CDN
+    puede seguir sirviendo un asset borrado, y cada slug mal escrito deja un
+    registro fantasma por `d_placeholder`. Verificar con la Admin API, no con
+    la URL.
+  - Validación: `tsc` ✓, lint ✓, 26 tests ✓, build ✓, y producción verificada
+    (`/demo`, `/granja-elancla` y `/` en 200).
+  - Aprendizajes operativos: la variable de entorno va **antes** del push
+    cuando cambia un slug; un Redeploy de Vercel no trae código nuevo; y
+    Ctrl+F5 para no mirar el build viejo. Todo en el README.
 
 - **Sesión 21 (20/09/2026) — Multitenant por path + imágenes en Cloudinary**:
   - Brainstorming → spec → plan (todo en `docs/superpowers/`). Decisiones:
@@ -802,6 +825,10 @@ No quedan items del análisis inicial sin resolver. El proyecto está
 listo para vender en su estado actual.
 
 ### Abierto
+
+- **Limpieza del alta del demo** (opcional): borrar
+  `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y renombrar el logo a
+  `logos/demo` (hoy sigue como `logos/carniceria-san-martin`; funciona igual).
 
 - **Dominio genérico `.vercel.app`** para los próximos clientes (hoy todo
   vive en `precios-el-ancla.vercel.app`, que sigue funcionando). Se agrega

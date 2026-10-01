@@ -1,7 +1,7 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { urlImagen, urlOferta, urlLogo, urlIcono } from './cloudinary.ts'
+import { urlImagen, urlOferta, urlLogo, urlIcono, urlOg } from './cloudinary.ts'
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'demo-cloud'
@@ -33,6 +33,13 @@ test('urlIcono genera PNG cuadrado con fondo blanco', () => {
   assert.equal(
     urlIcono('logos/granja-elancla', 192),
     'https://res.cloudinary.com/demo-cloud/image/upload/f_png,w_192,h_192,c_pad,b_white/logos/granja-elancla',
+  )
+})
+
+test('urlOg genera la imagen 1200x630 para compartir el link', () => {
+  assert.equal(
+    urlOg('logos/granja-elancla'),
+    'https://res.cloudinary.com/demo-cloud/image/upload/f_png,w_1200,h_630,c_pad,b_white/logos/granja-elancla',
   )
 })
 

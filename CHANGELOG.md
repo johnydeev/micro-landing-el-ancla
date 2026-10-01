@@ -5,6 +5,71 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 22 — 2026-10-01 (primer alta real: tenant `demo`, y precios alineados por el `$`)
+
+**Context**: dos cosas. Primero, dar de alta un segundo comercio para mostrarle
+el producto a prospectos — el primer uso real de `npm run alta`, con un cliente
+ficticio ("Carnicería San Martín") que reusa el catálogo de imágenes compartido.
+Segundo, un pedido del cliente sobre la alineación de la columna de precios.
+
+**Added**
+- **`tenants/demo.ts`**: comercio ficticio de muestra. Nombre visible
+  "Carnicería San Martín", paleta verde/negro (`#1B5E20` / `#212121`), logo
+  propio en Cloudinary, planilla propia con 6 listas de precios y 15 ofertas
+  activas. Vive en **`/demo`**, no en `/carniceria-san-martin`: la URL se manda
+  por WhatsApp a prospectos y conviene que se lea como lo que es.
+- **Planilla modelo terminada** (fuera del repo): copia con datos de demo,
+  `_catalogo` conectada al catálogo maestro por `IMPORTRANGE` (3 columnas:
+  nombre de referencia, slug, rubro) y desplegables de `imagen`, `estado` y
+  `plantilla`. Es el molde para los clientes que vengan.
+- Archivos de apoyo en `micro-landing/planilla-modelo/demo/`: los 4 CSV de las
+  pestañas y el logo generado.
+
+**Changed**
+- **`app/page.module.css`**: la columna de precios estaba **centrada**, así que
+  el ancho del número (4 o 5 dígitos) y el de la unidad ("por KG" vs "por 2KG")
+  movían el arranque de cada fila y la columna se veía torcida.
+  Primero se alineó a la derecha (convención de listas de precios), y el cliente
+  pidió lo contrario: **alinear por el signo `$`**. Quedó `flex-start`, con el
+  número creciendo hacia la derecha. Medido sobre los píxeles de una captura:
+  dispersión del `$` = **0 px** en los dos comercios, con precios de 4 y 5
+  dígitos y unidades KG/2KG/3KG mezcladas.
+- **`docs/decisiones.md`**: nota nueva en el ADR de Cloudinary sobre dos efectos
+  de `d_placeholder` (ver abajo).
+
+**Aprendido sobre Cloudinary** (de la sesión del catálogo, verificado acá)
+- Un slug **borrado puede seguir viéndose bien**: el CDN sirve la copia vieja.
+  `pechito-x2` devolvió 200 con sus 129.074 bytes originales horas después de
+  borrarse de la cuenta. "Se ve bien" no prueba que el asset exista.
+- **Cada slug mal escrito deja un registro fantasma** en la cuenta: pedir un
+  public_id inexistente con `d_placeholder.png` hace que Cloudinary lo registre
+  con formato `unknown` y cero bytes. Los typos de las planillas de los clientes
+  van a ensuciar el catálogo de a poco.
+- **Verificar existencia con la Admin API**, no probando URLs. En el repo del
+  catálogo hay un `npm run verificar` para eso.
+
+**Validation**
+- `tsc --noEmit` ✓, `npm run lint` ✓, `npm test` 26/26 ✓, `npm run build` ✓.
+- Local contra `npm start`: `/demo` 200 con 15 ofertas,
+  `/carniceria-san-martin` 404 tras el rename, `/granja-elancla` y `/` 200.
+- Producción verificada: `/demo` sirve nombre, logo y ofertas; el CSS
+  desplegado tiene `justify-content:flex-start` en el bloque de precios.
+- Los 15 slugs de la planilla del demo verificados uno por uno contra
+  Cloudinary antes de publicarla.
+
+**Notas operativas**
+- El alta completa tardó bastante por ser la primera: faltaban la planilla
+  modelo, el logo, los tokens de Vercel y el catálogo maestro. Con eso ya
+  resuelto, el alta siguiente es el checklist del README.
+- Al cambiar el slug de un tenant cambia también el nombre de su variable de
+  entorno (`TENANT_<SLUG>_CSV_URL`). **La variable va primero en Vercel, el push
+  después**: al revés, la ruta nueva queda sin datos hasta que se cargue.
+- Un redeploy en Vercel **no** trae código nuevo: solo rehace el build del
+  commit que ya estaba. Para que salga un cambio hay que pushear.
+- Pendiente opcional: borrar `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y
+  renombrar el logo a `logos/demo` (hoy sigue en `logos/carniceria-san-martin`,
+  funciona igual).
+
 ### Sesión 21 — 2026-09-20 (multitenant por path + imágenes en Cloudinary)
 
 **Context**: pedido del cliente: "necesito que esto sea multitenant". Brainstorming

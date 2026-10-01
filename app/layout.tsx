@@ -14,10 +14,11 @@ export const metadata: Metadata = {
   description: 'Pantalla de precios y ofertas para comercios',
 }
 
-// `app/icon.png` y `app/apple-icon.png` se auto-detectan por convencion de
-// archivo de Next. El manifest y el theme-color son por tenant:
-// app/[tenant]/layout.tsx (generateMetadata / generateViewport) y
-// app/[tenant]/manifest.webmanifest/route.ts.
+// NO hay app/icon.png ni app/apple-icon.png: eran el logo del primer comercio y,
+// al ser globales, se colaban como miniatura al compartir el link de cualquier
+// otro (WhatsApp cae al apple-touch-icon cuando no hay Open Graph). Icono,
+// manifest, theme-color y preview son por tenant:
+// app/[tenant]/layout.tsx y app/[tenant]/manifest.webmanifest/route.ts.
 
 export default function RootLayout({
   children,
