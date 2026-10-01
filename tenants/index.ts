@@ -2,7 +2,7 @@ import type { Tenant } from '@/types/tenant'
 // Extension .ts explicita: tenants/registro.test.ts importa este modulo con
 // `node --test` (sin bundler), y Node ESM exige la extension. tsconfig tiene
 // allowImportingTsExtensions; Turbopack la resuelve igual.
-import { carniceriaSanMartin } from './carniceria-san-martin.ts'
+import { demo } from './demo.ts'
 import { granjaElAncla } from './granja-elancla.ts'
 
 /*
@@ -14,7 +14,7 @@ import { granjaElAncla } from './granja-elancla.ts'
  * Ver README "Alta de un cliente".
  */
 export const TENANTS: Record<string, Tenant> = {
-  'carniceria-san-martin': carniceriaSanMartin,
+  'demo': demo,
   'granja-elancla': granjaElAncla,
 }
 

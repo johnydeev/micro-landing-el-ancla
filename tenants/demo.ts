@@ -1,8 +1,13 @@
 import type { Tenant } from '@/types/tenant'
 
 // Generado por `npm run alta` el 2026-10-01. Editable a mano.
-export const carniceriaSanMartin: Tenant = {
-  slug: 'carniceria-san-martin',
+//
+// Comercio ficticio para mostrar el producto a prospectos. Vive en /demo (no en
+// /carniceria-san-martin) porque la URL se comparte por WhatsApp y conviene que
+// se lea como lo que es: una muestra. El logo sigue con su public_id original
+// en Cloudinary; no hace falta renombrarlo alla.
+export const demo: Tenant = {
+  slug: 'demo',
   nombre: 'Carnicería San Martín',
   eslogan: 'Desde 1972, calidad de barrio',
   logo: 'logos/carniceria-san-martin',
