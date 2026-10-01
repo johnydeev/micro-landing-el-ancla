@@ -143,6 +143,26 @@ peor que haberlos escrito.
 - **Imágenes propias por comercio fuera del catálogo.** Si aparece el caso:
   carpeta `clientes/<slug>/` y un prefijo en el slug.
 
+### Dos efectos de `d_placeholder` que conviene conocer (2026-10-01)
+
+1. **Un slug borrado puede seguir viéndose bien.** El CDN sirve la copia
+   cacheada del archivo viejo (verificado: `pechito-x2` devolvía 200 con sus
+   129.074 bytes originales horas después de borrarse de la cuenta). Cuando
+   expira la caché, el cartel pasa al placeholder sin aviso. **"Se ve bien" no
+   prueba que el asset exista.**
+2. **Cada slug mal escrito deja un registro fantasma en la cuenta.** Pedir un
+   public_id inexistente con `d_placeholder.png` hace que Cloudinary registre
+   ese nombre con formato `unknown` y cero bytes. Los typos de las planillas de
+   los clientes van a ensuciar el catálogo de a poco; hay que limpiarlo cada
+   tanto.
+
+Nada de esto cambia la decisión: `d_placeholder` sigue siendo correcto, porque
+el objetivo es que la pantalla del local nunca muestre una imagen rota.
+
+**Cómo verificar si un slug existe**: la Admin API de Cloudinary, no la URL. En
+el repo del catálogo (`catalogo-comun`) hay un `npm run verificar` que compara
+carpeta local, Cloudinary y hoja maestra. Probar la URL puede dar 200 por caché.
+
 ### Costo y cuota
 
 Cloudinary free: 25 créditos/mes (~25 GB de transferencia). Una pantalla
