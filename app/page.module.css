@@ -119,24 +119,25 @@
 
 .priceCell {
   width: 35%;
-  padding-left: 40px;
-  padding-right: 4vw;
-  text-align: right;
+  padding-left: 6vw;
+  padding-right: 20px;
+  text-align: left;
   vertical-align: middle;
 }
 
 /*
- * Los precios se alinean a la DERECHA, no centrados: con el bloque centrado,
- * la unidad ("por KG" vs "por 2KG") cambia el ancho total y cada fila arranca
- * en una x distinta — se ve como una columna torcida.
- * `flex-end` + un ancho minimo para la unidad hacen que el numero termine
- * siempre en la misma linea vertical, fila a fila.
+ * Los precios se alinean por el SIGNO $, no centrados: con el bloque centrado,
+ * el ancho del numero (4 o 5 digitos) y el de la unidad ("por KG" vs "por 2KG")
+ * movian el arranque de cada fila y la columna se veia torcida.
+ * `flex-start` hace que todos los $ caigan en la misma linea vertical; el
+ * numero crece hacia la derecha. Pedido del cliente (01/10/2026) sobre la
+ * alternativa de alinear por la derecha.
  */
 .priceInline {
   display: flex;
   width: 100%;
   align-items: baseline;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.45em;
 }
 
@@ -151,9 +152,6 @@
 }
 
 .unitValue {
-  /* Ancho minimo para que "por KG" y "por 2KG" ocupen la misma columna. */
-  min-width: 4.2em;
-  text-align: left;
   font-size: clamp(
     calc(8px * var(--table-font-scale, 1)),
     calc(0.9vw * var(--table-font-scale, 1)),
