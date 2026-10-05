@@ -8,6 +8,7 @@ import Header from '@/components/Header'
 import HealthIndicator from '@/components/HealthIndicator'
 import TablaClasica from '@/templates/tabla/Clasica'
 import { CATALOGO_CARTELES } from '@/templates'
+import { estadoInicialRotacion, rotationReducer } from '@/lib/rotacion'
 import type { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
 import type { Tenant } from '@/types/tenant'
 import styles from '@/app/page.module.css'
@@ -35,53 +36,6 @@ const RELOAD_INTERVAL_MS = 30 * 60 * 1000
  * cubre los hipos cortos sin disparar falsos positivos.
  */
 const HEARTBEAT_INTERVAL_MS = 20 * 1000
-
-/*
- * Estado de la rotacion entre tabla de precios y cartel de oferta,
- * manejado con useReducer para tener una sola transicion atomica por
- * tick. Antes usabamos 3 useState separados (modo, listaIndex,
- * cartelIndex) y las transiciones entre modos requerian llamar a un
- * setter dentro del updater de otro setter — anti-patron de React que
- * puede causar dispatches duplicados o estados inconsistentes
- * acumulativos. El reducer resuelve todo en una sola actualizacion.
- */
-type RotationState = {
-  modo: 'tabla' | 'cartel'
-  listaIndex: number
-  cartelIndex: number
-}
-
-type RotationAction = {
-  type: 'tick'
-  listasCount: number
-  ofertasCount: number
-}
-
-function rotationReducer(state: RotationState, action: RotationAction): RotationState {
-  const { listasCount, ofertasCount } = action
-
-  if (state.modo === 'tabla') {
-    if (state.listaIndex < listasCount - 1) {
-      return { ...state, listaIndex: state.listaIndex + 1 }
-    }
-    if (ofertasCount > 0) {
-      return { modo: 'cartel', listaIndex: 0, cartelIndex: 0 }
-    }
-    return { ...state, listaIndex: 0 }
-  }
-
-  // modo === 'cartel'
-  if (state.cartelIndex < ofertasCount - 1) {
-    return { ...state, cartelIndex: state.cartelIndex + 1 }
-  }
-  return { modo: 'tabla', listaIndex: 0, cartelIndex: 0 }
-}
-
-const ROTATION_INITIAL: RotationState = {
-  modo: 'tabla',
-  listaIndex: 0,
-  cartelIndex: 0,
-}
 
 interface PantallaRotativaProps {
   tenant: Tenant
@@ -115,15 +69,15 @@ export default function PantallaRotativa({
   // resetea cualquier acumulacion de memoria/listeners en el browser.
   const [{ modo, listaIndex, cartelIndex }, dispatchRotation] = useReducer(
     rotationReducer,
-    ROTATION_INITIAL,
-    (initial) =>
+    undefined,
+    () =>
       modoFijo
         ? {
             modo: modoFijo,
             listaIndex: modoFijo === 'tabla' ? indiceFijo : 0,
             cartelIndex: modoFijo === 'cartel' ? indiceFijo : 0,
           }
-        : initial,
+        : estadoInicialRotacion(listas.length, ofertas.length),
   )
 
   const segundosCartel = configRemota.segundosCartel ?? tenant.defaults.segundosCartel

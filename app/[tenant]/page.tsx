@@ -1,4 +1,5 @@
 import PantallaRotativa from '@/components/PantallaRotativa'
+import { filtrarPorRubro, parseRubrosParam } from '@/lib/rubros'
 import { getPantallaData } from '@/lib/sheets'
 import { getTenantOr404, type TenantParams } from '@/lib/tenant-route'
 
@@ -8,9 +9,19 @@ import { getTenantOr404, type TenantParams } from '@/lib/tenant-route'
 // docs/decisiones.md (sesion 19).
 export const dynamic = 'force-dynamic'
 
-export default async function PantallaTenant({ params }: { params: TenantParams }) {
+export default async function PantallaTenant({
+  params,
+  searchParams,
+}: {
+  params: TenantParams
+  searchParams: Promise<{ rubro?: string | string[] }>
+}) {
   const tenant = await getTenantOr404(params)
-  const { listas, ofertas, configRemota } = await getPantallaData(tenant)
+  const { rubro } = await searchParams
+  const { listas, ofertas, configRemota } = filtrarPorRubro(
+    await getPantallaData(tenant),
+    parseRubrosParam(rubro),
+  )
 
   return (
     <PantallaRotativa

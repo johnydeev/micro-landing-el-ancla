@@ -118,7 +118,7 @@ components/          PantallaRotativa (rotación, reload, watchdog), Header, Foo
 lib/                 lectura y parseo de los CSV, URLs de Cloudinary, helpers del alta; todo testeado
 scripts/             `npm run alta`: alta de cliente desde la terminal
 types/               tipos compartidos (Oferta, Tenant, …)
-docs/                bitácora de implementación, decisiones técnicas, specs y planes
+docs/                bitácora de implementación, decisiones técnicas, specs, planes y el pitch de venta
 .github/workflows/   CI
 ```
 
@@ -244,11 +244,21 @@ que ya estaba desplegado. Para que salga un cambio del repo hay que pushear.
 
 En producción desde mayo de 2026 con Granja El Ancla, corriendo todos los días en el local. Desde octubre de 2026 el mismo deploy sirve también el comercio de muestra en `/demo`.
 
+**Lo que falta no es técnico: es vender.** El producto está listo para ofrecer —
+hay un caso real andando, un demo publicado y el alta de un cliente nuevo es un
+checklist de 20 minutos. El material para ofrecerlo está en
+[`docs/pitch-venta.md`](docs/pitch-venta.md).
+
 Pendientes conocidos:
 
-- Validar el watchdog en el navegador Silk real del Fire TV (hoy probado en Chrome de escritorio).
+- Validar el watchdog en el navegador Silk real del Fire TV (hoy probado en Chrome de escritorio). Es lo único que nunca se probó en el hardware de verdad.
 - Medir la latencia de publicación del CSV de Google (`/pub`) si el cliente nota demora al actualizar precios.
 - Dominio genérico: todo vive bajo `precios-el-ancla.vercel.app`, que es el nombre del primer cliente. Se agrega uno nuevo en Vercel → Domains cuando entre el primer cliente pago, **sin borrar el viejo** (la TV de El Ancla apunta ahí).
+- Limpiezas del alta del demo, opcionales: borrar `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y renombrar el logo a `logos/demo` (hoy sigue como `logos/carniceria-san-martin`; funciona igual).
+
+Lo que probablemente aparezca cuando haya clientes: más plantillas de cartel
+(hoy hay una sola, y es el diferencial visual más barato de construir) y fotos
+de otros rubros en el catálogo, si se vende a almacén o verdulería.
 
 ---
 

@@ -4,6 +4,12 @@ export interface Producto {
   nombre: string
   precio: string
   unidad: string
+  /**
+   * Rubro normalizado (ej. "vacuno", "cerdo") desde la columna
+   * "Categoria"/"Rubro" de la lista. undefined si la lista no tiene esa
+   * columna o la celda esta vacia. Ver lib/rubros.ts.
+   */
+  rubro?: string
 }
 
 export interface ListaPrecios {
@@ -20,7 +26,7 @@ export interface Oferta {
    * Tamano de la imagen dentro del cartel, en escala 1-10.
    * 1 = 55% del wrapper (mas chica), 10 = 120% (excede el wrapper).
    * 6 (=91%) es el default y se aplica si la columna falta o el valor
-   * no es valido. Parseo en lib/sheets.ts -> parseTamanoOferta, mapeo a
+   * no es valido. Parseo en lib/planilla.ts -> parseTamanoOferta, mapeo a
    * porcentaje en components/PantallaRotativa.tsx -> TAMANO_OFERTA_A_ESCALA.
    */
   tamano: number
@@ -30,16 +36,22 @@ export interface Oferta {
    * un badge debajo de "SUPER OFERTA". Columna opcional en el Sheets
    * (alias aceptados: descripcion, aclaracion, condicion, detalle, nota) —
    * si falta o esta vacia, el badge no se muestra. Parseo en
-   * lib/sheets.ts -> findOfertasTableOffsets / mapRowToOfertas.
+   * lib/planilla.ts -> findOfertasTableOffsets / mapRowToOfertas.
    */
   descripcion: string
   /**
    * Plantilla de cartel elegida por el cliente para ESTA oferta, desde la
    * columna opcional "plantilla" del Sheets (desplegable). undefined = usar
-   * tenant.plantillaCartelDefault. Parseo en lib/sheets.ts ->
+   * tenant.plantillaCartelDefault. Parseo en lib/planilla.ts ->
    * findOfertasTableOffsets / mapRowToOfertas; ids en lib/plantillas.ts.
    */
   plantilla?: PlantillaCartelId
+  /**
+   * Rubro normalizado del bloque de ofertas, tomado del super-header
+   * arriba del bloque (ej. "RES" -> "vacuno"). undefined si el bloque no
+   * tiene titulo. Ver lib/rubros.ts.
+   */
+  rubro?: string
 }
 
 export interface ConfigNegocio {

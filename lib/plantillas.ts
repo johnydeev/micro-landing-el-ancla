@@ -2,7 +2,7 @@
  * Ids de las plantillas de cartel de oferta.
  *
  * Viven aca (y no en templates/index.ts) a proposito: este modulo no importa
- * React ni componentes .tsx, asi que lo pueden usar lib/sheets.ts (server) y
+ * React ni componentes .tsx, asi que lo pueden usar lib/planilla.ts (parser) y
  * los tests de `node --test` (que no compilan JSX). templates/index.ts se
  * tipa contra PlantillaCartelId, asi que agregar un id aca sin agregar el
  * componente al catalogo no compila.

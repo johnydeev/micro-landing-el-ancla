@@ -5,6 +5,46 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 23 — 2026-10-05 (rubro por pantalla)
+
+**Context**: modelo comercial "abono por pantalla". Para que la segunda y
+tercera tele de un local tengan sentido, cada una puede mostrar solo su
+rubro. Spec: `docs/superpowers/specs/2026-10-05-rubro-por-pantalla-design.md`.
+Plan: `docs/superpowers/plans/2026-10-05-rubro-por-pantalla.md`. Además se
+armó material de venta: `docs/guion-reunion.md` y `docs/guion-reunion.pdf`.
+
+**Added**
+- **`?rubro=` en la pantalla** (`/`, `/<slug>`, `vistaCartel`, `vistaLista`):
+  `?rubro=cerdo` muestra solo las ofertas del bloque CERDO y los productos
+  con Categoria CERDO; `?rubro=cerdo,pollo` une rubros. Sin param, todo como
+  antes. RES y VACUNO son el mismo rubro.
+- **`lib/rubros.ts`** (+ tests): normalización, parseo del link y filtro.
+- **`lib/rotacion.ts`** (+ tests): el reducer de rotación sale de
+  `PantallaRotativa.tsx`.
+- Campo `rubro` en `/api/<slug>/productos` y `/ofertas` (aditivo).
+- **`lib/planilla.ts`** (+ 16 tests): toda la interpretación del CSV (listas,
+  ofertas, configuración) sale de `lib/sheets.ts`, que queda solo con URLs,
+  fetch y manejo de errores. Antes el lector de la planilla no tenía tests
+  porque `server-only` y los imports `@/` no corren en `node --test`. Los
+  fixtures copian la forma del CSV real de El Ancla. Verificado que los
+  tests fallan si se rompe el filtro de INACTIVO o la lectura de Categoria.
+
+**Changed**
+- Rotación: si no hay listas pero sí ofertas, la pantalla se queda en modo
+  cartel en vez de pasar por la tabla vacía.
+- `quitarAcentos` se mueve de `lib/sheets.ts` a `lib/rubros.ts`.
+
+**Validation**
+- `tsc --noEmit` ✓, `npm run lint` ✓, `npm test` 60/60 ✓, `npm run build` ✓.
+- Contra `npm start`: `/api/<slug>/productos|ofertas|config` de
+  `granja-elancla` y `demo` idénticos a producción (sacando el campo nuevo
+  `rubro`). Filtros `?rubro=` verificados con datos reales.
+
+**Notas operativas**
+- La planilla de El Ancla ya funciona sin cambios. En la del demo, cerdo y
+  pollo figuran como GRANJA en Categoria: corregir a CERDO / POLLO. En la
+  planilla modelo, renombrar los títulos `RUBRO 1/2/3` de ofertas.
+
 ### Sesión 22 — 2026-10-01 (primer alta real: tenant `demo`, y precios alineados por el `$`)
 
 **Context**: dos cosas. Primero, dar de alta un segundo comercio para mostrarle
@@ -37,6 +77,23 @@ Segundo, un pedido del cliente sobre la alineación de la columna de precios.
 - **`docs/decisiones.md`**: nota nueva en el ADR de Cloudinary sobre dos efectos
   de `d_placeholder` (ver abajo).
 
+**Fixed — la miniatura al compartir el link mostraba el logo equivocado**
+- Al mandar por WhatsApp el link de un comercio, la vista previa salía con el
+  logo de **otro**: `app/icon.png` y `app/apple-icon.png` eran el logo de El
+  Ancla (sesión 17) y viven en la raíz del sitio, o sea que valen para todas las
+  rutas. Cuando no hay imagen de Open Graph, WhatsApp cae al `apple-touch-icon`.
+- Los dos archivos se **eliminaron** del repo.
+- **`lib/cloudinary.ts` → `urlOg()`**: imagen 1200×630 con el logo centrado
+  sobre blanco, que es lo que esperan WhatsApp y las redes.
+- **`app/[tenant]/layout.tsx`**: cada comercio emite su propio `og:image` y su
+  favicon. Si el tenant no tiene logo, no se emite ninguna etiqueta — no hereda
+  la de otro.
+- Resultado verificado en producción: `/demo` muestra el logo de San Martín,
+  `/granja-elancla` el suyo, y `/` **no muestra ninguno** (pedido del dueño:
+  que el link genérico no tenga marca por ahora).
+- Nota operativa: WhatsApp cachea las previews por URL. Para forzar que relea
+  una ya compartida, mandar el link con un parámetro cualquiera (`?v=2`).
+
 **Aprendido sobre Cloudinary** (de la sesión del catálogo, verificado acá)
 - Un slug **borrado puede seguir viéndose bien**: el CDN sirve la copia vieja.
   `pechito-x2` devolvió 200 con sus 129.074 bytes originales horas después de
@@ -49,7 +106,7 @@ Segundo, un pedido del cliente sobre la alineación de la columna de precios.
   catálogo hay un `npm run verificar` para eso.
 
 **Validation**
-- `tsc --noEmit` ✓, `npm run lint` ✓, `npm test` 26/26 ✓, `npm run build` ✓.
+- `tsc --noEmit` ✓, `npm run lint` ✓, `npm test` 27/27 ✓, `npm run build` ✓.
 - Local contra `npm start`: `/demo` 200 con 15 ofertas,
   `/carniceria-san-martin` 404 tras el rename, `/granja-elancla` y `/` 200.
 - Producción verificada: `/demo` sirve nombre, logo y ofertas; el CSS

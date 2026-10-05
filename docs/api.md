@@ -46,14 +46,14 @@ del Sheets.
   {
     "titulo": "POLLO",
     "productos": [
-      { "nombre": "Pollo entero", "precio": "3500", "unidad": "kg" },
-      { "nombre": "Pechuga", "precio": "5200", "unidad": "kg" }
+      { "nombre": "Pollo entero", "precio": "3500", "unidad": "kg", "rubro": "pollo" },
+      { "nombre": "Pechuga", "precio": "5200", "unidad": "kg", "rubro": "pollo" }
     ]
   },
   {
     "titulo": "CERDO",
     "productos": [
-      { "nombre": "Bondiola", "precio": "6800", "unidad": "kg" }
+      { "nombre": "Bondiola", "precio": "6800", "unidad": "kg", "rubro": "cerdo" }
     ]
   }
 ]
@@ -70,6 +70,12 @@ del Sheets.
   convención aplicada por la pantalla principal.
 - Se soportan múltiples listas por hoja, detectadas por bloques de
   encabezado repetidos.
+- `rubro` sale de la columna `Categoria` (o `Rubro`) ubicada justo a la
+  izquierda de `Nombre`. Se normaliza (minúsculas, sin acentos) y `RES`
+  se convierte en `vacuno`. Si la lista no tiene esa columna o la celda
+  está vacía, la clave **se omite**. La API no filtra por rubro: el
+  filtro `?rubro=` es solo de la pantalla (ver
+  `docs/superpowers/specs/2026-10-05-rubro-por-pantalla-design.md`).
 
 ### `GET /api/<tenant>/ofertas`
 
@@ -87,7 +93,8 @@ tenant.sheets.gidOfertas`.
     "estado": "ACTIVO",
     "tamano": 3,
     "descripcion": "Solo efectivo",
-    "plantilla": "clasico"
+    "plantilla": "clasico",
+    "rubro": "vacuno"
   }
 ]
 ```
@@ -96,6 +103,9 @@ tenant.sheets.gidOfertas`.
 
 - Solo se devuelven ofertas con `estado === "ACTIVO"`. Las
   `"INACTIVO"` se filtran en el servidor.
+- `rubro` es el título del bloque de ofertas (la celda de arriba del
+  header `titulo`, ej. `RES` / `CERDO` / `POLLO`), normalizado igual que
+  en productos. Si el bloque no tiene título, la clave **se omite**.
 - `imagen` es el **id de la imagen en el catálogo de Cloudinary**
   (`catalogo-comun/<slug>`), compartido por todos los comercios. La pantalla lo
   usa como `https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo-comun/<slug>`.
@@ -176,7 +186,7 @@ tenant.sheets.gidConfig`.
   ignora como cualquier clave desconocida.
 - Las claves se aceptan con varias variantes (mayúsculas, con
   acentos, sinónimos en español). Ver `CONFIG_ALIASES` en
-  `lib/sheets.ts`.
+  `lib/planilla.ts`.
 - Si falta `TENANT_<SLUG>_CSV_URL` o `tenant.sheets.gidConfig`, devuelve
   `{}`.
 

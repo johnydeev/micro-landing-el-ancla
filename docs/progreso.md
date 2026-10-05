@@ -150,11 +150,17 @@ imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
     centrada y el ancho del número y de la unidad movían cada fila. Se probó
     primero alineando a la derecha; el cliente pidió lo contrario. Medido sobre
     píxeles: dispersión 0 px en los dos comercios.
+  - **Vista previa al compartir el link, por comercio**: `app/icon.png` y
+    `app/apple-icon.png` eran el logo de El Ancla y, al ser globales, WhatsApp
+    los usaba como miniatura en el link de cualquier otro comercio. Se
+    eliminaron; ahora cada tenant emite su `og:image` (nuevo `urlOg()`, 1200×630)
+    y su favicon desde `app/[tenant]/layout.tsx`. `/` queda sin logo a pedido
+    del dueño.
   - **Documentadas dos trampas de Cloudinary** en `docs/decisiones.md`: el CDN
     puede seguir sirviendo un asset borrado, y cada slug mal escrito deja un
     registro fantasma por `d_placeholder`. Verificar con la Admin API, no con
     la URL.
-  - Validación: `tsc` ✓, lint ✓, 26 tests ✓, build ✓, y producción verificada
+  - Validación: `tsc` ✓, lint ✓, 27 tests ✓, build ✓, y producción verificada
     (`/demo`, `/granja-elancla` y `/` en 200).
   - Aprendizajes operativos: la variable de entorno va **antes** del push
     cuando cambia un slug; un Redeploy de Vercel no trae código nuevo; y
@@ -829,6 +835,12 @@ listo para vender en su estado actual.
 - **Limpieza del alta del demo** (opcional): borrar
   `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y renombrar el logo a
   `logos/demo` (hoy sigue como `logos/carniceria-san-martin`; funciona igual).
+- **Dominio genérico**: todo cuelga de `precios-el-ancla.vercel.app`, el nombre
+  del primer cliente. Se agrega otro en Vercel → Domains cuando entre el primer
+  cliente pago, sin borrar el viejo (la TV de El Ancla apunta ahí).
+- **No hay trabajo técnico bloqueante.** Lo que falta es vender: el pitch está
+  en `docs/pitch-venta.md`. Lo que aparezca después va a venir pedido por un
+  cliente real — probablemente más plantillas de cartel y fotos de otros rubros.
 
 - **Dominio genérico `.vercel.app`** para los próximos clientes (hoy todo
   vive en `precios-el-ancla.vercel.app`, que sigue funcionando). Se agrega
