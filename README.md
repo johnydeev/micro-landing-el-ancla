@@ -2,7 +2,7 @@
 
 Cartelería digital para comercios de barrio: una pantalla que rota entre la lista de precios y los carteles de ofertas, corriendo 24/7 en un Fire TV colgado en el local. Un solo deploy sirve a varios comercios, cada uno en su propia URL, con su paleta, sus textos y su planilla.
 
-**[Ver la pantalla en vivo →](https://precios-el-ancla.vercel.app/)** (Granja El Ancla, el primer cliente) · **[Demo →](https://precios-el-ancla.vercel.app/demo)** (comercio ficticio, para mostrar el producto)
+**[Ver la pantalla en vivo →](https://tv-precios.vercel.app/granja-elancla)** (Granja El Ancla, el primer cliente) · **[Demo →](https://tv-precios.vercel.app/demo)** (comercio ficticio, para mostrar el producto)
 
 ![Pantalla de precios: tabla de precios y cartel de oferta](docs/img/pantalla.png)
 
@@ -61,7 +61,7 @@ Un kiosko que corre días enteros en hardware limitado termina congelándose: el
 
 La primera versión detectaba el freeze desde el propio main thread. No servía: **cualquier mecanismo en el main thread es inútil si el thread está muerto.**
 
-La solución fue mover el watchdog al Service Worker, que corre en otro thread. Si deja de recibir señales de vida de la página, fuerza la recarga desde afuera. A eso se suma un reload preventivo cada 30 minutos que limpia memoria y listeners acumulados.
+La solución fue mover el watchdog al Service Worker, que corre en otro thread. Si deja de recibir señales de vida de la página, fuerza la recarga desde afuera. A eso se suma un reload preventivo cada 5 minutos que trae precios frescos y limpia memoria y listeners acumulados.
 
 ### 2. Polling eliminado: −99,4% de requests
 
@@ -79,7 +79,7 @@ La pantalla usaba ISR (`revalidate = 60`) hasta que apareció la pregunta que im
 
 Hoy corre con `export const dynamic = 'force-dynamic'` y los fetch en `cache: 'no-store'` con parámetro anti-cache. Cada recarga trae precios frescos.
 
-**Trade-off aceptado y documentado:** sin ISR no hay última-versión-buena. Si Google Sheets falla, los lectores devuelven `[]` y la pantalla muestra el empty state hasta la próxima recarga (hasta 30 minutos). Se evaluó un fallback en `localStorage` y el cliente lo descartó: para este caso de uso, mostrar un precio viejo es peor que no mostrar nada.
+**Trade-off aceptado y documentado:** sin ISR no hay última-versión-buena. Si Google Sheets falla, los lectores devuelven `[]` y la pantalla muestra el empty state hasta la próxima recarga (hasta 5 minutos). Se evaluó un fallback en `localStorage` y el cliente lo descartó: para este caso de uso, mostrar un precio viejo es peor que no mostrar nada.
 
 ### 5. Multitenant por path, sin SaaS
 
@@ -225,7 +225,7 @@ editable a mano.
 ### 6. Commit y push
 
 **Fuera del horario de atención de los comercios que ya están en producción**:
-el push redeploya para todos, y sus pantallas recargan dentro de los 30 minutos.
+el push redeploya para todos, y sus pantallas recargan dentro de los 5 minutos.
 Son 1-2 segundos de interrupción, pero mejor evitarlos con público en el local.
 
 Después del deploy, verificar `<dominio>/<slug>`. Si no ves el cambio en tu
@@ -253,7 +253,7 @@ Pendientes conocidos:
 
 - Validar el watchdog en el navegador Silk real del Fire TV (hoy probado en Chrome de escritorio). Es lo único que nunca se probó en el hardware de verdad.
 - Medir la latencia de publicación del CSV de Google (`/pub`) si el cliente nota demora al actualizar precios.
-- Dominio genérico: todo vive bajo `precios-el-ancla.vercel.app`, que es el nombre del primer cliente. Se agrega uno nuevo en Vercel → Domains cuando entre el primer cliente pago, **sin borrar el viejo** (la TV de El Ancla apunta ahí).
+- Dominio: el genérico es `tv-precios.vercel.app` (agregado el 05/10/2026). `precios-el-ancla.vercel.app` sigue activo hasta que la TV de El Ancla pase al nuevo; no borrarlo antes.
 - Limpiezas del alta del demo, opcionales: borrar `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y renombrar el logo a `logos/demo` (hoy sigue como `logos/carniceria-san-martin`; funciona igual).
 
 Lo que probablemente aparezca cuando haya clientes: más plantillas de cartel

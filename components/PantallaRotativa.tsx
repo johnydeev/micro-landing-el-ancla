@@ -21,12 +21,18 @@ import styles from '@/app/page.module.css'
  * cualquier acumulacion de memoria/estado del browser — funciona como
  * PREVENCION del freeze del Stick TV.
  *
- * 30 min (bajado de 1h en sesion 11) reduce la ventana de exposicion
- * al freeze. Como esto corre en el main thread, no es recovery: si el
+ * 5 min (sesion 23; antes 30 min, y 1h hasta sesion 11): un precio
+ * corregido en la planilla llega a la TV en ~10 min como maximo (4-5 min
+ * de publicacion de Google + hasta 5 de espera), y achica todavia mas la
+ * ventana de exposicion al freeze. No se baja de 5: cada reload reinicia
+ * la rotacion desde la primera lista, y una vuelta completa en El Ancla
+ * (6 listas x 10s + 19 ofertas x 8s) dura ~3,5 min; con menos, las
+ * ofertas del final no llegarian a mostrarse. Costo: ~290 reloads/dia por
+ * pantalla, 3 fetch a Google cada uno. Como esto corre en el main thread, no es recovery: si el
  * thread ya esta muerto, el setInterval no se ejecuta. Para esos casos
  * tenemos el watchdog en el Service Worker (ver sendHeartbeat abajo).
  */
-const RELOAD_INTERVAL_MS = 30 * 60 * 1000
+const RELOAD_INTERVAL_MS = 5 * 60 * 1000
 
 /*
  * Cada cuanto el main thread le manda un heartbeat al SW. El SW tiene
@@ -83,7 +89,7 @@ export default function PantallaRotativa({
   const segundosCartel = configRemota.segundosCartel ?? tenant.defaults.segundosCartel
   const segundosTabla = configRemota.segundosTabla ?? tenant.defaults.segundosTabla
 
-  // Reload completo periodico (cada RELOAD_INTERVAL_MS = 30 min).
+  // Reload completo periodico (cada RELOAD_INTERVAL_MS = 5 min).
   // Refresca datos via SSR y resetea cualquier acumulacion del browser.
   // PREVENCION del freeze — si el main thread ya esta muerto, no corre.
   // Para recovery cuando el main thread muere, el watchdog del SW

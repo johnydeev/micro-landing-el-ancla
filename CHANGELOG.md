@@ -33,6 +33,28 @@ armó material de venta: `docs/guion-reunion.md` y `docs/guion-reunion.pdf`.
 - Rotación: si no hay listas pero sí ofertas, la pantalla se queda en modo
   cartel en vez de pasar por la tabla vacía.
 - `quitarAcentos` se mueve de `lib/sheets.ts` a `lib/rubros.ts`.
+- **Reload de la pantalla: 30 min → 5 min** (`RELOAD_INTERVAL_MS`). Un precio
+  corregido llega a la TV en ~10 min como máximo (4-5 de publicación de
+  Google + hasta 5 de espera). Se pidió 1 min y se descartó: cada reload
+  reinicia la rotación, y la vuelta completa de El Ancla dura ~3,5 min
+  (6 listas × 10 s + 19 ofertas × 8 s), así que las ofertas no habrían
+  llegado a mostrarse. ~290 reloads/día por pantalla.
+- **Títulos de ofertas libres** (planilla, fuera del repo): `titulo` deja de
+  ser un desplegable atado a `Precios`; `slug imagen` pasa a elegirse de un
+  desplegable del catálogo en vez de calcularse con `BUSCARV`. La app no
+  cambia: nunca validó el título. Actualizados
+  `planilla-modelo/INSTRUCCIONES.md` y `2-ofertas.tsv` (modelo y demo); en
+  el modelo, los títulos de bloque `RUBRO 1/2/3` pasan a VACUNO/CERDO/POLLO.
+- **Filas de la lista de precios más justas** (`.priceValue`,
+  `line-height: 1.5 → 1.35`). En el navegador del Fire TV (960×540) una
+  lista de 7 productos se pasaba 17,7 px y el footer tapaba la mitad del
+  último producto (visto en la TV del demo). Ahora sobran 14,8 px en las 12
+  listas (demo y El Ancla); 1280×720: 22 px, 1366×768: 24 px, 1920×1080:
+  151 px. Ninguna letra cambia de tamaño. Límite conocido: si el navegador
+  no está en pantalla completa y le come alto (ej. 960×500) se vuelve a pasar,
+  porque las letras escalan con el ancho y no con el alto.
+- Dominio genérico **`tv-precios.vercel.app`** agregado en Vercel;
+  `precios-el-ancla.vercel.app` sigue activo hasta pasar la TV de El Ancla.
 
 **Validation**
 - `tsc --noEmit` ✓, `npm run lint` ✓, `npm test` 60/60 ✓, `npm run build` ✓.

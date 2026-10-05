@@ -149,6 +149,14 @@
   );
   font-weight: 700;
   color: var(--c-primario);
+  /*
+   * El precio es la letra mas grande de la fila, asi que su line-height
+   * define el alto de cada fila. Con el 1.5 heredado, en el navegador del
+   * Fire TV (960x540) la fila de 7 productos se pasaba ~18px y el footer
+   * tapaba la mitad del ultimo producto. 1.35 deja ~14px de aire a esa
+   * resolucion (medido) sin achicar ninguna letra.
+   */
+  line-height: 1.35;
 }
 
 .unitValue {

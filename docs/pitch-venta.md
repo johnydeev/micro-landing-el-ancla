@@ -21,7 +21,7 @@ dice y lo que no.
 >
 > Sin computadora. Un Fire TV de los baratos y la tele que ya tenés.
 >
-> Mirá: https://precios-el-ancla.vercel.app/demo
+> Mirá: https://tv-precios.vercel.app/demo
 >
 > Ya está andando todos los días en Granja El Ancla, Florencio Varela.
 
@@ -58,13 +58,13 @@ dice y lo que no.
 
 | Para qué | URL |
 |---|---|
-| Demo para mostrar | https://precios-el-ancla.vercel.app/demo |
-| Cliente real | https://precios-el-ancla.vercel.app/granja-elancla |
+| Demo para mostrar | https://tv-precios.vercel.app/demo |
+| Cliente real | https://tv-precios.vercel.app/granja-elancla |
 
 El demo es un comercio ficticio ("Carnicería San Martín") que reusa el catálogo
 de imágenes compartido. Ver `tenants/demo.ts`.
 
-**Ojo con el dominio**: hoy todo cuelga de `precios-el-ancla.vercel.app`, que es
-el nombre del primer cliente. Para un prospecto queda raro. Cuando entre el
-primer cliente pago conviene agregar un dominio genérico en Vercel → Domains,
-**sin borrar el viejo** (la TV de El Ancla apunta ahí).
+**Dominio**: desde el 05/10/2026 el link genérico es `tv-precios.vercel.app`.
+El viejo `precios-el-ancla.vercel.app` sigue andando (mismo proyecto) hasta que
+la TV de El Ancla pase al nuevo; no borrarlo antes. `carteleria.vercel.app` es
+de otra persona: no usarlo.
