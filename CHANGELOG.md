@@ -53,6 +53,15 @@ armó material de venta: `docs/guion-reunion.md` y `docs/guion-reunion.pdf`.
   151 px. Ninguna letra cambia de tamaño. Límite conocido: si el navegador
   no está en pantalla completa y le come alto (ej. 960×500) se vuelve a pasar,
   porque las letras escalan con el ancho y no con el alto.
+- **Fotos de ofertas y logo se refrescan una vez por día**
+  (`versionDelDia` en `lib/cloudinary.ts`, + 3 tests). Cloudinary manda las
+  imágenes con caché de 30 días: al reemplazar `costillar` por una versión
+  sin fondo con el mismo nombre, la PC seguía mostrando la vieja aunque
+  Cloudinary ya entregaba la nueva (verificado en webp, png y con Accept de
+  Chrome). Ahora la URL lleva `v<AAAAMMDD>` (fecha de Argentina); Cloudinary
+  acepta cualquier versión y sirve la actual. Una foto reemplazada aparece
+  sola en menos de 24 h. `suppressHydrationWarning` en los `<img>` por si el
+  server y la TV cruzan la medianoche entre render e hidratación.
 - Dominio genérico **`tv-precios.vercel.app`** agregado en Vercel;
   `precios-el-ancla.vercel.app` sigue activo hasta pasar la TV de El Ancla.
 

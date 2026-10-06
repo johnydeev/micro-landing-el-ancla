@@ -31,6 +31,28 @@ export function urlImagen(publicId: string, transformaciones: string): string {
 }
 
 /*
+ * Version del dia para la URL (`v20261006`), con la fecha de Argentina.
+ *
+ * Cloudinary manda las imagenes con `max-age=2592000` (30 dias). Si el
+ * usuario reemplaza una foto en Cloudinary con el MISMO nombre, la URL no
+ * cambia y la TV (o la PC) sigue mostrando la copia vieja hasta 30 dias
+ * (paso con el costillar sin fondo, 06/10/2026). Cloudinary acepta cualquier
+ * `v<numero>` en la URL y entrega la version actual (verificado), asi que
+ * meter la fecha hace que cada dia sea una URL nueva: una foto reemplazada
+ * aparece sola en menos de 24 h. Costo: las fotos se bajan de nuevo una vez
+ * por dia (~150 KB cada una).
+ */
+export function versionDelDia(fecha: Date = new Date()): string {
+  const dia = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fecha)
+  return `v${dia.replaceAll('-', '')}`
+}
+
+/*
  * Imagen de una oferta. `slug` es lo que el cliente escribe en la columna
  * "slug imagen" de su planilla (ej. "asado-de-tira"), sin carpeta ni
  * extension. El catalogo es plano (`catalogo-comun/<slug>`); el rubro va
@@ -38,13 +60,19 @@ export function urlImagen(publicId: string, transformaciones: string): string {
  * existe en Cloudinary, sirve la imagen `placeholder.png` de la raiz del
  * cloud en vez de 404.
  */
-export function urlOferta(slug: string): string {
-  return urlImagen(`${carpetaCatalogo()}/${slug}`, 'f_auto,q_auto,w_1200,d_placeholder.png')
+export function urlOferta(slug: string, fecha: Date = new Date()): string {
+  return urlImagen(
+    `${versionDelDia(fecha)}/${carpetaCatalogo()}/${slug}`,
+    'f_auto,q_auto,w_1200,d_placeholder.png',
+  )
 }
 
-/* Logo del header. Se ve a lo sumo a ~100px de alto: 400px de ancho sobra. */
-export function urlLogo(publicId: string): string {
-  return urlImagen(publicId, 'f_auto,q_auto,w_400')
+/*
+ * Logo del header. Se ve a lo sumo a ~100px de alto: 400px de ancho sobra.
+ * Lleva la version del dia por el mismo motivo que las ofertas.
+ */
+export function urlLogo(publicId: string, fecha: Date = new Date()): string {
+  return urlImagen(`${versionDelDia(fecha)}/${publicId}`, 'f_auto,q_auto,w_400')
 }
 
 /*

@@ -34,7 +34,9 @@ function Header({ tenant }: HeaderProps) {
               flexShrink: 0,
             }}
           >
+            {/* suppressHydrationWarning: misma razon que en el cartel (URL con fecha del dia). */}
             <img
+              suppressHydrationWarning
               src={urlLogo(tenant.logo)}
               alt={tenant.nombre}
               width={100}

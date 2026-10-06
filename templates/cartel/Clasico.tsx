@@ -104,7 +104,12 @@ export default function CartelClasico({ oferta, textos }: CartelProps) {
           {/* crossOrigin: la respuesta de Cloudinary llega como CORS (no
               opaca) y el Service Worker la puede cachear sin el padding de
               cuota que Chrome aplica a respuestas opacas. */}
+          {/* suppressHydrationWarning: la URL lleva la fecha del dia
+              (versionDelDia); si el server renderiza a las 23:59:59 y la TV
+              hidrata a las 00:00:00, las fechas difieren. Cualquiera de las
+              dos URLs sirve. */}
           <img
+            suppressHydrationWarning
             src={urlOferta(slug)}
             alt={oferta.nombre}
             width={800}

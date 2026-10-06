@@ -1,7 +1,10 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { urlImagen, urlOferta, urlLogo, urlIcono, urlOg } from './cloudinary.ts'
+import { urlImagen, urlOferta, urlLogo, urlIcono, urlOg, versionDelDia } from './cloudinary.ts'
+
+// 06/10/2026 00:30 en Argentina (UTC-3).
+const DIA = new Date('2026-10-06T03:30:00Z')
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'demo-cloud'
@@ -15,17 +18,29 @@ test('urlImagen arma la URL base de Cloudinary con transformaciones', () => {
   )
 })
 
-test('urlOferta prefija la carpeta del catalogo y usa placeholder', () => {
+test('versionDelDia: fecha de Argentina como vAAAAMMDD', () => {
+  assert.equal(versionDelDia(DIA), 'v20261006')
+  // 23:30 del 05/10 en Argentina, aunque en UTC ya sea 06/10.
+  assert.equal(versionDelDia(new Date('2026-10-06T02:30:00Z')), 'v20261005')
+})
+
+test('urlOferta prefija version del dia y carpeta del catalogo, y usa placeholder', () => {
   assert.equal(
-    urlOferta('asado-de-tira'),
-    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/catalogo-comun/asado-de-tira',
+    urlOferta('asado-de-tira', DIA),
+    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/v20261006/catalogo-comun/asado-de-tira',
   )
+})
+
+test('urlOferta cambia de URL al cambiar el dia (fuerza a bajar la foto de nuevo)', () => {
+  const hoy = urlOferta('costillar', DIA)
+  const manana = urlOferta('costillar', new Date('2026-10-07T03:30:00Z'))
+  assert.notEqual(hoy, manana)
 })
 
 test('urlLogo comprime a 400px', () => {
   assert.equal(
-    urlLogo('logos/granja-elancla'),
-    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_400/logos/granja-elancla',
+    urlLogo('logos/granja-elancla', DIA),
+    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_400/v20261006/logos/granja-elancla',
   )
 })
 
