@@ -62,6 +62,14 @@ armó material de venta: `docs/guion-reunion.md` y `docs/guion-reunion.pdf`.
   acepta cualquier versión y sirve la actual. Una foto reemplazada aparece
   sola en menos de 24 h. `suppressHydrationWarning` en los `<img>` por si el
   server y la TV cruzan la medianoche entre render e hidratación.
+- **Primer cliente pago: `el-latigo`** (Frigorífico El Látigo), dado de alta
+  con `npm run alta`. 2 TVs: `?rubro=vacuno` y `?rubro=cerdo,pollo`. Paleta
+  amarilla y negra tomada de su flyer (amarillo de fondo de filas, negro en
+  barras y precios). Logo recortado en círculo con fondo transparente
+  (`micro-landing/clientes/el-latigo/`, fuera del repo).
+- **`.tableWrap` usa `var(--c-fondo)`** en vez de blanco fijo: con fondo de
+  color, el espacio libre debajo de la última fila ya no queda como franja
+  blanca. Sin cambio visual para los comercios con fondo blanco.
 - Dominio genérico **`tv-precios.vercel.app`** agregado en Vercel;
   `precios-el-ancla.vercel.app` sigue activo hasta pasar la TV de El Ancla.
 

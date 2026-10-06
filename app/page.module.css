@@ -43,7 +43,12 @@
 .tableWrap {
   flex: 1;
   overflow: hidden;
-  background: #fff;
+  /*
+   * Mismo color que las filas: el espacio libre debajo de la ultima fila
+   * (hasta ~150px en 1920x1080) no queda como una franja blanca cuando el
+   * comercio usa un fondo de color (El Latigo, amarillo).
+   */
+  background: var(--c-fondo, #fff);
 }
 
 .table {

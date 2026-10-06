@@ -3,6 +3,7 @@ import type { Tenant } from '@/types/tenant'
 // `node --test` (sin bundler), y Node ESM exige la extension. tsconfig tiene
 // allowImportingTsExtensions; Turbopack la resuelve igual.
 import { demo } from './demo.ts'
+import { elLatigo } from './el-latigo.ts'
 import { granjaElAncla } from './granja-elancla.ts'
 
 /*
@@ -15,6 +16,7 @@ import { granjaElAncla } from './granja-elancla.ts'
  */
 export const TENANTS: Record<string, Tenant> = {
   'demo': demo,
+  'el-latigo': elLatigo,
   'granja-elancla': granjaElAncla,
 }
 
