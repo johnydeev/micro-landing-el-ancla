@@ -67,6 +67,12 @@ armó material de venta: `docs/guion-reunion.md` y `docs/guion-reunion.pdf`.
   amarilla y negra tomada de su flyer (amarillo de fondo de filas, negro en
   barras y precios). Logo recortado en círculo con fondo transparente
   (`micro-landing/clientes/el-latigo/`, fuera del repo).
+- **Color de acento opcional en el cartel de oferta** (`paleta.acento` y
+  `paleta.textoAcento` en `types/tenant.ts`): pinta la banda diagonal y el
+  círculo del precio. Sin definir = secundario y texto blanco, como antes
+  (verificado: El Ancla y demo idénticos). El Látigo lo usa con su amarillo
+  y el precio en negro, porque su amarillo no puede ir de primario (lleva
+  texto blanco encima).
 - **`.tableWrap` usa `var(--c-fondo)`** en vez de blanco fijo: con fondo de
   color, el espacio libre debajo de la última fila ya no queda como franja
   blanca. Sin cambio visual para los comercios con fondo blanco.

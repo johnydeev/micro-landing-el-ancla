@@ -17,10 +17,12 @@ export const elLatigo: Tenant = {
   paleta: {
     primario: '#111111', // barras de arriba y abajo, precios, badge
     secundario: '#2A2A2A', // fondo del titulo de cada lista
-    fondo: '#F5D547', // filas (y texto del titulo de lista)
+    fondo: '#F9F908', // filas (y texto del titulo de lista), amarillo del logo
     textoPrimario: '#111111',
-    textoSecundario: '#4A3B12', // "por KG", marron oscuro
-    filaImpar: '#E9C62E',
+    textoSecundario: '#4A4A12', // "por KG", oliva oscuro
+    filaImpar: '#E3E300', // el mismo amarillo, un poco mas oscuro
+    acento: '#F9F908', // cartel de oferta: banda diagonal y circulo del precio (amarillo del logo)
+    textoAcento: '#111111',
   },
 
   tipografia: {

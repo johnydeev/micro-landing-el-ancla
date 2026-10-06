@@ -25,6 +25,14 @@ export interface Tenant {
     textoPrimario: string
     textoSecundario: string
     filaImpar: string
+    /**
+     * Opcional. Color de marca para el cartel de oferta: banda diagonal y
+     * circulo del precio. Sin definir = secundario (como antes). El Latigo:
+     * su amarillo, que no puede ir de primario porque lleva texto blanco.
+     */
+    acento?: string
+    /** Opcional. Texto sobre el acento (precio). Sin definir = blanco. */
+    textoAcento?: string
   }
   /** Escala en %: 100 = normal, 115 = 15% mas grande. */
   tipografia: {
