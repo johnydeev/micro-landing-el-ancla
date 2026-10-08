@@ -1,5 +1,6 @@
 import PantallaRotativa from '@/components/PantallaRotativa'
 import { filtrarPorRubro, parseRubrosParam } from '@/lib/rubros'
+import { claveGuardado } from '@/lib/ultimo-dato-bueno'
 import { getPantallaData } from '@/lib/sheets'
 import { getTenantOr404, type TenantParams } from '@/lib/tenant-route'
 
@@ -21,9 +22,10 @@ export default async function VistaCartel({
 }) {
   const tenant = await getTenantOr404(params)
   const { index, rubro } = await searchParams
-  const { listas, ofertas, configRemota } = filtrarPorRubro(
+  const rubros = parseRubrosParam(rubro)
+  const { listas, ofertas, configRemota, estado, generadoEn } = filtrarPorRubro(
     await getPantallaData(tenant),
-    parseRubrosParam(rubro),
+    rubros,
   )
 
   return (
@@ -32,6 +34,9 @@ export default async function VistaCartel({
       listas={listas}
       ofertas={ofertas}
       configRemota={configRemota}
+      estado={estado}
+      generadoEn={generadoEn}
+      claveGuardado={claveGuardado(tenant.slug, rubros)}
       modoFijo="cartel"
       indiceFijo={index ? Number(index) : 0}
     />

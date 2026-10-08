@@ -265,8 +265,13 @@ function mapRowToOfertas(columns: string[], headers: OfertasTableHeader[]): Ofer
   return ofertas
 }
 
-/** Listas de precios desde el CSV de la pestaña principal. */
-export function parsearListas(text: string): ListaPrecios[] {
+/*
+ * Listas de precios desde el CSV de la pestaña principal. `ok: false` solo
+ * si el CSV no tiene ninguna fila de encabezados (Nombre|Precio|Unidad):
+ * planilla rota o desacomodada. Una planilla bien armada sin productos es
+ * `ok: true` con `datos: []`. Ver lib/ultimo-dato-bueno.ts.
+ */
+export function leerListas(text: string): { datos: ListaPrecios[]; ok: boolean } {
   const rows = parseCsvRows(text)
 
   const headerBlocks: { headerRowIndex: number; offsets: number[] }[] = []
@@ -279,7 +284,7 @@ export function parsearListas(text: string): ListaPrecios[] {
 
   if (headerBlocks.length === 0) {
     console.error('No se encontró ninguna fila de encabezados en el CSV de productos')
-    return []
+    return { datos: [], ok: false }
   }
 
   const listas: ListaPrecios[] = []
@@ -321,7 +326,12 @@ export function parsearListas(text: string): ListaPrecios[] {
     listas.push(...blockListas)
   }
 
-  return listas.filter((l) => l.productos.length > 0)
+  return { datos: listas.filter((l) => l.productos.length > 0), ok: true }
+}
+
+/** Listas de precios (solo los datos). Ver leerListas. */
+export function parsearListas(text: string): ListaPrecios[] {
+  return leerListas(text).datos
 }
 
 /*
@@ -430,8 +440,11 @@ export function parsearConfig(text: string): ConfigNegocio {
   return config
 }
 
-/** Ofertas ACTIVAS desde el CSV de la pestaña de ofertas. */
-export function parsearOfertas(text: string): Oferta[] {
+/*
+ * Ofertas ACTIVAS desde el CSV de la pestaña de ofertas. `ok: false` solo
+ * si no se encontro la fila de encabezados (titulo|precio|slug imagen|estado).
+ */
+export function leerOfertas(text: string): { datos: Oferta[]; ok: boolean } {
   const rows = parseCsvRows(text)
 
   let headers: OfertasTableHeader[] = []
@@ -447,7 +460,7 @@ export function parsearOfertas(text: string): Oferta[] {
 
   if (headerRowIndex === -1) {
     console.error('No se encontró la fila de encabezados en el CSV de ofertas')
-    return []
+    return { datos: [], ok: false }
   }
 
   // El rubro de cada bloque es su super-header (fila de arriba del header).
@@ -457,8 +470,14 @@ export function parsearOfertas(text: string): Oferta[] {
     rubro: normalizarRubro(tituloDeBloque(superHeaderRow, header.offset, idx > 0 ? headers[idx - 1].offset : -1)),
   }))
 
-  return rows
+  const datos = rows
     .slice(headerRowIndex + 1)
     .flatMap((columns) => mapRowToOfertas(columns, headers))
     .filter((o) => o.estado === 'ACTIVO')
+  return { datos, ok: true }
+}
+
+/** Ofertas ACTIVAS (solo los datos). Ver leerOfertas. */
+export function parsearOfertas(text: string): Oferta[] {
+  return leerOfertas(text).datos
 }

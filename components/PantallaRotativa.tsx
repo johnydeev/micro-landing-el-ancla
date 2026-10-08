@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useReducer, type CSSProperties } from 'react'
+import { useEffect, useMemo, useReducer, useSyncExternalStore, type CSSProperties } from 'react'
 
 import DimOverlay from '@/components/DimOverlay'
 import Footer from '@/components/Footer'
@@ -9,7 +9,8 @@ import HealthIndicator from '@/components/HealthIndicator'
 import TablaClasica from '@/templates/tabla/Clasica'
 import { CATALOGO_CARTELES } from '@/templates'
 import { estadoInicialRotacion, rotationReducer } from '@/lib/rotacion'
-import type { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
+import { leerGuardado, resolver } from '@/lib/ultimo-dato-bueno'
+import type { ConfigNegocio, EstadoPantalla, ListaPrecios, Oferta } from '@/types'
 import type { Tenant } from '@/types/tenant'
 import styles from '@/app/page.module.css'
 
@@ -21,18 +22,20 @@ import styles from '@/app/page.module.css'
  * cualquier acumulacion de memoria/estado del browser — funciona como
  * PREVENCION del freeze del Stick TV.
  *
- * 5 min (sesion 23; antes 30 min, y 1h hasta sesion 11): un precio
- * corregido en la planilla llega a la TV en ~10 min como maximo (4-5 min
- * de publicacion de Google + hasta 5 de espera), y achica todavia mas la
- * ventana de exposicion al freeze. No se baja de 5: cada reload reinicia
- * la rotacion desde la primera lista, y una vuelta completa en El Ancla
- * (6 listas x 10s + 19 ofertas x 8s) dura ~3,5 min; con menos, las
- * ofertas del final no llegarian a mostrarse. Costo: ~290 reloads/dia por
- * pantalla, 3 fetch a Google cada uno. Como esto corre en el main thread, no es recovery: si el
- * thread ya esta muerto, el setInterval no se ejecuta. Para esos casos
+ * 10 min (sesion 24; 5 min en sesion 23, 30 min antes y 1h hasta sesion
+ * 11): la mitad de pedidos a Google que con 5 min (~145 reloads/dia por
+ * pantalla, 3 fetch cada uno), que es la dependencia sin limite publicado.
+ * Un precio corregido llega a la TV en ~15 min como maximo (4-5 de
+ * publicacion de Google + hasta 10 de espera). No se baja de ~5: cada
+ * reload reinicia la rotacion, y una vuelta completa en El Ancla dura
+ * ~3,5 min. Si Google falla, la TV muestra el ultimo dato bueno
+ * (lib/ultimo-dato-bueno.ts) y reintenta en cada reload.
+ *
+ * Como esto corre en el main thread, no es recovery: si el thread ya esta
+ * muerto, el setInterval no se ejecuta. Para esos casos
  * tenemos el watchdog en el Service Worker (ver sendHeartbeat abajo).
  */
-const RELOAD_INTERVAL_MS = 5 * 60 * 1000
+const RELOAD_INTERVAL_MS = 10 * 60 * 1000
 
 /*
  * Cada cuanto el main thread le manda un heartbeat al SW. El SW tiene
@@ -48,6 +51,12 @@ interface PantallaRotativaProps {
   listas: ListaPrecios[]
   ofertas: Oferta[]
   configRemota: ConfigNegocio
+  /** Estado de lectura de cada parte (lib/sheets.ts -> getPantallaData). */
+  estado: EstadoPantalla
+  /** Date.now() del server al armar la pagina. */
+  generadoEn: number
+  /** Clave de localStorage de esta TV (claveGuardado(slug, rubros)). */
+  claveGuardado: string
   /**
    * Modo desarrollador: si esta definido, la pantalla arranca fija en ese
    * modo y la rotacion NO corre (sin setInterval, sin reload periodico).
@@ -60,15 +69,74 @@ interface PantallaRotativaProps {
   indiceFijo?: number
 }
 
+/*
+ * localStorage via useSyncExternalStore: en SSR (y durante la hidratacion)
+ * no hay nada guardado (null); en el cliente se lee el string crudo. Un
+ * string es comparable por valor, asi que no hay loop de re-render. Sin
+ * suscripcion: solo esta TV escribe su clave. try/catch: si el storage esta
+ * bloqueado o falla, la pantalla sigue como si no hubiera nada guardado.
+ */
+function sinSuscripcion(): () => void {
+  return () => {}
+}
+
+function leerStorage(clave: string): string | null {
+  try {
+    return window.localStorage.getItem(clave)
+  } catch {
+    return null
+  }
+}
+
 export default function PantallaRotativa({
   tenant,
-  listas,
-  ofertas,
-  configRemota,
+  listas: listasRecibidas,
+  ofertas: ofertasRecibidas,
+  configRemota: configRecibida,
+  estado,
+  generadoEn,
+  claveGuardado,
   modoFijo,
   indiceFijo = 0,
 }: PantallaRotativaProps) {
-  // Los datos vienen DIRECTO de props del Server Component. No hay polling
+  // Ultimo dato bueno: si alguna parte llego con `error`, se muestra lo
+  // guardado en esta TV (hasta 2 h). Ver lib/ultimo-dato-bueno.ts.
+  // `undefined` = todavia no se leyo (SSR y render de hidratacion);
+  // `null` = se leyo y no hay nada guardado. La distincion importa para la
+  // escritura: ver el effect de abajo.
+  const crudo = useSyncExternalStore<string | null | undefined>(
+    sinSuscripcion,
+    () => leerStorage(claveGuardado),
+    () => undefined,
+  )
+  const { mostrar, guardar, usandoGuardado } = useMemo(
+    () =>
+      resolver(
+        { listas: listasRecibidas, ofertas: ofertasRecibidas, configRemota: configRecibida, estado, generadoEn },
+        leerGuardado(crudo ?? null),
+      ),
+    [listasRecibidas, ofertasRecibidas, configRecibida, estado, generadoEn, crudo],
+  )
+  const { listas, ofertas, configRemota } = mostrar
+
+  // Escritura del ultimo dato bueno. Effect sin setState (solo storage).
+  // No se escribe mientras `crudo` es `undefined`: en el render de
+  // hidratacion todavia no se leyo lo guardado, y `guardar` saldria sin las
+  // copias de las partes con error -> borraria el ultimo dato bueno justo
+  // cuando hace falta.
+  // Memo: la rotacion re-renderiza cada pocos segundos; serializar solo
+  // cuando cambia lo que hay que guardar (el Fire TV es hardware chico).
+  const guardarJson = useMemo(() => JSON.stringify(guardar), [guardar])
+  useEffect(() => {
+    if (crudo === undefined || guardarJson === crudo) return
+    try {
+      window.localStorage.setItem(claveGuardado, guardarJson)
+    } catch {
+      // Storage lleno o bloqueado: seguimos sin guardar.
+    }
+  }, [claveGuardado, guardarJson, crudo])
+  // Los datos vienen de props del Server Component (o, si Google fallo, de
+  // lo guardado en esta TV: ver `mostrar` arriba). No hay polling
   // client-side: cada `RELOAD_INTERVAL_MS` la pantalla se reloadea completa
   // y el Server Component vuelve a SSR con datos frescos. Bajamos de ~4300
   // peticiones/dia (polling cada 1min) a ~25/dia. Ademas el reload completo
@@ -89,7 +157,7 @@ export default function PantallaRotativa({
   const segundosCartel = configRemota.segundosCartel ?? tenant.defaults.segundosCartel
   const segundosTabla = configRemota.segundosTabla ?? tenant.defaults.segundosTabla
 
-  // Reload completo periodico (cada RELOAD_INTERVAL_MS = 5 min).
+  // Reload completo periodico (cada RELOAD_INTERVAL_MS = 10 min).
   // Refresca datos via SSR y resetea cualquier acumulacion del browser.
   // PREVENCION del freeze — si el main thread ya esta muerto, no corre.
   // Para recovery cuando el main thread muere, el watchdog del SW
@@ -183,7 +251,7 @@ export default function PantallaRotativa({
     <main className={styles.pageShell}>
       <div className={styles.screen} style={screenVars}>
         <DimOverlay desde={configRemota.atenuarDesde} hasta={configRemota.atenuarHasta} />
-        <HealthIndicator />
+        <HealthIndicator usandoGuardado={usandoGuardado} />
         <Header tenant={tenant} />
         {ofertaActual && Cartel ? (
           // key por nombre: el remount dispara la animacion de entrada.

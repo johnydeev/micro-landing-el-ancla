@@ -61,7 +61,7 @@ Un kiosko que corre días enteros en hardware limitado termina congelándose: el
 
 La primera versión detectaba el freeze desde el propio main thread. No servía: **cualquier mecanismo en el main thread es inútil si el thread está muerto.**
 
-La solución fue mover el watchdog al Service Worker, que corre en otro thread. Si deja de recibir señales de vida de la página, fuerza la recarga desde afuera. A eso se suma un reload preventivo cada 5 minutos que trae precios frescos y limpia memoria y listeners acumulados.
+La solución fue mover el watchdog al Service Worker, que corre en otro thread. Si deja de recibir señales de vida de la página, fuerza la recarga desde afuera. A eso se suma un reload preventivo cada 10 minutos que trae precios frescos y limpia memoria y listeners acumulados.
 
 ### 2. Polling eliminado: −99,4% de requests
 
@@ -79,7 +79,12 @@ La pantalla usaba ISR (`revalidate = 60`) hasta que apareció la pregunta que im
 
 Hoy corre con `export const dynamic = 'force-dynamic'` y los fetch en `cache: 'no-store'` con parámetro anti-cache. Cada recarga trae precios frescos.
 
-**Trade-off aceptado y documentado:** sin ISR no hay última-versión-buena. Si Google Sheets falla, los lectores devuelven `[]` y la pantalla muestra el empty state hasta la próxima recarga (hasta 5 minutos). Se evaluó un fallback en `localStorage` y el cliente lo descartó: para este caso de uso, mostrar un precio viejo es peor que no mostrar nada.
+**Si Google falla:** el servidor informa qué parte falló y cada TV muestra
+su **último dato bueno, hasta 2 horas**, guardado en el navegador de la
+propia TV (punto de estado ámbar mientras tanto). Pasadas las 2 horas sin
+respuesta, vuelve al empty state. Acota la decisión original de sesión 19
+("mostrar un precio viejo es peor que no mostrar nada"). Ver
+`docs/decisiones.md`.
 
 ### 5. Multitenant por path, sin SaaS
 
@@ -225,7 +230,7 @@ editable a mano.
 ### 6. Commit y push
 
 **Fuera del horario de atención de los comercios que ya están en producción**:
-el push redeploya para todos, y sus pantallas recargan dentro de los 5 minutos.
+el push redeploya para todos, y sus pantallas recargan dentro de los 10 minutos.
 Son 1-2 segundos de interrupción, pero mejor evitarlos con público en el local.
 
 Después del deploy, verificar `<dominio>/<slug>`. Si no ves el cambio en tu

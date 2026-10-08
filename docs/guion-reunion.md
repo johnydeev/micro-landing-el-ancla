@@ -50,7 +50,7 @@ Después señalá:
 Con la planilla abierta en el celular, cambiale un precio adelante de él.
 Que vea que es tocar una celda y escribir, como en una calculadora.
 
-> La pantalla toma el cambio sola en un rato (puede tardar hasta unos 10 minutos).
+> La pantalla toma el cambio sola en un rato (puede tardar hasta unos 15 minutos).
 > **Hacé el cambio al principio de la reunión** y mostrale el resultado al final.
 > No prometas "al instante".
 
@@ -170,7 +170,7 @@ oferta con la foto del producto, rotando, mientras la gente espera. Eso es lo
 que vende más."
 
 **"¿Cuánto tarda en cambiar el precio?"**
-Respondé la verdad: "Unos minutos, hasta 10 como mucho. Si estás apurado,
+Respondé la verdad: "Unos minutos, hasta 15 como mucho. Si estás apurado,
 esperás unos 5 minutos, apagás y prendés el aparato, y ya lo toma."
 
 ---

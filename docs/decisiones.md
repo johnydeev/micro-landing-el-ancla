@@ -2434,3 +2434,12 @@ la planilla está caída o sin esa clave.
 La página es de "broadcast" — la mira cualquiera que pase por la
 vidriera del local. No hay usuarios. El único actor con permisos es el
 cliente, que edita su Sheets.
+
+## Sesión 24 — Último dato bueno, acotado a 2 horas
+
+La sesión 19 descartó el fallback en `localStorage` ("mostrar un precio
+viejo es peor que no mostrar nada"). Con varios comercios, una falla de
+Google deja todas las TVs vacías a la vez. Se reabre acotado: cada TV
+muestra su último dato bueno **hasta 2 horas**; pasado eso, vuelve al empty
+state de siempre. Guardado en la TV (no en el servidor) para no sumar
+servicios. Detalle en `docs/superpowers/specs/2026-10-08-ultimo-dato-bueno-design.md`.

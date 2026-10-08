@@ -69,3 +69,12 @@ export interface ConfigNegocio {
   /** Hora (formato 24hs, "HH" o "HH:MM") en que termina el atenuado. Ej: "16". */
   atenuarHasta?: string
 }
+
+/** Resultado de leer una parte de la planilla. Ver lib/ultimo-dato-bueno.ts. */
+export type EstadoLectura = 'ok' | 'error'
+
+export interface EstadoPantalla {
+  listas: EstadoLectura
+  ofertas: EstadoLectura
+  config: EstadoLectura
+}

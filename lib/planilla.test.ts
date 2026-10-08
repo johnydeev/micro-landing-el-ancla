@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parsearConfig, parsearListas, parsearOfertas } from './planilla.ts'
+import { leerListas, leerOfertas, parsearConfig, parsearListas, parsearOfertas } from './planilla.ts'
 
 /*
  * Fixtures con la misma forma que el CSV publicado de El Ancla (verificado
@@ -168,4 +168,18 @@ test('config: claves con alias, acentos y valores numericos', () => {
 test('config: claves desconocidas, valores vacios y numeros invalidos se ignoran', () => {
   const csv = ['segundos x ofertas,abc', 'atenuar desde,', 'color,rojo', 'segundos x listas,7'].join('\n')
   assert.deepEqual(parsearConfig(csv), { segundosTabla: 7 })
+})
+
+test('leerListas: ok=false si no hay fila de encabezados, ok=true si la hay (aunque este vacia)', () => {
+  assert.deepEqual(leerListas('hola,chau\n1,2'), { datos: [], ok: false })
+  assert.deepEqual(leerListas(''), { datos: [], ok: false })
+  assert.deepEqual(leerListas('LISTA,,\nNombre,Precio,Unidad'), { datos: [], ok: true })
+  assert.equal(leerListas(LISTAS).ok, true)
+})
+
+test('leerOfertas: ok=false sin encabezados; ok=true con todo INACTIVO', () => {
+  assert.deepEqual(leerOfertas('a,b,c\n1,2,3'), { datos: [], ok: false })
+  const todoInactivo = ['titulo,precio,slug imagen,estado', 'FALDA,20999,falda,INACTIVO'].join('\n')
+  assert.deepEqual(leerOfertas(todoInactivo), { datos: [], ok: true })
+  assert.equal(leerOfertas(OFERTAS).ok, true)
 })

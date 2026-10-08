@@ -1,8 +1,8 @@
 import 'server-only'
 
-import type { ConfigNegocio, ListaPrecios, Oferta } from '@/types'
+import type { ConfigNegocio, EstadoLectura, EstadoPantalla, ListaPrecios, Oferta } from '@/types'
 import type { Tenant } from '@/types/tenant'
-import { parsearConfig, parsearListas, parsearOfertas } from '@/lib/planilla'
+import { leerListas, leerOfertas, parsearConfig } from '@/lib/planilla'
 import { csvUrlDe, envKeyCsv } from '@/lib/tenant-env'
 
 /*
@@ -51,12 +51,24 @@ function urlSinCache(url: string): string {
  */
 const FETCH_SIN_CACHE = { cache: 'no-store' } as const
 
-export async function getListasPrecios(tenant: Tenant): Promise<ListaPrecios[]> {
+/*
+ * Resultado de leer una parte de la planilla. `error` = fetch fallido,
+ * respuesta no-2xx, falta de configuracion (env/gid) o CSV sin encabezados.
+ * `ok` con datos vacios = planilla bien armada pero vacia (decision del
+ * comercio). La TV usa el estado para decidir si muestra lo guardado
+ * (lib/ultimo-dato-bueno.ts).
+ */
+export interface Lectura<T> {
+  datos: T
+  estado: EstadoLectura
+}
+
+export async function getListasPrecios(tenant: Tenant): Promise<Lectura<ListaPrecios[]>> {
   const csvUrl = csvUrlDe(tenant.slug)
 
   if (!csvUrl) {
     console.error(`Falta la variable de entorno ${envKeyCsv(tenant.slug)}`)
-    return []
+    return { datos: [], estado: 'error' }
   }
 
   try {
@@ -64,22 +76,28 @@ export async function getListasPrecios(tenant: Tenant): Promise<ListaPrecios[]> 
 
     if (!res.ok) {
       console.error('Error fetching CSV:', res.status, res.statusText)
-      return []
+      return { datos: [], estado: 'error' }
     }
 
-    return parsearListas(await res.text())
+    const { datos, ok } = leerListas(await res.text())
+    return { datos, estado: ok ? 'ok' : 'error' }
   } catch (error) {
     console.error('Error en getListasPrecios:', error)
-    return []
+    return { datos: [], estado: 'error' }
   }
 }
 
-export async function getConfig(tenant: Tenant): Promise<ConfigNegocio> {
+export async function getConfig(tenant: Tenant): Promise<Lectura<ConfigNegocio>> {
   const csvUrl = csvUrlDe(tenant.slug)
   const gidConfig = tenant.sheets.gidConfig
 
-  if (!csvUrl || !gidConfig) {
-    return {}
+  if (!csvUrl) {
+    console.error(`Falta la variable de entorno ${envKeyCsv(tenant.slug)}`)
+    return { datos: {}, estado: 'error' }
+  }
+  // Pestaña de configuracion opcional: sin gid no es una falla.
+  if (!gidConfig) {
+    return { datos: {}, estado: 'ok' }
   }
 
   const configUrl = urlConGid(csvUrl, gidConfig)
@@ -88,12 +106,12 @@ export async function getConfig(tenant: Tenant): Promise<ConfigNegocio> {
     const res = await fetch(urlSinCache(configUrl), FETCH_SIN_CACHE)
     if (!res.ok) {
       console.error('Error fetching CSV de configuracion:', res.status)
-      return {}
+      return { datos: {}, estado: 'error' }
     }
-    return parsearConfig(await res.text())
+    return { datos: parsearConfig(await res.text()), estado: 'ok' }
   } catch (error) {
     console.error('Error en getConfig:', error)
-    return {}
+    return { datos: {}, estado: 'error' }
   }
 }
 
@@ -101,26 +119,35 @@ export async function getPantallaData(tenant: Tenant): Promise<{
   listas: ListaPrecios[]
   ofertas: Oferta[]
   configRemota: ConfigNegocio
+  estado: EstadoPantalla
+  /** Date.now() del server al armar la pagina (vigencia del ultimo dato bueno). */
+  generadoEn: number
 }> {
-  const [listas, ofertas, configRemota] = await Promise.all([
+  const [listas, ofertas, config] = await Promise.all([
     getListasPrecios(tenant),
     getOfertas(tenant),
     getConfig(tenant),
   ])
-  return { listas, ofertas, configRemota }
+  return {
+    listas: listas.datos,
+    ofertas: ofertas.datos,
+    configRemota: config.datos,
+    estado: { listas: listas.estado, ofertas: ofertas.estado, config: config.estado },
+    generadoEn: Date.now(),
+  }
 }
 
-export async function getOfertas(tenant: Tenant): Promise<Oferta[]> {
+export async function getOfertas(tenant: Tenant): Promise<Lectura<Oferta[]>> {
   const csvUrl = csvUrlDe(tenant.slug)
   const gidOfertas = tenant.sheets.gidOfertas
 
   if (!csvUrl) {
     console.error(`Falta la variable de entorno ${envKeyCsv(tenant.slug)}`)
-    return []
+    return { datos: [], estado: 'error' }
   }
   if (!gidOfertas) {
     console.error(`Tenant ${tenant.slug} sin sheets.gidOfertas`)
-    return []
+    return { datos: [], estado: 'error' }
   }
 
   const ofertasUrl = urlConGid(csvUrl, gidOfertas)
@@ -129,11 +156,12 @@ export async function getOfertas(tenant: Tenant): Promise<Oferta[]> {
     const res = await fetch(urlSinCache(ofertasUrl), FETCH_SIN_CACHE)
     if (!res.ok) {
       console.error('Error fetching CSV de ofertas:', res.status)
-      return []
+      return { datos: [], estado: 'error' }
     }
-    return parsearOfertas(await res.text())
+    const { datos, ok } = leerOfertas(await res.text())
+    return { datos, estado: ok ? 'ok' : 'error' }
   } catch (error) {
     console.error('Error en getOfertas:', error)
-    return []
+    return { datos: [], estado: 'error' }
   }
 }

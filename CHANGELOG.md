@@ -5,6 +5,29 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 24 — 2026-10-08 (último dato bueno + reload 10 min)
+
+**Context**: preparar escala (~20 clientes / ~40 TVs). Una falla de Google
+Sheets dejaba todas las TVs en "Estamos actualizando" a la vez. Spec:
+`docs/superpowers/specs/2026-10-08-ultimo-dato-bueno-design.md`. Plan:
+`docs/superpowers/plans/2026-10-08-ultimo-dato-bueno.md`.
+
+**Added**
+- **Último dato bueno por TV** (`lib/ultimo-dato-bueno.ts` + tests): si una
+  parte (listas, ofertas, config) falla, la TV muestra lo último que recibió
+  bien, hasta 2 horas, guardado en su `localStorage` por tenant + rubros.
+  Cada respuesta buena actualiza la copia y reinicia las 2 horas.
+- `lib/sheets.ts` informa `ok`/`error` por parte y `generadoEn`. Error =
+  fetch fallido, no-2xx, falta de configuración o CSV sin encabezados
+  (columna desacomodada). Planilla vacía pero bien armada = `ok`.
+- `leerListas` / `leerOfertas` en `lib/planilla.ts` (+ tests de `ok`).
+- Punto de estado **ámbar** = mostrando datos guardados.
+
+**Changed**
+- Reload de la pantalla **5 → 10 min**: la mitad de pedidos a Google. Precio
+  corregido llega en ~15 min como máximo.
+- La API pública no cambia su JSON.
+
 ### Sesión 23 — 2026-10-05 (rubro por pantalla)
 
 **Context**: modelo comercial "abono por pantalla". Para que la segunda y

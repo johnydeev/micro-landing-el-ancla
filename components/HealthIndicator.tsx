@@ -13,6 +13,7 @@ import { memo, useSyncExternalStore } from 'react'
  *   verde    — online: navigator.onLine === true
  *   rojo     — offline: navigator.onLine === false
  *   gris     — inicial: durante SSR / antes de hidratar
+ *   ambar    — online, pero mostrando el ultimo dato bueno (Google fallo)
  *
  * navigator.onLine no es 100% confiable cuando dice true (puede haber
  * wifi sin internet real), pero cuando dice false es de fiar. Para el
@@ -25,18 +26,20 @@ import { memo, useSyncExternalStore } from 'react'
  * suscribirse a estado externo del browser sin setState-in-effect).
  */
 
-type EstadoSalud = 'inicial' | 'online' | 'offline'
+type EstadoSalud = 'inicial' | 'online' | 'offline' | 'guardado'
 
 const COLORES: Record<EstadoSalud, string> = {
   inicial: '#9ca3af', // gris
   online: '#22c55e',  // verde
   offline: '#ef4444', // rojo
+  guardado: '#f59e0b', // ambar: mostrando el ultimo dato bueno (Google fallo)
 }
 
 const TITULOS: Record<EstadoSalud, string> = {
   inicial: 'Estado: cargando',
   online: 'Estado: conectado',
   offline: 'Estado: sin conexion',
+  guardado: 'Estado: mostrando datos guardados',
 }
 
 function obtenerEstadoCliente(): EstadoSalud {
@@ -56,15 +59,16 @@ function suscribirEventosRed(callback: () => void): () => void {
   }
 }
 
-// Sin props. `memo` evita re-ejecutar este componente en cada tick de la
-// rotacion de PantallaRotativa; su propio estado (online/offline) sigue
-// actualizandose via los listeners de useSyncExternalStore, memo no los afecta.
-function HealthIndicator() {
-  const estado = useSyncExternalStore(
+// `memo` evita re-ejecutar este componente en cada tick de la rotacion de
+// PantallaRotativa; su estado de red sigue actualizandose via los listeners
+// de useSyncExternalStore. Prioridad: rojo (offline) > ambar > verde.
+function HealthIndicator({ usandoGuardado = false }: { usandoGuardado?: boolean }) {
+  const red = useSyncExternalStore(
     suscribirEventosRed,
     obtenerEstadoCliente,
     obtenerEstadoServidor,
   )
+  const estado: EstadoSalud = red === 'online' && usandoGuardado ? 'guardado' : red
 
   return (
     <div
