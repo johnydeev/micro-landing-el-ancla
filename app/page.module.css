@@ -75,7 +75,8 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
   background: var(--c-secundario);
-  color: var(--c-fondo);
+  /* Texto del titulo de lista: acento si el comercio lo define, si no fondo. */
+  color: var(--c-titulo-lista, var(--c-fondo));
 }
 
 /*

@@ -238,6 +238,7 @@ export default function PantallaRotativa({
     '--c-fila-impar': tenant.paleta.filaImpar,
     '--c-acento': tenant.paleta.acento ?? tenant.paleta.secundario,
     '--c-texto-acento': tenant.paleta.textoAcento ?? '#fff',
+    '--c-titulo-lista': tenant.paleta.acento ?? tenant.paleta.fondo,
     '--table-font-scale': `${tenant.tipografia.tabla / 100}`,
   } as CSSProperties
 

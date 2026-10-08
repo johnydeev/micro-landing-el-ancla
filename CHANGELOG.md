@@ -27,6 +27,11 @@ Sheets dejaba todas las TVs en "Estamos actualizando" a la vez. Spec:
 - Reload de la pantalla **5 → 10 min**: la mitad de pedidos a Google. Precio
   corregido llega en ~15 min como máximo.
 - La API pública no cambia su JSON.
+- **El Látigo, filas más suaves y más contrastadas**: crema `#FFF7A8` y
+  dorado `#F3DD3E` (antes `#F9F908` / `#E3E300`, casi iguales y muy
+  intensas a pantalla completa). El título de cada lista sigue con el
+  amarillo del logo gracias a `--c-titulo-lista` (acento si existe, si no
+  fondo): sin cambio para El Ancla ni el demo.
 
 ### Sesión 23 — 2026-10-05 (rubro por pantalla)
 
