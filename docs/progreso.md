@@ -832,6 +832,17 @@ listo para vender en su estado actual.
 
 ### Abierto
 
+- **Activación de pantallas — etapa 1 hecha** (12/10/2026). "Solo código":
+  `npm run activar -- <slug> [rubros] [horas]` genera link firmado
+  (`/activar/...`) que deja cookie `tele` con `{ id, tenant, rubros }`; el
+  rubro sale de la cookie. Por comercio: `requiereActivacion` (sin cookie =
+  "Pantalla no habilitada") y `pagadoHasta` (+5 días de gracia =
+  "Servicio suspendido"). Cada carga loguea `[tele]` en Vercel = última
+  conexión. Env: `ACTIVACION_SECRET` (obligatoria), `SOPORTE_CONTACTO`
+  (opcional). **Etapa 2**: panel `/admin` + Upstash, reusando el `id` de la
+  cookie (opciones en `docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md`).
+  Pendiente: renovar la cookie antes de 400 días (límite de Chrome).
+
 - **Limpieza del alta del demo** (opcional): borrar
   `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y renombrar el logo a
   `logos/demo` (hoy sigue como `logos/carniceria-san-martin`; funciona igual).
@@ -924,6 +935,8 @@ aparece un caso de uso real:
     productos.
   - `GOOGLE_SHEETS_GID_OFERTAS`: `gid` de la pestaña de ofertas.
   - `GOOGLE_SHEETS_GID_CONFIG`: `gid` de la pestaña de config remota.
+  - `ACTIVACION_SECRET`: firma links y cookies de activación de teles
+    (solo Production en Vercel). `SOPORTE_CONTACTO` opcional.
 - Si falta `GOOGLE_SHEETS_CSV_URL` los lectores devuelven array
   vacío y loguean a `console.error`; la página igual renderiza.
 - El proyecto usa **Next.js 16** (no es el Next.js anterior — ver

@@ -1,5 +1,7 @@
+import PantallaBloqueada from '@/components/PantallaBloqueada'
 import PantallaRotativa from '@/components/PantallaRotativa'
-import { filtrarPorRubro, parseRubrosParam } from '@/lib/rubros'
+import { resolverAcceso } from '@/lib/acceso'
+import { filtrarPorRubro } from '@/lib/rubros'
 import { claveGuardado } from '@/lib/ultimo-dato-bueno'
 import { getPantallaData } from '@/lib/sheets'
 import { getTenantOr404, type TenantParams } from '@/lib/tenant-route'
@@ -19,7 +21,9 @@ export default async function PantallaTenant({
 }) {
   const tenant = await getTenantOr404(params)
   const { rubro } = await searchParams
-  const rubros = parseRubrosParam(rubro)
+  const acceso = await resolverAcceso(tenant, rubro)
+  if (acceso.tipo !== 'ok') return <PantallaBloqueada tenant={tenant} motivo={acceso.tipo} />
+  const rubros = acceso.rubros
   const { listas, ofertas, configRemota, estado, generadoEn } = filtrarPorRubro(
     await getPantallaData(tenant),
     rubros,

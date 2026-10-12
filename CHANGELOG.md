@@ -5,6 +5,20 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 25 — 2026-10-12 (activación de pantallas, etapa 1)
+
+**Context**: cobrar por tele; hoy cualquiera con el link abre la pantalla.
+Opción 1 variante C de `docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md`,
+con id por tele para el panel futuro (opción 2).
+
+**Added**
+- `npm run activar`: link firmado con vencimiento (`/activar/<tenant>/<rubros>/<id>/<vence>/<firma>`)
+  que deja la cookie `tele` y redirige a la pantalla.
+- `lib/acceso.ts`: rubro fijo desde la cookie, `requiereActivacion` y
+  `pagadoHasta` (+5 días) por comercio, log `[tele]` por carga. Sin
+  `ACTIVACION_SECRET`, ante la duda se muestra.
+- `components/PantallaBloqueada.tsx`: "Pantalla no habilitada" / "Servicio suspendido", recarga cada 10 min.
+
 ### Sesión 24 — 2026-10-08 (último dato bueno + reload 10 min)
 
 **Context**: preparar escala (~20 clientes / ~40 TVs). Una falla de Google

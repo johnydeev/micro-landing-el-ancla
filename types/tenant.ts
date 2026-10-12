@@ -44,6 +44,18 @@ export interface Tenant {
     gidOfertas: string
     gidConfig: string
   }
+  /**
+   * Opcional. true = sin cookie de activacion (`npm run activar`) la tele
+   * muestra "Pantalla no habilitada". Prenderlo recien con todas sus teles
+   * ya activadas. Ver lib/activacion.ts.
+   */
+  requiereActivacion?: boolean
+  /**
+   * Opcional. 'AAAA-MM-DD'. Vencido (mas DIAS_GRACIA_PAGO en lib/acceso.ts),
+   * las teles del comercio muestran "Servicio suspendido". Al cobrar, se
+   * corre la fecha y se pushea.
+   */
+  pagadoHasta?: string
   /** Fallback si la pestana CONFIG del Sheets no trae la clave. */
   defaults: {
     segundosCartel: number

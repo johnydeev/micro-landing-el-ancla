@@ -161,6 +161,18 @@ Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N
 
 ---
 
+## Activación de una tele
+
+1. `npm run activar -- <slug> [rubros] [horas]` (ej. `npm run activar -- el-latigo cerdo,pollo`).
+   Imprime el id de la tele y un link que vence en 2 h por defecto. Un link por tele.
+2. Abrir el link en el Fire TV: deja la cookie y redirige a la pantalla. El rubro
+   queda fijo (el `?rubro=` del link se ignora).
+3. Con todas las teles del comercio activadas: `requiereActivacion: true` y
+   `pagadoHasta: 'AAAA-MM-DD'` en `tenants/<slug>.ts`, push fuera de horario.
+   Al cobrar, correr `pagadoHasta` y pushear (5 días de gracia).
+
+Detalle en `lib/activacion.ts` y `lib/acceso.ts`.
+
 ## Alta de un cliente
 
 Probado de punta a punta el 01/10/2026 con el comercio de muestra (`/demo`).
