@@ -251,7 +251,12 @@
   background: var(--c-primario);
   color: #fff;
   border-radius: 16px;
-  padding: 24px 40px;
+  /*
+   * Relativo al ancho: con 24px 40px fijos, en el navegador del Fire TV
+   * (960x540) el relleno era casi tan grande como el texto. 1.2vw 2vw da
+   * ~23px 38px en 1920 (igual que antes) y la mitad en 960.
+   */
+  padding: 1.2vw 2vw;
   font-size: clamp(28px, 4vw, 60px);
   font-weight: bold;
   text-align: center;

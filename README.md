@@ -163,6 +163,9 @@ Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N
 
 ## Activación de una tele
 
+> Recorrido completo de un cliente nuevo (planilla, alta, cuenta de Amazon,
+> Fire TV, Fully, local): [docs/manual-nuevo-cliente.md](docs/manual-nuevo-cliente.md).
+
 1. `npm run activar -- <slug> [rubros] [horas]` (ej. `npm run activar -- el-latigo cerdo,pollo`).
    Imprime el id de la tele y un link que vence en 2 h por defecto. Un link por tele.
 2. Abrir el link en el Fire TV: deja la cookie y redirige a la pantalla. El rubro

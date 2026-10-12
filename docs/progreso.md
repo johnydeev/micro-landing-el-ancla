@@ -842,6 +842,17 @@ listo para vender en su estado actual.
   (opcional). **Etapa 2**: panel `/admin` + Upstash, reusando el `id` de la
   cookie (opciones en `docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md`).
   Pendiente: renovar la cookie antes de 400 días (límite de Chrome).
+  Pendiente: link de activación más corto de tipear (hoy ~85 caracteres con el
+  control remoto). Opciones: `/a/<id>` corto, o código que muestra la tele y
+  se carga desde el panel (etapa 2). Mientras: app Amazon Fire TV en el
+  celular como teclado (pegar el link).
+
+- **Cuenta de Amazon de los Fire TV** (El Ancla + El Látigo comparten una).
+  1) Mail y contraseña en el gestor de contraseñas (prioridad: sin acceso, un
+  Fire TV reseteado no se reinstala). 2) Verificación en dos pasos y sin
+  tarjeta cargada. 3) Nombrar cada Fire TV en "Administrar contenido y
+  dispositivos". Desde el 3er cliente: una cuenta por cliente (probar alias
+  Gmail con `+`; si Amazon lo rechaza, dominio propio con reenvío).
 
 - **Limpieza del alta del demo** (opcional): borrar
   `TENANT_CARNICERIA_SAN_MARTIN_CSV_URL` de Vercel y renombrar el logo a
