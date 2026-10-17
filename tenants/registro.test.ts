@@ -25,16 +25,6 @@ test('plantillaCartelDefault existe en el catalogo', () => {
   }
 })
 
-// Una fecha mal escrita no suspende nunca (lib/activacion.ts: ante la duda,
-// mostrar), asi que el error tiene que saltar aca y no en la tele.
-test('pagadoHasta, si esta, es una fecha AAAA-MM-DD valida', () => {
-  for (const tenant of Object.values(TENANTS)) {
-    if (tenant.pagadoHasta === undefined) continue
-    assert.match(tenant.pagadoHasta, /^\d{4}-\d{2}-\d{2}$/, `${tenant.slug}: pagadoHasta "${tenant.pagadoHasta}"`)
-    assert.ok(!Number.isNaN(Date.parse(tenant.pagadoHasta)), `${tenant.slug}: pagadoHasta invalida`)
-  }
-})
-
 test('getTenant devuelve el tenant o undefined', () => {
   assert.equal(getTenant('granja-elancla')?.nombre, 'Granja El Ancla')
   assert.equal(getTenant('no-existe'), undefined)

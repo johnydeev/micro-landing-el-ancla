@@ -2,28 +2,25 @@ import 'server-only'
 
 import { cookies } from 'next/headers'
 
-import { pagoVencido, verificarCookie } from '@/lib/activacion'
-import { parseRubrosParam } from '@/lib/rubros'
+import { decidirAcceso, type Acceso } from '@/lib/acceso-decision'
+import { verificarCookie } from '@/lib/activacion'
+import { estadoTele } from '@/lib/estado-tele'
 import type { Tenant } from '@/types/tenant'
 
-export const COOKIE_TELE = 'tele'
-/** Dias que la pantalla sigue andando despues de `pagadoHasta`. */
-export const DIAS_GRACIA_PAGO = 5
+export { DIAS_GRACIA_PAGO, type Acceso } from '@/lib/acceso-decision'
 
-export type Acceso =
-  | { tipo: 'ok'; rubros: Set<string> | null }
-  | { tipo: 'no-habilitada' }
-  | { tipo: 'suspendida' }
+export const COOKIE_TELE = 'tele'
 
 /*
  * Decide si la tele puede mostrar precios y con que rubros. Lo usan todas
  * las pages que renderizan PantallaRotativa.
  *
- * - Cookie valida del comercio: el rubro sale de la cookie (el `?rubro=` del
- *   link se ignora) y se loguea `[tele]` = ultima conexion de esa tele en
- *   los logs de Vercel, hasta que exista el panel.
- * - Sin cookie: como antes (rubro del link), salvo `requiereActivacion`.
- * - Falta ACTIVACION_SECRET: falla nuestra, ante la duda se muestra.
+ * - Cookie valida del comercio = la tele. Se loguea `[tele]`.
+ * - Supabase (lib/estado-tele.ts) da el estado del comercio (activacion,
+ *   pago) y de la tele (switch, rubros) y anota la conexion.
+ * - La decision es pura (lib/acceso-decision.ts).
+ * - Falta ACTIVACION_SECRET: falla nuestra, ante la duda se muestra (no se
+ *   consulta la base: con `requiere_activacion` bloquearia a todos).
  */
 export async function resolverAcceso(
   tenant: Tenant,
@@ -36,14 +33,11 @@ export async function resolverAcceso(
 
   if (tele) console.log('[tele]', JSON.stringify(tele))
 
-  if (tenant.pagadoHasta && pagoVencido(tenant.pagadoHasta, Date.now(), DIAS_GRACIA_PAGO)) {
-    return { tipo: 'suspendida' }
-  }
-
-  if (tenant.requiereActivacion && !tele) {
-    if (secreto) return { tipo: 'no-habilitada' }
+  if (!secreto) {
     console.error('[activacion] falta ACTIVACION_SECRET: se muestra la pantalla igual')
+    return decidirAcceso({ estado: null, tele: null, rubroParam, ahoraMs: Date.now() })
   }
 
-  return { tipo: 'ok', rubros: tele ? (tele.rubros && new Set(tele.rubros)) : parseRubrosParam(rubroParam) }
+  const estado = await estadoTele(tenant.slug, tele)
+  return decidirAcceso({ estado, tele, rubroParam, ahoraMs: Date.now() })
 }

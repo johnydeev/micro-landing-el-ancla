@@ -170,11 +170,15 @@ Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N
    Imprime el id de la tele y un link que vence en 2 h por defecto. Un link por tele.
 2. Abrir el link en el Fire TV: deja la cookie y redirige a la pantalla. El rubro
    queda fijo (el `?rubro=` del link se ignora).
-3. Con todas las teles del comercio activadas: `requiereActivacion: true` y
-   `pagadoHasta: 'AAAA-MM-DD'` en `tenants/<slug>.ts`, push fuera de horario.
-   Al cobrar, correr `pagadoHasta` y pushear (5 días de gracia).
+3. Estado en Supabase (proyecto `tv-precios`, tablas `comercios` y `teles`,
+   sin push): cada tele se registra sola en su primera carga si su comercio
+   tiene fila. `comercios.requiere_activacion` (sin cookie = "Pantalla no
+   habilitada"), `comercios.pagado_hasta` (+5 días = "Servicio suspendido"),
+   `teles.activa` (switch = "Pantalla desactivada"), `teles.rubros`,
+   `teles.ultima_conexion`. Si Supabase falla, se muestra igual.
 
-Detalle en `lib/activacion.ts` y `lib/acceso.ts`.
+Detalle en `lib/activacion.ts`, `lib/acceso.ts`, `lib/acceso-decision.ts`,
+`lib/estado-tele.ts` y `supabase/migrations/`.
 
 ## Alta de un cliente
 

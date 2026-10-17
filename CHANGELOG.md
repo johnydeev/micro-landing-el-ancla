@@ -5,6 +5,23 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 26 — 2026-10-17 (activación Parte A: estado en Supabase)
+
+**Context**: operar teles y cobros sin push. Spec
+`docs/superpowers/specs/2026-10-17-activacion-supabase-parte-a-design.md`.
+
+**Added**
+- Supabase `tv-precios` (sa-east-1): tablas `comercios` y `teles` (RLS sin
+  políticas), función `estado_tele` (autoregistro + última conexión), solo
+  `service_role`. Migración en `supabase/migrations/`.
+- `lib/acceso-decision.ts` (decisión pura + validación) y `lib/estado-tele.ts`
+  (RPC con timeout 1 s). "Pantalla desactivada" por tele.
+
+**Changed**
+- `requiereActivacion` y `pagadoHasta` salen de `tenants/` y pasan a
+  `comercios`. Rubros de cada tele: manda `teles.rubros`, la cookie es respaldo.
+- Si Supabase falla o falta su env, se muestra igual.
+
 ### Sesión 25 — 2026-10-12 (activación de pantallas, etapa 1)
 
 **Context**: cobrar por tele; hoy cualquiera con el link abre la pantalla.

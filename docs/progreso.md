@@ -833,7 +833,12 @@ listo para vender en su estado actual.
 ### Abierto
 
 - **Activación de pantallas — etapa 1 hecha** (12/10/2026). "Solo código":
-  `npm run activar -- <slug> [rubros] [horas]` genera link firmado
+  **Parte A en código (17/10/2026)**: estado en Supabase (`tv-precios`,
+  tablas `comercios`/`teles`, función `estado_tele`); `requiereActivacion`/
+  `pagadoHasta` salieron de `tenants/`. Falta paso a producción (env en
+  Vercel, fila `el-latigo`, push) y Parte B (panel `/admin`, código corto).
+  Spec/plan: `docs/superpowers/{specs,plans}/2026-10-17-*`.
+  Etapa 1: `npm run activar -- <slug> [rubros] [horas]` genera link firmado
   (`/activar/...`) que deja cookie `tele` con `{ id, tenant, rubros }`; el
   rubro sale de la cookie. Por comercio: `requiereActivacion` (sin cookie =
   "Pantalla no habilitada") y `pagadoHasta` (+5 días de gracia =

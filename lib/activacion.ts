@@ -9,13 +9,12 @@ import { normalizarRubro } from './rubros.ts'
  *      /activar/<tenant>/<rubros>/<id>/<vence>/<firma>
  *    Corto a proposito: se tipea con el control remoto del Fire TV.
  * 2. Abrirlo en la tele deja una cookie firmada con { id, tenant, rubros }.
- * 3. Cada carga de la pantalla lee la cookie: el rubro sale de ahi (no del
- *    `?rubro=` del link) y, si el comercio tiene `requiereActivacion`, sin
- *    cookie valida no se muestran precios.
- *
- * El `id` de cada tele es la base del panel futuro (Upstash): la cookie ya lo
- * lleva y cada carga lo loguea (`[tele]` en los logs de Vercel).
- * Spec: docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md
+ * 3. Cada carga de la pantalla lee la cookie (lib/acceso.ts). El estado de la
+ *    tele (switch, rubros) y del comercio (`requiere_activacion`,
+ *    `pagado_hasta`) vive en Supabase, keyed por el `id` de la cookie: ver
+ *    lib/estado-tele.ts y lib/acceso-decision.ts.
+ * Specs: docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md y
+ * 2026-10-17-activacion-supabase-parte-a-design.md
  *
  * Modulo sin `@/` ni Next: se testea con `node --test`.
  */
@@ -108,7 +107,7 @@ export function verificarCookie(valor: string, secreto: string): Tele | null {
 }
 
 /*
- * `pagadoHasta` ('AAAA-MM-DD') vencido hace mas de `diasGracia` dias.
+ * `pagado_hasta` del comercio ('AAAA-MM-DD') vencido hace mas de `diasGracia` dias.
  * Fecha mal escrita = no vencido (ante la duda, mostrar).
  */
 export function pagoVencido(pagadoHasta: string, ahoraMs: number, diasGracia: number): boolean {

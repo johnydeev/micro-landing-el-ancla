@@ -20,7 +20,7 @@ Tiempo total: ~1 h de escritorio + ~20 min por tele.
 - [ ] Contraseña del wifi del local.
 - [ ] Cada tele: que tenga HDMI libre y un enchufe cerca para el Fire TV.
 - [ ] Fire TV Stick: lo compra el cliente (la puesta en marcha no lo incluye).
-- [ ] Fecha de cobro del abono (para `pagadoHasta`).
+- [ ] Fecha de cobro del abono (para `pagado_hasta` en Supabase).
 
 Referencia comercial (05/10/2026): puesta en marcha $150.000 sin Fire TV;
 abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
@@ -64,7 +64,8 @@ abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
 
 1. `.env.local` con los secretos (una sola vez, no por cliente):
    `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `VERCEL_TOKEN`,
-   `VERCEL_PROJECT_ID`, `ACTIVACION_SECRET`.
+   `VERCEL_PROJECT_ID`, `ACTIVACION_SECRET`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY` (las dos últimas también en Vercel, Production).
 2. `npm run alta` → nombre, slug, eslogan, dos colores, badge, contactos, URL
    de la planilla, logo. Escribe `tenants/<slug>.ts`, lo registra, crea
    `TENANT_<SLUG>_CSV_URL` en Vercel y en `.env.local`, corre los tests.
@@ -73,13 +74,15 @@ abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
    - Paleta: probar en `npm run dev` → `localhost:3000/<slug>`. Si el
      primario lleva texto blanco encima, no puede ser un color claro (caso El
      Látigo: amarillo al `acento`, negro de primario).
-   - **No** poner todavía `requiereActivacion` (bloquearía las teles antes de
-     instalarlas).
-4. `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
-5. Commit + push **fuera del horario de atención de los comercios que ya
+4. **Fila del cliente en Supabase** (proyecto `tv-precios` → Table Editor →
+   `comercios`): `slug` igual al del tenant, `requiere_activacion` en **false**
+   (en true bloquearía las teles antes de instalarlas), `pagado_hasta` vacío.
+   Sin esta fila sus teles no se registran ni se pueden bloquear.
+5. `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+6. Commit + push **fuera del horario de atención de los comercios que ya
    están en producción** (El Ancla cierra 13 h y 20:15): el push redeploya
    para todos.
-6. Verificar `https://tv-precios.vercel.app/<slug>` (Ctrl+F5) y probar un
+7. Verificar `https://tv-precios.vercel.app/<slug>` (Ctrl+F5) y probar un
    rubro: `/<slug>?rubro=cerdo`.
 
 ## 4. Cuenta de Amazon del cliente
@@ -192,19 +195,19 @@ derecha** (verde online, ámbar último dato bueno, rojo sin internet).
      activación);
    - si una tele muestra "Pantalla no habilitada": avisarte.
 
-## 8. Cerrar la activación (fuera de horario)
+## 8. Cerrar la activación (sin push)
 
-Con **todas** las teles del cliente activadas y probadas:
+Con **todas** las teles del cliente activadas y probadas, en Supabase
+(`tv-precios` → Table Editor):
 
-```ts
-// tenants/<slug>.ts
-requiereActivacion: true,
-pagadoHasta: 'AAAA-MM-DD',
-```
+1. `teles`: verificar que aparecen sus teles (se registran solas en su primera
+   carga) y ponerles `nombre` ("vacuno", "mostrador").
+2. `comercios` → fila del cliente: `requiere_activacion = true` y
+   `pagado_hasta` = fecha de cobro.
 
-Test + push fuera del horario de atención. Desde ahí, un aparato sin
-activar ve "Pantalla no habilitada"; las teles activadas siguen igual.
-Verificar desde tu PC: `/<slug>` tiene que mostrar el bloqueo.
+Impacta en ≤10 min, sin push. Desde ahí, un aparato sin activar ve
+"Pantalla no habilitada"; las teles activadas siguen igual. Verificar desde tu
+PC: `/<slug>` tiene que mostrar el bloqueo.
 
 Si el dueño quiere ver las pantallas en su celular: link de activación propio
 con id aparte (`npm run activar -- <slug> todo`), abierto en Chrome (no en el
@@ -212,21 +215,27 @@ navegador de WhatsApp).
 
 ## 9. Mantenimiento
 
-- **Cobro mensual**: correr `pagadoHasta` y pushear. Vencido + 5 días →
-  "Servicio suspendido" en todas sus teles; vuelve sola al pushear la fecha
-  nueva (≤10 min).
+- **Cobro mensual**: correr `comercios.pagado_hasta` en Supabase. Vencido + 5
+  días → "Servicio suspendido" en todas sus teles; vuelve sola al correr la
+  fecha (≤10 min, sin push).
+- **Apagar o prender una tele**: `teles.activa` en Supabase (≤10 min).
+- **Última conexión de una tele**: `teles.ultima_conexion` (se actualiza cada
+  ~10 min mientras está prendida).
 - **Tele reseteada o Fully reinstalado**: se pierde la cookie → link nuevo,
   pasos 6.4 y 6.5.
 - **Cookie de activación**: dura 400 días (límite de Chrome). Renovar antes
   (pendiente: que lo haga el panel).
-- **Cambio de rubro de una tele**: link nuevo con los rubros nuevos.
+- **Cambio de rubro de una tele**: `teles.rubros` en Supabase (ej. `{cerdo,pollo}`;
+  vacío = todo), sin ir al local.
 
 ## Problemas conocidos
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
 | "Link de activacion invalido o vencido" al arrancar | Start URL quedó con el link o con `/activar/` | Start URL = `https://tv-precios.vercel.app/<slug>` |
-| Muestra todos los rubros | Sin cookie (otro navegador, cookies borradas) | Activar de nuevo |
+| Muestra todos los rubros | Sin cookie (otro navegador, cookies borradas), o `teles.rubros` vacío | Activar de nuevo, o cargar sus rubros en `teles` |
+| "Pantalla desactivada" | `teles.activa = false` | Prender el switch en Supabase |
+| "Servicio suspendido" | `comercios.pagado_hasta` vencido + 5 días | Correr la fecha en Supabase |
 | Cartel "Permissions required" en cada arranque | Se apretó Cancel | Apretar IGNORE |
 | Ícono de micrófono en la esquina | Sin resolver (no es el permiso de Fully) | Pendiente: ADB para ver qué app lo usa |
 | Bordes cortados, punto de estado invisible | Overscan de la tele | Ajustar a pantalla |
