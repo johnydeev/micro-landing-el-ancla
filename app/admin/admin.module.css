@@ -1,0 +1,78 @@
+.raiz {
+  height: 100%;
+  overflow-y: auto;
+  background: #f4f6f9;
+  color: #17202e;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.contenido {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.tarjeta {
+  max-width: 380px;
+  margin: 12vh auto 0;
+  padding: 1.5rem;
+  background: #fff;
+  border: 1px solid #dde3ec;
+  border-radius: 14px;
+}
+
+.titulo {
+  margin-bottom: 1rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.campo label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.campo input {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 1px solid #b9c3d3;
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.campo input:focus-visible {
+  outline: 2px solid #1f3a5f;
+  outline-offset: 1px;
+}
+
+.error {
+  margin-bottom: 1rem;
+  color: #b3261e;
+  font-weight: 600;
+}
+
+.tarjeta button {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .contenido {
+    padding: 1rem 1rem 2rem;
+  }
+
+  .tarjeta {
+    margin-top: 6vh;
+    padding: 1.25rem;
+  }
+}

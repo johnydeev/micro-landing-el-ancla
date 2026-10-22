@@ -90,6 +90,23 @@ export function verificarLink(partes: string[], ahoraMs: number, secreto: string
   return { id, tenant, rubros: textoARubros(rubros) }
 }
 
+/* Nombre de la cookie de la tele. Vive aca (no en acceso.ts, que es server-only)
+   para poder importarla desde proxy.ts. */
+export const COOKIE_TELE = 'tele'
+
+// Chrome no deja cookies de mas de 400 dias. Antes de que venza, el panel
+// (o un link nuevo) la renueva.
+export const COOKIE_MAX_AGE_S = 400 * 24 * 60 * 60
+
+/* Opciones de la cookie de la tele: las comparten /activar y /api/alta. */
+export const OPCIONES_COOKIE_TELE = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax',
+  path: '/',
+  maxAge: COOKIE_MAX_AGE_S,
+} as const
+
 export function firmarCookie(tele: Tele, secreto: string): string {
   const datos = Buffer.from(JSON.stringify(tele)).toString('base64url')
   return `${datos}.${hmac(secreto, `cookie|${datos}`)}`

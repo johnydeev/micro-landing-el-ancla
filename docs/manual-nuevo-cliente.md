@@ -20,7 +20,7 @@ Tiempo total: ~1 h de escritorio + ~20 min por tele.
 - [ ] Contraseña del wifi del local.
 - [ ] Cada tele: que tenga HDMI libre y un enchufe cerca para el Fire TV.
 - [ ] Fire TV Stick: lo compra el cliente (la puesta en marcha no lo incluye).
-- [ ] Fecha de cobro del abono (para `pagado_hasta` en Supabase).
+- [ ] Fecha de cobro del abono (se carga en el panel `/admin`, en `pagado_hasta`).
 
 Referencia comercial (05/10/2026): puesta en marcha $150.000 sin Fire TV;
 abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
@@ -65,19 +65,26 @@ abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
 1. `.env.local` con los secretos (una sola vez, no por cliente):
    `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `VERCEL_TOKEN`,
    `VERCEL_PROJECT_ID`, `ACTIVACION_SECRET`, `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY` (las dos últimas también en Vercel, Production).
+   `SUPABASE_SERVICE_ROLE_KEY` (las dos últimas también en Vercel, Production),
+   y `ADMIN_PASSWORD` solo en Vercel (Secret, Production): es la contraseña del
+   panel `/admin`.
 2. `npm run alta` → nombre, slug, eslogan, dos colores, badge, contactos, URL
    de la planilla, logo. Escribe `tenants/<slug>.ts`, lo registra, crea
-   `TENANT_<SLUG>_CSV_URL` en Vercel y en `.env.local`, corre los tests.
+   `TENANT_<SLUG>_CSV_URL` en Vercel y en `.env.local`, **crea la fila del
+   cliente en `comercios`** (Supabase) y corre los tests. Flag `--sin-supabase`
+   si no querés tocar la base; sin `SUPABASE_*` avisa "Cargá la fila en
+   comercios a mano" y sigue.
 3. Revisar `tenants/<slug>.ts` a mano:
    - `defaults.whatsapp` / `instagram` / `horarios` reales.
    - Paleta: probar en `npm run dev` → `localhost:3000/<slug>`. Si el
      primario lleva texto blanco encima, no puede ser un color claro (caso El
      Látigo: amarillo al `acento`, negro de primario).
-4. **Fila del cliente en Supabase** (proyecto `tv-precios` → Table Editor →
-   `comercios`): `slug` igual al del tenant, `requiere_activacion` en **false**
-   (en true bloquearía las teles antes de instalarlas), `pagado_hasta` vacío.
-   Sin esta fila sus teles no se registran ni se pueden bloquear.
+4. **Fila del cliente en Supabase**: la crea `npm run alta` (`slug` del tenant,
+   `requiere_activacion` en **true**, `pagado_hasta` vacío). Verificar que
+   aparece en el panel `/admin` (vista Clientes). Solo si el script avisó que
+   no pudo: cargarla a mano en `tv-precios` → Table Editor → `comercios` con
+   `requiere_activacion` en true. Sin esta fila sus teles no se registran, no
+   muestran código y no se pueden bloquear.
 5. `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 6. Commit + push **fuera del horario de atención de los comercios que ya
    están en producción** (El Ancla cierra 13 h y 20:15): el push redeploya
@@ -96,19 +103,21 @@ abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
 - Guardar en el gestor de contraseñas: cuenta, contraseña, PIN de Prime Video,
   y por cada tele: nombre, número de serie, id de tele, rubros.
 
-## 5. Links de activación
+## 5. Activar las teles: código en pantalla
 
-```bash
-npm run activar -- <slug> <rubros> 6
-```
+Las teles no llevan link: la Start URL es la definitiva y la tele muestra un
+código que se carga en el panel (ver 6, Fully, pasos 4 y 5).
 
-- Uno por tele (`vacuno`, `cerdo,pollo`, `todo`). Anotar el **id** que
-  imprime.
-- El último número son las horas de vigencia: generarlos **el mismo día**, con
-  margen (6 h). Vencido → "Link de activacion invalido o vencido"; se genera
-  otro, no pasa nada.
+- Panel: `https://tv-precios.vercel.app/admin` (contraseña = `ADMIN_PASSWORD`).
+  Se usa también desde el celular.
+- **Plan B** (panel caído o tele que no muestra código): link largo firmado,
+  `npm run activar -- <slug> <rubros> 6` (`vacuno`, `cerdo,pollo`, `todo`).
+  Anotar el **id** que imprime. El último número son las horas de vigencia:
+  generarlo **el mismo día**, con margen (6 h). Vencido → "Link de activacion
+  invalido o vencido"; se genera otro.
 - Nunca mandar un link de activación por WhatsApp a nadie: activa cualquier
-  aparato que lo abra, con el id de la tele.
+  aparato que lo abra. El código del panel no tiene ese problema: solo lo
+  activa quien lo ve en la pantalla y entra al panel.
 
 ## 6. Fire TV (por tele, ~20 min)
 
@@ -136,12 +145,17 @@ Se puede hacer en casa y llevarlo configurado; en el local solo falta el wifi.
 3. Downloader → `fully-kiosk.com` → columna **BROWSER** → "Get APK file" →
    **Fully Kiosk Browser APK (regular edition)** (no EMM, no Single App) →
    Instalar → borrar el APK.
-4. Quick Start de Fully: **Start URL = link de activación**, los tres switches
-   apagados → Start using Fully → tiene que mostrar **solo su rubro**.
-5. **Cambiar la Start URL ya** (mantener apretado atrás → Settings → Web
-   Content Settings → Start URL) a `https://tv-precios.vercel.app/<slug>`.
-   Borrar también `activar/`: si queda `/activar/<slug>`, la tele arranca en
-   "Link de activacion invalido" (nos pasó).
+4. Quick Start de Fully: **Start URL = `https://tv-precios.vercel.app/<slug>`**
+   (la definitiva), los tres switches apagados → Start using Fully. Con el
+   cliente nuevo (`requiere_activacion` en true) muestra "Pantalla no
+   habilitada" y un **código de activación** (ej. `K7M-2QX`).
+5. **Activar la tele**: en el panel `/admin` → cliente → **Nueva tele** →
+   escribir el código (sin guion, mayúsculas o minúsculas) y marcar sus
+   rubros (ninguno = todo) → **Activar tele**. En ≤5 s la tele recarga y muestra **solo
+   su rubro**. El código vence a los 15 min: si venció, la tele pide otro sola
+   (o recargarla). Plan B: link largo de la sección 5 como Start URL, y
+   después volver a la definitiva borrando también `activar/` (si queda
+   `/activar/<slug>`, arranca en "Link de activacion invalido").
 6. Web Content Settings y recargas:
    - Auto Reload after Page Error: **60**
    - Auto Reload on Internet Reconnect: **sí**
@@ -162,7 +176,7 @@ Se puede hacer en casa y llevarlo configurado; en el local solo falta el wifi.
    teclado no siempre deja iniciar sesión, y un teclado con receptor USB no se
    conecta al Fire TV (el USB es de la tele). Un teclado **Bluetooth** sí.
    Cuidado con vincular por Bluetooth algo que no es tuyo: aparecen teles
-   vecinas ("[TV] …").
+   vecinas ("[TV] …"). Con el código de 6 caracteres casi no hace falta teclado.
 
 ### Encuadre
 
@@ -179,6 +193,7 @@ derecha** (verde online, ámbar último dato bueno, rojo sin internet).
       carteles encima.
 - [ ] Rota entre tablas y carteles de oferta de su rubro.
 - [ ] Punto de estado visible y verde.
+- [ ] En el panel `/admin` la tele aparece con su rubro y badge verde.
 - [ ] En los logs de Vercel (proyecto `carteleria`, retienen 1 h) aparece
       `[tele] {"id":"<id>",…}` con sus rubros. Pedímelo y lo miro.
 
@@ -195,47 +210,65 @@ derecha** (verde online, ámbar último dato bueno, rojo sin internet).
      activación);
    - si una tele muestra "Pantalla no habilitada": avisarte.
 
-## 8. Cerrar la activación (sin push)
+## 8. Cierre de la instalación (sin push)
 
-Con **todas** las teles del cliente activadas y probadas, en Supabase
-(`tv-precios` → Table Editor):
+Con **todas** las teles del cliente activadas y probadas:
 
-1. `teles`: verificar que aparecen sus teles (se registran solas en su primera
-   carga) y ponerles `nombre` ("vacuno", "mostrador").
-2. `comercios` → fila del cliente: `requiere_activacion = true` y
-   `pagado_hasta` = fecha de cobro.
+1. En el panel `/admin` verificar que figuran todas sus teles con el rubro
+   correcto y badge verde (se registran solas al activarlas).
+2. Cargar la **fecha de pago** del cliente (completar **Fecha de pago** y apretar **Guardar fecha**;
+   sin apretarlo no se guarda. **Pagó** la corre al mismo día del mes siguiente).
 
-Impacta en ≤10 min, sin push. Desde ahí, un aparato sin activar ve
-"Pantalla no habilitada"; las teles activadas siguen igual. Verificar desde tu
-PC: `/<slug>` tiene que mostrar el bloqueo.
+No hace falta "cerrar la activación": el cliente nuevo ya nace con
+`requiere_activacion = true` (lo crea `npm run alta`), así que un aparato sin
+activar ve "Pantalla no habilitada" desde el primer día. Verificar desde tu PC
+(navegador sin la cookie): `/<slug>` tiene que mostrar el bloqueo con el código.
+
+Excepción: clientes anteriores a la Parte B (El Látigo) tienen la fila creada
+a mano; si `requiere_activacion` está en false, prenderlo por SQL en Supabase
+(el panel no lo expone): `update comercios set requiere_activacion = true
+where slug = '<slug>';`.
 
 Si el dueño quiere ver las pantallas en su celular: link de activación propio
 con id aparte (`npm run activar -- <slug> todo`), abierto en Chrome (no en el
-navegador de WhatsApp).
+navegador de WhatsApp), o una **Nueva tele** más con su código.
 
-## 9. Mantenimiento
+## 9. Mantenimiento (desde el panel `/admin`)
 
-- **Cobro mensual**: correr `comercios.pagado_hasta` en Supabase. Vencido + 5
-  días → "Servicio suspendido" en todas sus teles; vuelve sola al correr la
-  fecha (≤10 min, sin push).
-- **Apagar o prender una tele**: `teles.activa` en Supabase (≤10 min).
-- **Última conexión de una tele**: `teles.ultima_conexion` (se actualiza cada
-  ~10 min mientras está prendida).
-- **Tele reseteada o Fully reinstalado**: se pierde la cookie → link nuevo,
-  pasos 6.4 y 6.5.
-- **Cookie de activación**: dura 400 días (límite de Chrome). Renovar antes
-  (pendiente: que lo haga el panel).
-- **Cambio de rubro de una tele**: `teles.rubros` en Supabase (ej. `{cerdo,pollo}`;
-  vacío = todo), sin ir al local.
+- **Cobro mensual**: botón **Pagó** (corre `pagado_hasta` al mismo día del mes
+  siguiente) o completar **Fecha de pago** y apretar **Guardar fecha**. El panel solo **avisa**: "por vencer" (≤3
+  días) y "vencido" con los días de atraso. El sistema **nunca corta solo**:
+  si el cliente no paga, vos decidís y apagás.
+- **Apagar o prender**: switch por tele (la tele muestra "Pantalla
+  desactivada") o **Apagar todas / Prender todas** por cliente (≤10 min, sin
+  push).
+- **Última conexión de una tele**: badge de cada tele (verde < 15 min, ámbar
+  15-60 min, rojo > 60 min o nunca, gris si está apagada). La tele reporta
+  cada ~10 min mientras está prendida.
+- **Tele reseteada o Fully reinstalado**: se pierde la cookie → Start URL
+  definitiva y **Nueva tele** con el código nuevo (pasos 6.4 y 6.5). Queda
+  como una tele más: apagar la vieja.
+- **Cookie de activación**: la renueva sola `proxy.ts` mientras la tele esté
+  prendida (dura 400 días, límite de Chrome). Una tele apagada más de 400 días
+  hay que volver a activarla.
+- **Cambio de rubro de una tele**: **Cambiar rubros** en el panel (pide la
+  contraseña; vacío = todo), sin ir al local.
+- **Baja de un cliente**: **Dar de baja** (pide la contraseña). Sus teles
+  muestran "Pantalla no habilitada", deja de autoregistrar teles y pasa a la
+  vista **Bajas**. **Reactivar** (un clic) lo devuelve como estaba.
 
 ## Problemas conocidos
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
 | "Link de activacion invalido o vencido" al arrancar | Start URL quedó con el link o con `/activar/` | Start URL = `https://tv-precios.vercel.app/<slug>` |
-| Muestra todos los rubros | Sin cookie (otro navegador, cookies borradas), o `teles.rubros` vacío | Activar de nuevo, o cargar sus rubros en `teles` |
-| "Pantalla desactivada" | `teles.activa = false` | Prender el switch en Supabase |
-| "Servicio suspendido" | `comercios.pagado_hasta` vencido + 5 días | Correr la fecha en Supabase |
+| Muestra todos los rubros | Sin cookie (otro navegador, cookies borradas), o `teles.rubros` vacío | Activar de nuevo, o Cambiar rubros en el panel |
+| "Pantalla desactivada" | `teles.activa = false` | Prender el switch en el panel |
+| "Pantalla no habilitada" con código | Tele sin activar (primera vez, o cookie borrada) | Cargar el código en el panel → Nueva tele |
+| "Pantalla no habilitada" y el panel no la muestra | Cliente dado de baja | Reactivar en la vista Bajas del panel |
+| No aparece el código en la pantalla bloqueada | Cliente dado de baja | Verificar la vista Bajas y reactivar; plan B con `npm run activar` |
+| La pantalla muestra precios sin bloqueo ni código | Sin fila en `comercios` (no hay bloqueo, por eso no hay código) | Crear la fila con `npm run alta` o en Supabase |
+| El código dice vencido o inválido | Pasaron 15 min o se escribió mal | Recargar la tele (pide uno nuevo) y cargarlo antes |
 | Cartel "Permissions required" en cada arranque | Se apretó Cancel | Apretar IGNORE |
 | Ícono de micrófono en la esquina | Sin resolver (no es el permiso de Fully) | Pendiente: ADB para ver qué app lo usa |
 | Bordes cortados, punto de estado invisible | Overscan de la tele | Ajustar a pantalla |

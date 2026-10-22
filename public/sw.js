@@ -18,6 +18,9 @@
  * version, el SW borra todas las caches que no coincidan.
  */
 
+// v8: alta de teles por codigo. /api/* pasa directo a la red: el polling de
+// /api/alta lleva el nonce y no debe quedar guardado en cache.
+//
 // v7: sesion 21 (multitenant + Cloudinary). Las imagenes ya no son
 // same-origin: se agrega res.cloudinary.com a los origenes cacheables. Sin
 // esto, con la wifi caida el cartel mostraria precio sin foto. Las <img>
@@ -34,7 +37,7 @@
 //
 // v5/v4: sesion 10. Se elimino el polling de /api/* y se agrego reload
 // completo cada 1 hora + HealthIndicator.
-const CACHE_VERSION = 'micro-landing-v7'
+const CACHE_VERSION = 'micro-landing-v8'
 
 const ORIGENES_CACHEABLES = new Set([self.location.origin, 'https://res.cloudinary.com'])
 
@@ -143,6 +146,13 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return
 
   const url = new URL(req.url)
+
+  // /api/* nunca se cachea (el polling de /api/alta lleva el nonce).
+  if (url.pathname.startsWith('/api/')) return
+
+  // /admin* nunca se cachea: panel privado (el no-store del server no frena a
+  // Cache Storage) y un panel viejo offline seria peor que un error.
+  if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) return
 
   // Same-origin + Cloudinary. Fonts externas, beacons, etc. pasan sin
   // interferencia (en este proyecto basicamente no hay, pero defensivo).

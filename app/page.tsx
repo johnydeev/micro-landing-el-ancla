@@ -19,7 +19,14 @@ export default async function Home({
   const tenant = getDefaultTenantOr404()
   const { rubro } = await searchParams
   const acceso = await resolverAcceso(tenant, rubro)
-  if (acceso.tipo !== 'ok') return <PantallaBloqueada tenant={tenant} motivo={acceso.tipo} />
+  if (acceso.tipo !== 'ok') return (
+      <PantallaBloqueada
+        tenant={tenant}
+        slug={tenant.slug}
+        motivo={acceso.tipo}
+        conCodigo={acceso.tipo === 'no-habilitada' && acceso.conCodigo}
+      />
+    )
   const rubros = acceso.rubros
   const { listas, ofertas, configRemota, estado, generadoEn } = filtrarPorRubro(
     await getPantallaData(tenant),

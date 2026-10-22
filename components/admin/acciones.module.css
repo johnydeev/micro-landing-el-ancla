@@ -1,0 +1,214 @@
+/* Controles de accion del panel /admin (Task 8). Una columna en celular (<=640px). */
+
+.accionesCliente,
+.controlesTele {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.etiquetaFecha {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.inputFecha,
+.inputCodigo,
+.campo input {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 1px solid #b9c3d3;
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.inputCodigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inputFecha:focus-visible,
+.inputCodigo:focus-visible,
+.campo input:focus-visible,
+.secundario:focus-visible,
+.casilla input:focus-visible {
+  outline: 2px solid #1f3a5f;
+  outline-offset: 1px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.campo label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Boton que solo abre/cierra un panel (sin accion asincrona: sin spinner). */
+.secundario {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid #b9c3d3;
+  border-radius: 10px;
+  background: #fff;
+  color: #1f3a5f;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secundario:hover:not(:disabled) {
+  background: #eef2f8;
+}
+
+.secundario[aria-expanded='true'] {
+  border-color: #1f3a5f;
+}
+
+.secundario:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.peligro {
+  color: #b3261e;
+}
+
+/* Mas especificidad que .boton de BotonAccion (el orden de los CSS no esta garantizado). */
+.panel .botonPeligro {
+  background: #b3261e;
+}
+
+.panel .botonPeligro:hover:not(:disabled) {
+  background: #8f1e18;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid #dde3ec;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.rubros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  border: 0;
+}
+
+.rubros legend {
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.casilla input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #1f3a5f;
+}
+
+.nota {
+  flex-basis: 100%;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.error {
+  color: #b3261e;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Switch de la tele: pista + perilla; el spinner de BotonAccion va al lado mientras corre. */
+.controlesTele .switch {
+  gap: 0.6rem;
+  padding: 0 0.9rem 0 0.6rem;
+  border: 1px solid #b9c3d3;
+  background: #fff;
+  color: #17202e;
+}
+
+.controlesTele .switch:hover:not(:disabled) {
+  background: #eef2f8;
+}
+
+.controlesTele .switch:focus-visible {
+  outline: 2px solid #1f3a5f;
+  outline-offset: 2px;
+}
+
+.pista {
+  position: relative;
+  width: 2.6rem;
+  height: 1.5rem;
+  flex: none;
+  border-radius: 999px;
+  background: #9aa5b5;
+  transition: background 0.15s;
+}
+
+.perilla {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.switch[data-activa='true'] .pista {
+  background: #1b7f3b;
+}
+
+.switch[data-activa='true'] .perilla {
+  transform: translateX(1.1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pista,
+  .perilla {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .fila > * {
+    flex: 1 1 auto;
+  }
+
+  .etiquetaFecha {
+    flex-basis: 100%;
+  }
+}

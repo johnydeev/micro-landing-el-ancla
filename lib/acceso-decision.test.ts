@@ -18,7 +18,7 @@ const estado = (over: {
   comercio:
     over.comercio === null
       ? null
-      : { requiereActivacion: false, pagadoHasta: null, ...over.comercio },
+      : { requiereActivacion: false, pagadoHasta: null, dadoDeBaja: false, ...over.comercio },
   tele: over.tele === null || over.tele === undefined ? null : { activa: true, rubros: null, ...over.tele },
 })
 
@@ -37,18 +37,20 @@ test('comercio null es sin control', () => {
   assert.equal(rubros(decidir(estado({ comercio: null }), null)), null)
 })
 
-test('pago vencido suspende', () => {
-  assert.equal(decidir(estado({ comercio: { pagadoHasta: '2026-10-14' } })).tipo, 'suspendida')
-  assert.equal(decidir(estado({ comercio: { pagadoHasta: '2026-10-15' } })).tipo, 'ok')
+test('pago vencido ya no suspende', () => {
+  assert.equal(decidir(estado({ comercio: { pagadoHasta: '2026-01-01' } })).tipo, 'ok')
 })
 
-test('suspendida gana a todo', () => {
-  const e = estado({ comercio: { pagadoHasta: '2026-10-01', requiereActivacion: true }, tele: { activa: false } })
-  assert.equal(decidir(e).tipo, 'suspendida')
+test('baja bloquea aunque tenga cookie', () => {
+  const e = estado({ comercio: { dadoDeBaja: true }, tele: { activa: true } })
+  assert.deepEqual(decidir(e), { tipo: 'no-habilitada', conCodigo: false })
 })
 
 test('requiere sin tele no habilita', () => {
-  assert.equal(decidir(estado({ comercio: { requiereActivacion: true } }), null).tipo, 'no-habilitada')
+  assert.deepEqual(decidir(estado({ comercio: { requiereActivacion: true } }), null), {
+    tipo: 'no-habilitada',
+    conCodigo: true,
+  })
 })
 
 test('requiere con tele sin fila usa la cookie', () => {
@@ -89,18 +91,32 @@ test('sin cookie usa el param', () => {
 test('parsearEstado acepta la respuesta de la RPC', () => {
   assert.deepEqual(
     parsearEstado({
-      comercio: { requiere_activacion: true, pagado_hasta: '2026-10-31' },
+      comercio: { requiere_activacion: true, pagado_hasta: '2026-10-31', dado_de_baja: true },
       tele: { activa: false, rubros: ['cerdo'] },
     }),
     {
-      comercio: { requiereActivacion: true, pagadoHasta: '2026-10-31' },
+      comercio: { requiereActivacion: true, pagadoHasta: '2026-10-31', dadoDeBaja: true },
       tele: { activa: false, rubros: ['cerdo'] },
     },
   )
   assert.deepEqual(parsearEstado({ comercio: null, tele: null }), { comercio: null, tele: null })
   assert.deepEqual(
     parsearEstado({ comercio: { requiere_activacion: false, pagado_hasta: null }, tele: { activa: true, rubros: null } }),
-    { comercio: { requiereActivacion: false, pagadoHasta: null }, tele: { activa: true, rubros: null } },
+    { comercio: { requiereActivacion: false, pagadoHasta: null, dadoDeBaja: false }, tele: { activa: true, rubros: null } },
+  )
+})
+
+test('parsearEstado sin dado_de_baja', () => {
+  assert.deepEqual(
+    parsearEstado({ comercio: { requiere_activacion: false, pagado_hasta: null }, tele: null }),
+    { comercio: { requiereActivacion: false, pagadoHasta: null, dadoDeBaja: false }, tele: null },
+  )
+})
+
+test('parsearEstado rechaza dado_de_baja no booleano', () => {
+  assert.equal(
+    parsearEstado({ comercio: { requiere_activacion: false, pagado_hasta: null, dado_de_baja: 'si' }, tele: null }),
+    null,
   )
 })
 

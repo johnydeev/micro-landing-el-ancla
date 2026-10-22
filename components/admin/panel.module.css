@@ -1,0 +1,209 @@
+/* Vistas Clientes y Bajas del panel /admin. Una columna en celular (<=640px). */
+
+.nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid #b9c3d3;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f3a5f;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.navLink[aria-current='page'] {
+  border-color: #1f3a5f;
+  background: #1f3a5f;
+  color: #fff;
+}
+
+.navLink:focus-visible {
+  outline: 2px solid #1f3a5f;
+  outline-offset: 2px;
+}
+
+.titulo {
+  margin-bottom: 1rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.error,
+.vacio {
+  color: #4a5568;
+}
+
+.error {
+  padding: 1rem;
+  border: 1px solid #f0c2bd;
+  border-radius: 12px;
+  background: #fdecea;
+  color: #8a1c14;
+  font-weight: 600;
+}
+
+/* Avisos de pago */
+.avisos {
+  margin-bottom: 1.25rem;
+}
+
+.avisos ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.aviso {
+  padding: 0.75rem 1rem;
+  border-left: 4px solid;
+  border-radius: 10px;
+}
+
+.aviso[data-tipo='vencido'] {
+  border-color: #c62828;
+  background: #fdecea;
+  color: #7f1d17;
+}
+
+.aviso[data-tipo='por-vencer'] {
+  border-color: #c77700;
+  background: #fff4e0;
+  color: #6b4100;
+}
+
+/* Clientes */
+.lista {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.cliente {
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid #dde3ec;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.clienteCabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.clienteNombre {
+  font-size: 1.15rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.pago {
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Teles */
+.teles {
+  list-style: none;
+  border-top: 1px solid #eef1f5;
+}
+
+.tele {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.teleInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.teleRubros {
+  font-weight: 600;
+}
+
+.teleId {
+  color: #6b7686;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.teleEstado {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.teleControles {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.punto {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge[data-color='verde'] {
+  color: #1b7f3b;
+}
+
+.badge[data-color='ambar'] {
+  color: #b26a00;
+}
+
+.badge[data-color='rojo'] {
+  color: #c62828;
+}
+
+.badge[data-color='gris'] {
+  color: #6b7686;
+}
+
+.hace {
+  color: #6b7686;
+}
+
+@media (max-width: 640px) {
+  .lista {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

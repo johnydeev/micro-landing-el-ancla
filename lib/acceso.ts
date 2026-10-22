@@ -3,13 +3,13 @@ import 'server-only'
 import { cookies } from 'next/headers'
 
 import { decidirAcceso, type Acceso } from '@/lib/acceso-decision'
-import { verificarCookie } from '@/lib/activacion'
+import { COOKIE_TELE, verificarCookie } from '@/lib/activacion'
 import { estadoTele } from '@/lib/estado-tele'
 import type { Tenant } from '@/types/tenant'
 
-export { DIAS_GRACIA_PAGO, type Acceso } from '@/lib/acceso-decision'
+export { type Acceso } from '@/lib/acceso-decision'
 
-export const COOKIE_TELE = 'tele'
+export { COOKIE_TELE }
 
 /*
  * Decide si la tele puede mostrar precios y con que rubros. Lo usan todas

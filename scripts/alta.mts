@@ -4,15 +4,18 @@
  * Pregunta los datos del comercio, resuelve los gids de su planilla a partir
  * de la URL publicada, sube el logo a Cloudinary, escribe tenants/<slug>.ts,
  * lo registra en tenants/index.ts, crea la env TENANT_<SLUG>_CSV_URL en
- * Vercel y en .env.local, y corre los tests. Lo unico que no hace: crear la
- * planilla (copia de la planilla modelo) y el commit.
+ * Vercel y en .env.local, crea la fila del cliente en `comercios` (Supabase,
+ * con requiere_activacion = true) y corre los tests. Lo unico que no hace:
+ * crear la planilla (copia de la planilla modelo) y el commit.
  *
  * Secretos: solo en .env.local (CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET,
- * VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID opcional). El script corre
+ * VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID opcional, SUPABASE_URL y
+ * SUPABASE_SERVICE_ROLE_KEY). El script corre
  * con `node --env-file=.env.local`.
  *
  * Flags: --force (sobreescribir un tenant existente), --sin-logo,
- * --sin-vercel (no toca Vercel; util sin token).
+ * --sin-vercel (no toca Vercel; util sin token), --sin-supabase (no crea la
+ * fila en comercios; hay que cargarla a mano).
  *
  * Spec: docs/superpowers/specs/2026-09-20-alta-de-cliente-design.md
  */
@@ -37,12 +40,14 @@ import {
   firmaCloudinary,
   envKeyCsv,
   upsertEnv,
+  pedidoComercio,
 } from '../lib/alta.ts'
 
 const flags = new Set(argv.slice(2))
 const FORCE = flags.has('--force')
 const SIN_LOGO = flags.has('--sin-logo')
 const SIN_VERCEL = flags.has('--sin-vercel')
+const SIN_SUPABASE = flags.has('--sin-supabase')
 
 /*
  * Entrada: interactiva (TTY) o por pipe (`npm run alta < respuestas.txt`, una
@@ -229,7 +234,34 @@ async function main() {
     console.log(`  ✓ ${key} en Vercel (production, preview, development)`)
   }
 
-  // ---- 6. Tests -----------------------------------------------------------
+  // ---- 6. Fila del cliente en Supabase -------------------------------------
+  /*
+   * Sin esta fila las teles del cliente no se registran ni se pueden bloquear.
+   * Nace con requiere_activacion = true: el panel /admin ya puede darles de
+   * alta con codigo. Si falla algo, no se corta el alta: se avisa y se sigue.
+   */
+  const supabaseUrl = env.SUPABASE_URL
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY
+  if (SIN_SUPABASE) {
+    console.log(`→ Supabase: saltado (--sin-supabase). Cargá la fila en comercios a mano (slug ${slug}, requiere_activacion true)`)
+  } else if (!supabaseUrl || !supabaseKey) {
+    console.log(`→ Supabase: faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY. Cargá la fila en comercios a mano (slug ${slug}, requiere_activacion true)`)
+  } else {
+    console.log('→ Creando la fila en comercios…')
+    const pedido = pedidoComercio(supabaseUrl, supabaseKey, slug)
+    try {
+      const res = await fetch(pedido.url, pedido.init)
+      if (res.ok) {
+        console.log(`  ✓ comercios: ${slug} (requiere_activacion = true; si ya existía, quedó como estaba)`)
+      } else {
+        console.log(`  ✖ Supabase respondió ${res.status}: ${await res.text()}. Cargá la fila en comercios a mano.`)
+      }
+    } catch (e) {
+      console.log(`  ✖ Supabase: ${(e as Error).message}. Cargá la fila en comercios a mano.`)
+    }
+  }
+
+  // ---- 7. Tests -----------------------------------------------------------
   console.log('\n→ npm test')
   try {
     execSync('npm test', { stdio: 'inherit' })
@@ -241,7 +273,7 @@ async function main() {
 ✓ Alta lista: ${nombre} (${slug})
 
   Archivos:   ${tenantPath}, tenants/index.ts
-  URL de TV:  https://<dominio>/${slug}
+  URL de TV:  https://<dominio>/${slug}  (Start URL definitiva; la tele muestra el código)
   API:        https://<dominio>/api/${slug}/ofertas
 
 Listo para commitear. Recordá: el push deploya al instante para todos los

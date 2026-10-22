@@ -5,6 +5,39 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
+### Sesión 27 — 2026-10-21 (panel admin, Parte B)
+
+**Context**: operar clientes y teles sin tocar código ni el editor de
+Supabase. Spec `docs/superpowers/specs/2026-10-19-panel-admin-parte-b-design.md`.
+Plan `docs/superpowers/plans/2026-10-19-panel-admin-parte-b.md`. En código,
+pendiente de producción.
+
+**Added**
+- Panel `/admin` (login con `ADMIN_PASSWORD`, sesión por cookie firmada de 30
+  días): vistas Clientes y Bajas; badge de última conexión; switch por tele,
+  Apagar/Prender todas, **Pagó**, fecha de pago, **Nueva tele**, **Cambiar
+  rubros** y **Dar de baja** (estos dos piden contraseña) y **Reactivar**.
+- Alta de teles con código: la pantalla bloqueada muestra `XXX-XXX` (vence a
+  los 15 min, secreto que solo conoce la tele) y se carga en el panel
+  (`components/CodigoAlta.tsx`, `app/api/alta/`, `lib/codigo-alta.ts`).
+- `proxy.ts`: renueva la cookie de cada tele antes de los 400 días.
+- Migración `20261019000000_panel_parte_b.sql`: `comercios.dado_de_baja`,
+  tabla `codigos_alta`, `estado_tele` actualizada.
+- `npm run alta` crea la fila del cliente en `comercios` con
+  `requiere_activacion = true` (flag `--sin-supabase`; sin `SUPABASE_*` avisa
+  y sigue). `pedidoComercio` en `lib/alta.ts` con test.
+- `ADMIN_PASSWORD` en `.env.local.example`.
+
+**Changed**
+- Se elimina el corte automático por pago ("Servicio suspendido" y
+  `DIAS_GRACIA_PAGO`): `pagado_hasta` solo avisa en el panel; cortar es apagar
+  a mano.
+- Cliente dado de baja: "Pantalla no habilitada" aunque tenga cookie, sin
+  autoregistro de teles.
+- Docs: README (Activación de una tele), manual de nuevo cliente (secciones 3,
+  5, 6, 8, 9 y problemas conocidos), progreso. El link largo `npm run activar`
+  queda como plan B.
+
 ### Sesión 26 — 2026-10-17 (activación Parte A: estado en Supabase)
 
 **Context**: operar teles y cobros sin push. Spec

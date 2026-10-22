@@ -1,12 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { COOKIE_TELE } from '@/lib/acceso'
-import { firmarCookie, verificarLink } from '@/lib/activacion'
+import { firmarCookie, OPCIONES_COOKIE_TELE, verificarLink } from '@/lib/activacion'
 import { getTenant } from '@/tenants'
-
-// Chrome no deja cookies de mas de 400 dias. Antes de que venza, el panel
-// (o un link nuevo) la renueva.
-const COOKIE_MAX_AGE_S = 400 * 24 * 60 * 60
 
 /*
  * Link de activacion generado con `npm run activar`. Deja la cookie de la
@@ -31,12 +27,6 @@ export async function GET(
   // La TV de El Ancla apunta a "/", que renderiza DEFAULT_TENANT.
   const destino = tele.tenant === process.env.DEFAULT_TENANT ? '/' : `/${tele.tenant}`
   const respuesta = NextResponse.redirect(new URL(destino, request.url))
-  respuesta.cookies.set(COOKIE_TELE, firmarCookie(tele, secreto), {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: COOKIE_MAX_AGE_S,
-  })
+  respuesta.cookies.set(COOKIE_TELE, firmarCookie(tele, secreto), OPCIONES_COOKIE_TELE)
   return respuesta
 }

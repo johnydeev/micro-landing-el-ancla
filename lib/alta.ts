@@ -273,3 +273,29 @@ export function upsertEnv(envText: string, key: string, value: string): string {
   const sep = envText.length === 0 || envText.endsWith('\n') ? '' : '\n'
   return `${envText}${sep}${line}\n`
 }
+
+/*
+ * Pedido que crea la fila del cliente en `comercios` (Supabase, PostgREST).
+ * Nace con requiere_activacion = true: el cliente nuevo ya pide activar sus
+ * teles con el codigo. ignore-duplicates: si la fila existe no la pisa (no
+ * pierde pagado_hasta ni dado_de_baja).
+ */
+export function pedidoComercio(
+  supabaseUrl: string,
+  serviceKey: string,
+  slug: string,
+): { url: string; init: { method: 'POST'; headers: Record<string, string>; body: string } } {
+  return {
+    url: `${supabaseUrl.replace(/\/+$/, '')}/rest/v1/comercios`,
+    init: {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=ignore-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ slug, requiere_activacion: true }),
+    },
+  }
+}

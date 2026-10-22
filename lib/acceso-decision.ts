@@ -1,4 +1,4 @@
-import { pagoVencido, type Tele } from './activacion.ts'
+import type { Tele } from './activacion.ts'
 import { normalizarRubro, parseRubrosParam } from './rubros.ts'
 
 /*
@@ -9,20 +9,17 @@ import { normalizarRubro, parseRubrosParam } from './rubros.ts'
  * Spec: docs/superpowers/specs/2026-10-17-activacion-supabase-parte-a-design.md
  */
 
-/** Dias que la pantalla sigue andando despues de `pagado_hasta`. */
-export const DIAS_GRACIA_PAGO = 5
-
 export interface EstadoBase {
   /** null = el comercio no tiene fila: sin activacion ni control de pago. */
-  comercio: { requiereActivacion: boolean; pagadoHasta: string | null } | null
+  comercio: { requiereActivacion: boolean; pagadoHasta: string | null; dadoDeBaja: boolean } | null
   /** null = la tele no tiene fila (o no vino cookie). */
   tele: { activa: boolean; rubros: string[] | null } | null
 }
 
 export type Acceso =
   | { tipo: 'ok'; rubros: Set<string> | null }
-  | { tipo: 'no-habilitada' }
-  | { tipo: 'suspendida' }
+  /* conCodigo: la pantalla puede mostrar el codigo de alta (false si el comercio esta dado de baja). */
+  | { tipo: 'no-habilitada'; conCodigo: boolean }
   | { tipo: 'desactivada' }
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
@@ -41,7 +38,10 @@ export function parsearEstado(json: unknown): EstadoBase | null {
     const { requiere_activacion, pagado_hasta } = comercio
     if (typeof requiere_activacion !== 'boolean') return null
     if (pagado_hasta !== null && typeof pagado_hasta !== 'string') return null
-    c = { requiereActivacion: requiere_activacion, pagadoHasta: pagado_hasta }
+    // Ausente (funcion SQL vieja) = no dado de baja; presente y no booleano = basura.
+    const baja = comercio.dado_de_baja ?? false
+    if (typeof baja !== 'boolean') return null
+    c = { requiereActivacion: requiere_activacion, pagadoHasta: pagado_hasta, dadoDeBaja: baja }
   }
 
   let t: EstadoBase['tele'] = null
@@ -64,7 +64,8 @@ const aSet = (rubros: string[] | null): Set<string> | null => {
 }
 
 /*
- * Orden: suspendida → no habilitada → desactivada → ok. `tele` llega ya
+ * Orden: baja → no habilitada → desactivada → ok. El pago vencido no corta
+ * la pantalla: solo avisa en el panel (el corte es la baja, a mano). `tele` llega ya
  * filtrada (cookie valida y del mismo comercio). Estado null (la base fallo):
  * ante la duda, se muestra.
  */
@@ -72,20 +73,18 @@ export function decidirAcceso({
   estado,
   tele,
   rubroParam,
-  ahoraMs,
 }: {
   estado: EstadoBase | null
   tele: Tele | null
   rubroParam: string | string[] | undefined
-  ahoraMs: number
+  /** Ya no interviene (el pago no corta); se conserva por compatibilidad con los llamadores. */
+  ahoraMs?: number
 }): Acceso {
   const comercio = estado?.comercio ?? null
   const fila = estado?.tele ?? null
 
-  if (comercio?.pagadoHasta && pagoVencido(comercio.pagadoHasta, ahoraMs, DIAS_GRACIA_PAGO)) {
-    return { tipo: 'suspendida' }
-  }
-  if (comercio?.requiereActivacion && !tele) return { tipo: 'no-habilitada' }
+  if (comercio?.dadoDeBaja) return { tipo: 'no-habilitada', conCodigo: false }
+  if (comercio?.requiereActivacion && !tele) return { tipo: 'no-habilitada', conCodigo: true }
   if (fila && !fila.activa) return { tipo: 'desactivada' }
 
   if (fila) return { tipo: 'ok', rubros: aSet(fila.rubros) }

@@ -14,6 +14,7 @@ import {
   firmaCloudinary,
   envKeyCsv,
   upsertEnv,
+  pedidoComercio,
 } from './alta.ts'
 
 test('slugificar: acentos, espacios, simbolos', () => {
@@ -140,4 +141,14 @@ test('envKeyCsv y upsertEnv', () => {
   assert.equal(upsertEnv('A=1\nB=viejo\n', 'B', 'nuevo'), 'A=1\nB=nuevo\n')
   assert.equal(upsertEnv('', 'B', '2'), 'B=2\n')
   assert.equal(upsertEnv('A=1', 'B', '2'), 'A=1\nB=2\n')
+})
+
+test('pedidoComercio: fila nueva con requiere_activacion y sin pisar existentes', () => {
+  const p = pedidoComercio('https://x.supabase.co/', 'KEY', 'mi-local')
+  assert.equal(p.url, 'https://x.supabase.co/rest/v1/comercios')
+  assert.equal(p.init.method, 'POST')
+  assert.equal(p.init.headers.apikey, 'KEY')
+  assert.equal(p.init.headers.Authorization, 'Bearer KEY')
+  assert.match(p.init.headers.Prefer, /resolution=ignore-duplicates/)
+  assert.deepEqual(JSON.parse(p.init.body), { slug: 'mi-local', requiere_activacion: true })
 })

@@ -146,6 +146,9 @@ Variables de entorno (ver [`.env.local.example`](.env.local.example)):
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloud name de Cloudinary |
 | `NEXT_PUBLIC_CLOUDINARY_CATALOGO` | Carpeta base del catálogo (`catalogo-comun`, plana; el rubro va como tag) |
 | `TENANT_<SLUG>_CSV_URL` | Una por comercio: URL del CSV publicado de su planilla |
+| `ACTIVACION_SECRET` | Firma cookies de las teles y de la sesión del panel |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Estado de teles y cobros (solo servidor) |
+| `ADMIN_PASSWORD` | Contraseña del panel `/admin` (Secret, Production) |
 
 Scripts:
 
@@ -166,19 +169,35 @@ Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N
 > Recorrido completo de un cliente nuevo (planilla, alta, cuenta de Amazon,
 > Fire TV, Fully, local): [docs/manual-nuevo-cliente.md](docs/manual-nuevo-cliente.md).
 
-1. `npm run activar -- <slug> [rubros] [horas]` (ej. `npm run activar -- el-latigo cerdo,pollo`).
-   Imprime el id de la tele y un link que vence en 2 h por defecto. Un link por tele.
-2. Abrir el link en el Fire TV: deja la cookie y redirige a la pantalla. El rubro
-   queda fijo (el `?rubro=` del link se ignora).
-3. Estado en Supabase (proyecto `tv-precios`, tablas `comercios` y `teles`,
-   sin push): cada tele se registra sola en su primera carga si su comercio
-   tiene fila. `comercios.requiere_activacion` (sin cookie = "Pantalla no
-   habilitada"), `comercios.pagado_hasta` (+5 días = "Servicio suspendido"),
-   `teles.activa` (switch = "Pantalla desactivada"), `teles.rubros`,
-   `teles.ultima_conexion`. Si Supabase falla, se muestra igual.
+1. Start URL definitiva del Fire TV: `https://tv-precios.vercel.app/<slug>`.
+   Mientras la tele no esté activada muestra "Pantalla no habilitada" con un
+   **código de activación** (ej. `K7M-2QX`, vence a los 15 min).
+2. En el panel `/admin` (login con `ADMIN_PASSWORD`) → **Nueva tele** → escribir
+   el código y marcar los rubros. En ≤5 s la tele queda activada y recarga con
+   su rubro fijo. El código se guarda con un secreto que solo conoce la tele,
+   así que sin ver la pantalla no se puede activar.
+3. Plan B (sin panel): `npm run activar -- <slug> [rubros] [horas]` imprime el
+   id de la tele y un link largo firmado (2 h por defecto); abrirlo en el Fire
+   TV deja la cookie. Un link por tele; no mandarlo por WhatsApp.
+4. Estado en Supabase (proyecto `tv-precios`, tablas `comercios` y `teles`),
+   operado desde el panel, sin push:
+   - **Clientes**: cada tele con su rubro y badge de última conexión (verde
+     < 15 min, ámbar 15-60 min, rojo > 60 min o nunca, gris apagada); switch
+     por tele y **Apagar/Prender todas**; **Cambiar rubros** y **Dar de baja**
+     piden la contraseña.
+   - **Cobros**: `comercios.pagado_hasta` solo **avisa** en el panel ("por
+     vencer" ≤3 días, "vencido"); **Guardar fecha** fija la fecha a mano; **Pagó** la corre al mismo día del mes
+     siguiente. El sistema nunca corta por pago: cortar es apagar a mano.
+   - **Bajas**: el cliente dado de baja ve "Pantalla no habilitada" en todas
+     sus teles; **Reactivar** (un clic) lo devuelve como estaba.
+   - `comercios.requiere_activacion` (sin cookie = "Pantalla no habilitada"):
+     `npm run alta` lo crea en true. `teles.activa` (switch = "Pantalla
+     desactivada"). La cookie de cada tele se renueva sola (`proxy.ts`).
+   Si Supabase falla, se muestra igual.
 
 Detalle en `lib/activacion.ts`, `lib/acceso.ts`, `lib/acceso-decision.ts`,
-`lib/estado-tele.ts` y `supabase/migrations/`.
+`lib/estado-tele.ts`, `lib/codigo-alta.ts`, `app/admin/`, `app/api/alta/`, `proxy.ts`
+y `supabase/migrations/`.
 
 ## Alta de un cliente
 
@@ -224,7 +243,7 @@ que dar 200.
 ### 4. Secretos en `.env.local` (una sola vez, no por cliente)
 
 `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `VERCEL_TOKEN`,
-`VERCEL_PROJECT_ID` (ver `.env.local.example`). Sin comillas, como el resto del
+`VERCEL_PROJECT_ID`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (ver `.env.local.example`). Sin comillas, como el resto del
 archivo. El token de Vercel conviene con expiración larga: con 1 día hay que
 rehacerlo en cada alta.
 
@@ -238,9 +257,12 @@ planilla y la ruta del logo (vacío si ya lo subiste). Con eso:
 - sube el logo a Cloudinary como `logos/<slug>`;
 - escribe `tenants/<slug>.ts` y lo registra en `tenants/index.ts`;
 - crea `TENANT_<SLUG>_CSV_URL` en Vercel y en tu `.env.local`;
+- crea la fila del cliente en `comercios` (Supabase) con `requiere_activacion`
+  en true; sin las variables de Supabase avisa y hay que cargarla a mano;
 - corre `npm test`.
 
-Flags: `--force` (sobreescribir un tenant), `--sin-logo`, `--sin-vercel`.
+Flags: `--force` (sobreescribir un tenant), `--sin-logo`, `--sin-vercel`,
+`--sin-supabase`.
 Acepta respuestas por pipe: `npm run alta < cliente.txt`.
 
 La paleta completa se deriva de los dos colores; `tenants/<slug>.ts` queda

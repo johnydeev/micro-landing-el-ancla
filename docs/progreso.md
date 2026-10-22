@@ -832,25 +832,29 @@ listo para vender en su estado actual.
 
 ### Abierto
 
-- **Activación de pantallas — etapa 1 hecha** (12/10/2026). "Solo código":
-  **Parte A en código (17/10/2026)**: estado en Supabase (`tv-precios`,
-  tablas `comercios`/`teles`, función `estado_tele`); `requiereActivacion`/
-  `pagadoHasta` salieron de `tenants/`. Falta paso a producción (env en
-  Vercel, fila `el-latigo`, push) y Parte B (panel `/admin`, código corto).
-  Spec/plan: `docs/superpowers/{specs,plans}/2026-10-17-*`.
-  Etapa 1: `npm run activar -- <slug> [rubros] [horas]` genera link firmado
-  (`/activar/...`) que deja cookie `tele` con `{ id, tenant, rubros }`; el
-  rubro sale de la cookie. Por comercio: `requiereActivacion` (sin cookie =
-  "Pantalla no habilitada") y `pagadoHasta` (+5 días de gracia =
-  "Servicio suspendido"). Cada carga loguea `[tele]` en Vercel = última
-  conexión. Env: `ACTIVACION_SECRET` (obligatoria), `SOPORTE_CONTACTO`
-  (opcional). **Etapa 2**: panel `/admin` + Upstash, reusando el `id` de la
-  cookie (opciones en `docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md`).
-  Pendiente: renovar la cookie antes de 400 días (límite de Chrome).
-  Pendiente: link de activación más corto de tipear (hoy ~85 caracteres con el
-  control remoto). Opciones: `/a/<id>` corto, o código que muestra la tele y
-  se carga desde el panel (etapa 2). Mientras: app Amazon Fire TV en el
-  celular como teclado (pegar el link).
+- **Activación de pantallas — Parte B hecha en código (19-21/10/2026),
+  pendiente de producción.** Panel `/admin` (login con `ADMIN_PASSWORD`; vistas
+  Clientes y Bajas; switch por tele, Apagar/Prender todas, Pagó, fecha de pago,
+  Nueva tele con código, Cambiar rubros y Dar de baja con contraseña,
+  Reactivar), alta de teles con código de 6 caracteres que muestra la pantalla
+  (`components/CodigoAlta.tsx`, `app/api/alta/`), renovación de la cookie
+  (`proxy.ts`) y `npm run alta` que crea la fila en `comercios`. Se eliminó el
+  corte automático por pago ("Servicio suspendido"): `pagado_hasta` solo avisa
+  en el panel. Migración `20261019000000_panel_parte_b.sql`.
+  **Falta**: cargar `ADMIN_PASSWORD` (Secret, Production) en Vercel, push fuera
+  de horario (+ Redeploy si la variable se cargó después), verificar
+  `/admin/login` en producción, y dar de alta El Látigo en el panel: fecha de
+  pago, ver `vufw80` y `7au8no` con badge verde y prender
+  `requiere_activacion` por SQL (el panel no lo expone). Spec/plan:
+  `docs/superpowers/{specs,plans}/2026-10-19-*`.
+  Antes: Parte A en código (17/10/2026), estado en Supabase (`tv-precios`,
+  tablas `comercios`/`teles`, función `estado_tele`); etapa 1 (12/10/2026):
+  `npm run activar -- <slug> [rubros] [horas]` genera el link firmado
+  (`/activar/...`) que deja la cookie `tele` con `{ id, tenant, rubros }`;
+  ahora es el plan B del código. Cada carga loguea `[tele]` en Vercel. Env:
+  `ACTIVACION_SECRET` (obligatoria), `SOPORTE_CONTACTO` (opcional),
+  `SUPABASE_*`, `ADMIN_PASSWORD`. Opciones históricas en
+  `docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md`.
 
 - **Cuenta de Amazon de los Fire TV** (El Ancla + El Látigo comparten una).
   1) Mail y contraseña en el gestor de contraseñas (prioridad: sin acceso, un
@@ -951,8 +955,10 @@ aparece un caso de uso real:
     productos.
   - `GOOGLE_SHEETS_GID_OFERTAS`: `gid` de la pestaña de ofertas.
   - `GOOGLE_SHEETS_GID_CONFIG`: `gid` de la pestaña de config remota.
-  - `ACTIVACION_SECRET`: firma links y cookies de activación de teles
-    (solo Production en Vercel). `SOPORTE_CONTACTO` opcional.
+  - `ACTIVACION_SECRET`: firma links y cookies de activación de teles y la
+    sesión del panel (solo Production en Vercel). `SOPORTE_CONTACTO` opcional.
+  - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: estado de teles y cobros.
+  - `ADMIN_PASSWORD`: contraseña del panel `/admin` (Secret, Production).
 - Si falta `GOOGLE_SHEETS_CSV_URL` los lectores devuelven array
   vacío y loguean a `console.error`; la página igual renderiza.
 - El proyecto usa **Next.js 16** (no es el Next.js anterior — ver

@@ -1,0 +1,24 @@
+/* Se lee a 3 metros de una TV: todo en vw, como el resto de PantallaBloqueada. */
+.alta {
+  margin-top: 3vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1vh;
+}
+
+.etiqueta {
+  font-size: 2.5vw;
+  opacity: 0.85;
+}
+
+.codigo {
+  font-family: ui-monospace, 'Cascadia Mono', 'Roboto Mono', monospace;
+  font-size: 9vw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 2vh 3vw;
+  border-radius: 1.5vw;
+  background: rgba(0, 0, 0, 0.25);
+}
