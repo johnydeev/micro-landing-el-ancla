@@ -231,6 +231,9 @@
   position: absolute;
   top: 50%;
   left: 8%;
+  /* Por encima de la foto: la imagen va despues en el DOM y la tapaba
+     cuando la oferta usa un tamano alto (columna "tamano"). */
+  z-index: 2;
   max-width: 18%;
   background: var(--c-secundario);
   border: 3px solid #fff;
@@ -248,6 +251,8 @@
   position: absolute;
   top: 3%;
   left: 8%;
+  /* Delante de la foto: va antes en el DOM y con tamanos altos la tapaba. */
+  z-index: 2;
   background: var(--c-primario);
   color: #fff;
   border-radius: 16px;
@@ -275,6 +280,8 @@
   left: 33%;
   right: 5%;
   top: 3%;
+  /* Mismo motivo que .cartelBadge: la foto se pinta despues en el DOM. */
+  z-index: 2;
   display: flex;
   justify-content: center;
 }
