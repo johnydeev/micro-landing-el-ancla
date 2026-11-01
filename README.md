@@ -149,6 +149,8 @@ Variables de entorno (ver [`.env.local.example`](.env.local.example)):
 | `ACTIVACION_SECRET` | Firma cookies de las teles y de la sesión del panel |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Estado de teles y cobros (solo servidor) |
 | `ADMIN_PASSWORD` | Contraseña del panel `/admin` (Secret, Production) |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REFRESH_TOKEN` | Solo scripts locales (`alta-express`, `google-auth`): OAuth de Drive + Sheets |
+| `GOOGLE_TEMPLATE_SHEET_ID` | Solo `alta-express` (local): planilla modelo a copiar |
 
 Scripts:
 
@@ -158,6 +160,8 @@ npm run build   # build de producción
 npm test        # node --test sobre lib/ y tenants/
 npm run lint
 npm run alta    # alta de un cliente (ver abajo)
+npm run alta-express -- cliente.json   # atajo: planilla + config + logo + tenant + env + Supabase
+npm run google-auth                    # OAuth de Google, una sola vez
 ```
 
 Rutas de desarrollo: `/<slug>/vistaLista?index=N` y `/<slug>/vistaCartel?index=N` fijan la pantalla en un modo sin rotación.
@@ -203,6 +207,8 @@ y `supabase/migrations/`.
 
 Probado de punta a punta el 01/10/2026 con el comercio de muestra (`/demo`).
 Lleva unos 20 minutos. Los pasos 1 a 4 son manuales; el 5 lo hace el script.
+El atajo `alta-express` (más abajo) automatiza la copia de la planilla, la
+configuración, el logo, el tenant, la env y la fila en Supabase.
 
 ### 1. La planilla del cliente
 
@@ -276,6 +282,50 @@ Son 1-2 segundos de interrupción, pero mejor evitarlos con público en el local
 
 Después del deploy, verificar `<dominio>/<slug>`. Si no ves el cambio en tu
 navegador, **Ctrl+F5**: el CSS y el HTML viejos quedan cacheados.
+
+### Atajo: `npm run alta-express`
+
+Automatiza los pasos 1, 3 y 5 a partir de un JSON: copia la planilla
+modelo, la comparte por link, escribe la configuracion, resuelve los gids,
+sube el logo, crea el tenant, la env y la fila en Supabase. El paso 2
+(verificar que los slugs de imagen existan en Cloudinary) sigue siendo manual.
+
+```bash
+cp scripts/cliente.ejemplo.json cliente.json   # editar datos
+npm run alta-express -- cliente.json
+```
+
+Requisitos (una sola vez):
+
+1. En Google Cloud, habilitar **Drive API** y **Sheets API**.
+2. Crear un **ID de cliente OAuth** de tipo **App de escritorio** y pegar
+   `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` en `.env.local`.
+3. Correr `npm run google-auth`: abre el navegador, autorizás Drive + Sheets
+   y guarda `GOOGLE_OAUTH_REFRESH_TOKEN` en `.env.local`.
+4. Poner el id de la planilla modelo en `GOOGLE_TEMPLATE_SHEET_ID` o en
+   `planilla.templateId` del JSON.
+
+Se usa OAuth (no service account) porque una service account no tiene cuota de
+Drive y no puede ser dueña de la copia. Si la app de OAuth queda en modo
+**Testing**, Google vence el refresh token a los 7 días: se vuelve a correr
+`npm run google-auth`.
+
+El CSV se arma con `/export?format=csv&gid=`, asi que no hace falta
+"Publicar en la web": alcanza con que la copia quede compartida como
+"Cualquiera con el link". Si en el JSON usás `planilla.sheetId` (una planilla
+ya existente), el script **no cambia sus permisos**: agregá
+`"compartir": true` si querés que la comparta. Tampoco escribe su
+configuración salvo `"escribirConfig": true` (pisaría lo que ven sus teles). Flags: `--force`, `--sin-logo`,
+`--sin-vercel`, `--sin-supabase`. Sigue faltando el commit + push y activar las
+teles.
+
+Los slugs no pueden empezar con `api`, `admin` ni `activar`: el matcher de
+`proxy.ts` excluye esas rutas y la cookie de la tele no se renovaría.
+
+Detalle técnico, decisiones y límites: [`docs/alta-express.md`](docs/alta-express.md).
+
+La copia hereda el `IMPORTRANGE` del catálogo. Si al abrirla el catálogo no
+carga, entrar a `_catalogo` y volver a dar "Permitir acceso".
 
 ### Si cambiás el slug de un tenant existente
 

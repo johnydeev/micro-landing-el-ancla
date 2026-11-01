@@ -5,7 +5,54 @@ Versionado semántico cuando se publique a producción.
 
 ## [Unreleased]
 
-### Sesión 27 — 2026-10-21 (panel admin, Parte B)
+### Imágenes de ofertas con margen uniforme
+
+**Changed**
+- `urlOferta` (`lib/cloudinary.ts`) antepone la transformación nombrada
+  `t_margen8`: recorta el transparente sobrante y deja 8% del lado más largo
+  en los cuatro lados. Es al vuelo (no toca los assets) y aplica a las ofertas
+  de **todos** los comercios. `t_margen8` tiene que existir en Cloudinary
+  (verificado 31/10: responde 200 y sigue sirviendo el placeholder si el slug
+  no existe).
+
+### Alta express — 2026-10-22
+
+**Added**
+- `npm run alta-express -- cliente.json`: alta de cliente sin tocar Google
+  Sheets a mano. Copia la planilla modelo (Drive API), la comparte por link,
+  escribe la configuracion, resuelve los gids, sube el logo, crea
+  `tenants/<slug>.ts`, la env en Vercel/`.env.local` y la fila en `comercios`.
+- `npm run google-auth`: OAuth de Google una sola vez (Drive + Sheets) y
+  guarda el refresh token en `.env.local`. Se usa OAuth y no service account
+  porque una service account no tiene cuota de Drive para ser dueña de la copia.
+- `lib/google.ts` (OAuth y APIs REST de Drive/Sheets sin dependencias), `lib/alta-express.ts`
+  (validacion del JSON, URL `/export?format=csv`, escritura de Configuracion),
+  `lib/logo-cloudinary.ts` (subida compartida con `npm run alta`) y tests.
+- `scripts/cliente.ejemplo.json` y seccion en el README. Detalle tecnico,
+  decisiones y riesgos: `docs/alta-express.md`.
+
+**Changed**
+- `normalizarClave` de `lib/planilla.ts` ahora se exporta (la usa el alta express).
+- Si el JSON usa `planilla.sheetId` (planilla existente), no se tocan sus
+  permisos salvo `planilla.compartir: true`; las copias nuevas se comparten
+  siempre por link.
+- El alta (`npm run alta` y `alta-express`) rechaza slugs que empiezan con
+  `api`, `admin` o `activar` (el matcher de `proxy.ts` no les renueva la cookie).
+- `alta-express` elige la pestaña de listas por nombre (no por orden) y valida
+  los encabezados del CSV antes de escribir archivos.
+- `alta-express` no toma como CSV la pagina de login que Google devuelve para
+  una planilla no compartida; con `planilla.sheetId` no escribe la
+  configuracion salvo `"escribirConfig": true`; prueba el token de Vercel en
+  el preflight y crea la env antes de escribir archivos del repo.
+- `lib/alta-io.ts`: env de Vercel, archivos del tenant, fila de Supabase y
+  `existe()` compartidos por `alta`, `alta-express` y `google-auth` (antes
+  copiados en cada script). `npm run alta` ahora también crea la env en Vercel
+  antes de escribir archivos.
+- `alta-express` corta enseguida ante 4xx o login de una planilla existente;
+  solo reintenta mientras propaga el permiso de una planilla recién compartida.
+  Sin pestaña de listas, el error lista las pestañas en vez de tomar otra.
+
+### Sesión 27 — 2026-10-21 (panel admin, Parte B) · en producción 2026-10-22
 
 **Context**: operar clientes y teles sin tocar código ni el editor de
 Supabase. Spec `docs/superpowers/specs/2026-10-19-panel-admin-parte-b-design.md`.

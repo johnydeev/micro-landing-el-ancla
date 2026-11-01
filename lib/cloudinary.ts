@@ -59,11 +59,14 @@ export function versionDelDia(fecha: Date = new Date()): string {
  * como tag en Cloudinary, no en la ruta. `d_placeholder.png`: si el slug no
  * existe en Cloudinary, sirve la imagen `placeholder.png` de la raiz del
  * cloud en vez de 404.
+ *
+ * `t_margen8` recorta el transparente sobrante y deja 8% del lado mas largo en
+ * los cuatro lados. Es una transformacion al vuelo: no modifica el asset.
  */
 export function urlOferta(slug: string, fecha: Date = new Date()): string {
   return urlImagen(
     `${versionDelDia(fecha)}/${carpetaCatalogo()}/${slug}`,
-    'f_auto,q_auto,w_1200,d_placeholder.png',
+    't_margen8/f_auto,q_auto,w_1200,d_placeholder.png',
   )
 }
 

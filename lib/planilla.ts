@@ -399,7 +399,8 @@ const CONFIG_ALIASES: Record<string, keyof ConfigNegocio> = {
   'hora atenuado hasta': 'atenuarHasta',
 }
 
-function normalizarClave(raw: string): keyof ConfigNegocio | null {
+/* Exportada para el alta express: escribe valores en la fila correcta de Configuracion. */
+export function normalizarClave(raw: string): keyof ConfigNegocio | null {
   const key = quitarAcentos(raw.trim().toLowerCase())
   return CONFIG_ALIASES[key] ?? null
 }

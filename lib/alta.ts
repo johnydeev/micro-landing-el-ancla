@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto'
 
 const COMBINING_DIACRITICS = new RegExp('[\\u0300-\\u036f]', 'g')
 
-function sinAcentos(raw: string): string {
+export function sinAcentos(raw: string): string {
   return raw.normalize('NFD').replace(COMBINING_DIACRITICS, '')
 }
 
@@ -23,6 +23,17 @@ export function slugificar(raw: string): string {
 }
 
 export const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/*
+ * El matcher de proxy.ts excluye /api*, /admin*, /activar* y /_next*: un
+ * tenant con esos prefijos no renovaria la cookie de la tele (vence a los
+ * 400 dias). Se rechazan en el alta.
+ */
+const PREFIJOS_RESERVADOS = ['api', 'admin', 'activar'] as const
+
+export function slugReservado(slug: string): boolean {
+  return PREFIJOS_RESERVADOS.some((p) => slug.startsWith(p))
+}
 
 /* "carniceria-lopez" -> "carniceriaLopez" (nombre del export en tenants/) */
 export function camelCase(slug: string): string {

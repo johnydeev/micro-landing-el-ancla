@@ -2,7 +2,8 @@
 
 De "cerré la venta" a "las teles andan solas en el local". Armado el
 12/10/2026 con lo aprendido en El Látigo (2 teles). Detalle técnico del alta
-en el README ("Alta de un cliente"); acá está el orden completo y las trampas.
+en el README ("Alta de un cliente") y en
+[`docs/alta-express.md`](alta-express.md); acá está el orden completo y las trampas.
 
 Tiempo total: ~1 h de escritorio + ~20 min por tele.
 
@@ -74,6 +75,10 @@ abono $35.000 con 1 tele, $30.000 c/u con 2 o más.
    cliente en `comercios`** (Supabase) y corre los tests. Flag `--sin-supabase`
    si no querés tocar la base; sin `SUPABASE_*` avisa "Cargá la fila en
    comercios a mano" y sigue.
+   **Atajo**: `npm run alta-express -- cliente.json` reemplaza el paso 2
+   (además de la copia de la planilla y el logo) por editar el JSON; el paso 1
+   de secretos sigue siendo necesario, más las credenciales OAuth de Google
+   (ver README y [`docs/alta-express.md`](alta-express.md)).
 3. Revisar `tenants/<slug>.ts` a mano:
    - `defaults.whatsapp` / `instagram` / `horarios` reales.
    - Paleta: probar en `npm run dev` → `localhost:3000/<slug>`. Si el

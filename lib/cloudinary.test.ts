@@ -27,7 +27,7 @@ test('versionDelDia: fecha de Argentina como vAAAAMMDD', () => {
 test('urlOferta prefija version del dia y carpeta del catalogo, y usa placeholder', () => {
   assert.equal(
     urlOferta('asado-de-tira', DIA),
-    'https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,w_1200,d_placeholder.png/v20261006/catalogo-comun/asado-de-tira',
+    'https://res.cloudinary.com/demo-cloud/image/upload/t_margen8/f_auto,q_auto,w_1200,d_placeholder.png/v20261006/catalogo-comun/asado-de-tira',
   )
 })
 

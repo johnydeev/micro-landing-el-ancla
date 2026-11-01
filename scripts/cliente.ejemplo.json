@@ -1,0 +1,27 @@
+{
+  "nombre": "Carnicería López",
+  "slug": "carniceria-lopez",
+  "eslogan": "Desde 1990, el barrio de siempre",
+  "colores": {
+    "primario": "#B91C1C",
+    "secundario": "#1F2937"
+  },
+  "badgeOferta": "SUPER OFERTA",
+  "contacto": {
+    "whatsapp": "11 2222 3333",
+    "instagram": "@carniceria_lopez",
+    "horarios": "LUN a SAB: 8 a 13 y 16 a 20 | DOM: 8 a 13"
+  },
+  "logo": "./logo-lopez.png",
+  "planilla": {
+    "templateId": "ID_DE_LA_PLANILLA_MODELO",
+    "titulo": "Precios Carnicería López",
+    "config": {
+      "horarios": "LUN a SAB: 8 a 13 y 16 a 20 | DOM: 8 a 13",
+      "whatsapp": "11 2222 3333",
+      "instagram": "@carniceria_lopez",
+      "segundosCartel": 4,
+      "segundosTabla": 5
+    }
+  }
+}

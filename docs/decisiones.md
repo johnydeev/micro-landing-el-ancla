@@ -2443,3 +2443,57 @@ Google deja todas las TVs vacías a la vez. Se reabre acotado: cada TV
 muestra su último dato bueno **hasta 2 horas**; pasado eso, vuelve al empty
 state de siempre. Guardado en la TV (no en el servidor) para no sumar
 servicios. Detalle en `docs/superpowers/specs/2026-10-08-ultimo-dato-bueno-design.md`.
+
+## Sesión 28 — Alta express: OAuth, copia y CSV por `/export`
+
+### Problema
+
+El alta de un cliente copiaba la planilla modelo a mano, escribía la
+configuración, subía el logo y creaba tenant/env/fila de Supabase en varios
+pasos. Con más clientes, el cuello de botella pasa a ser operativo.
+
+### Decisión
+
+`npm run alta-express -- cliente.json` automatiza copia, permisos, config,
+gids, CSV, logo, tenant, env y Supabase. Quedan manuales el commit/push y la
+activación de teles.
+
+- **OAuth con refresh token, no service account**: una service account no
+  tiene cuota de Drive para ser dueña de la copia.
+- **CSV por `/export?format=csv&gid=`**, con link sharing. Evita “Publicar en
+  la web” y permite validar los encabezados antes de escribir archivos.
+- **Planilla existente sin cambios de permisos** salvo `compartir: true`:
+  cambiar permisos de una planilla ajena es destructivo.
+- **Pestaña de listas por nombre**, no por orden; se prioriza “tabla” sobre
+  “precio” y se excluyen ofertas, config y `_catalogo`.
+- **Configuración con `RAW`**: evita que Sheets interprete fórmulas o fechas.
+- **Slugs `api*`, `admin*`, `activar*` rechazados**: el matcher de `proxy.ts`
+  no les renueva la cookie de la tele.
+
+### Alternativas descartadas
+
+- **Service account**: sin cuota de Drive para la copia.
+- **Publicar cada pestaña en la web**: un paso manual más y no necesario para
+  leer el CSV con link sharing.
+- **Cambiar permisos siempre**: podía romper una planilla existente del
+  cliente.
+- **Primera pestaña como listas**: frágil si el cliente mueve pestañas.
+
+### Ajustes tras la revisión (31/10/2026)
+
+- **Planilla existente: config también opt-in** (`escribirConfig: true`), igual
+  que los permisos. Puede estar en uso y se pisaría lo que ven sus teles.
+- **Vercel antes que los archivos del repo**, y el token se prueba en el
+  preflight. Un token vencido dejaba tenant, registro y `.env.local` escritos
+  con la planilla ya copiada. Aplicado también a `npm run alta`.
+- **HTML no es CSV**: `/export` de una planilla no compartida responde 200 con
+  la página de login; se detecta y se informa como "no compartida".
+- **Reintentos del CSV solo mientras propaga**: copia nueva o recién
+  compartida reintenta 16 s; planilla existente corta ante 4xx o login.
+- **I/O de los scripts en `lib/alta-io.ts`**: Vercel, archivos y Supabase
+  estaban copiados en `alta` y `alta-express`; un arreglo en uno no llegaba al
+  otro. `lib/alta.ts` sigue siendo puro.
+- **`fail()` tira en vez de `exit()`** en `alta-express`: en Windows, `exit()`
+  justo después de un `fetch` dispara un assert de libuv y sale con 127.
+
+Detalle técnico, flujo y riesgos: [`docs/alta-express.md`](alta-express.md).

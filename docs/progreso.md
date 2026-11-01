@@ -137,6 +137,32 @@ imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
 
 ## Completado ✅
 
+- **Sesión 28 (22/10/2026) — Alta express con OAuth de Google**:
+  - `npm run alta-express -- cliente.json` copia la planilla modelo, la
+    comparte por link, escribe la configuración, resuelve los gids, sube el
+    logo, crea `tenants/<slug>.ts`, la env en Vercel/`.env.local` y la fila en
+    `comercios` con `requiere_activacion = true`.
+  - OAuth con refresh token (no service account: una service account no tiene
+    cuota de Drive para ser dueña de la copia). `npm run google-auth` hace el
+    consentimiento una sola vez y guarda el token en `.env.local`.
+  - El CSV usa `/export?format=csv&gid=` con link sharing; no hace falta
+    “Publicar en la web”. Se validan los encabezados antes de escribir.
+  - Planilla existente (`planilla.sheetId`): no se tocan permisos salvo
+    `"compartir": true`.
+  - Slugs `api*`, `admin*`, `activar*` rechazados en `npm run alta` y
+    `alta-express` (el matcher de `proxy.ts` no les renueva la cookie).
+  - **Revisión y arreglos (31/10/2026)**: no toma como CSV la página de login
+    de una planilla no compartida; con `sheetId` no escribe la configuración
+    salvo `"escribirConfig": true`; el token de Vercel se prueba en el
+    preflight y la env se crea antes de escribir archivos (también en
+    `npm run alta`); el CSV de una planilla existente corta enseguida ante 4xx.
+    Limpieza: I/O compartido en `lib/alta-io.ts` (antes copiado en cada
+    script), sin caché de tokens, `fail()` sin `exit()` (en Windows salía 127).
+  - Verificación (31/10): 145 tests, `tsc`, lint y build OK; token de Vercel
+    inválido corta en el preflight. Falta la prueba end-to-end real contra
+    Google (crear cliente OAuth y correr `npm run google-auth`).
+  - Detalle: [`docs/alta-express.md`](alta-express.md).
+
 - **Sesión 22 (01/10/2026) — Primer alta real (`/demo`) y alineación de precios**:
   - **`npm run alta` usado por primera vez de verdad**, con un comercio
     ficticio de muestra ("Carnicería San Martín"). Vive en **`/demo`**: la URL
@@ -832,8 +858,8 @@ listo para vender en su estado actual.
 
 ### Abierto
 
-- **Activación de pantallas — Parte B hecha en código (19-21/10/2026),
-  pendiente de producción.** Panel `/admin` (login con `ADMIN_PASSWORD`; vistas
+- **Activación de pantallas — Parte B en producción (22/10/2026, commit
+  1f6e8e0, deploy verificado sin errores; teles andando).** Panel `/admin` (login con `ADMIN_PASSWORD`; vistas
   Clientes y Bajas; switch por tele, Apagar/Prender todas, Pagó, fecha de pago,
   Nueva tele con código, Cambiar rubros y Dar de baja con contraseña,
   Reactivar), alta de teles con código de 6 caracteres que muestra la pantalla
@@ -841,11 +867,13 @@ listo para vender en su estado actual.
   (`proxy.ts`) y `npm run alta` que crea la fila en `comercios`. Se eliminó el
   corte automático por pago ("Servicio suspendido"): `pagado_hasta` solo avisa
   en el panel. Migración `20261019000000_panel_parte_b.sql`.
-  **Falta**: cargar `ADMIN_PASSWORD` (Secret, Production) en Vercel, push fuera
-  de horario (+ Redeploy si la variable se cargó después), verificar
-  `/admin/login` en producción, y dar de alta El Látigo en el panel: fecha de
-  pago, ver `vufw80` y `7au8no` con badge verde y prender
-  `requiere_activacion` por SQL (el panel no lo expone). Spec/plan:
+  `ADMIN_PASSWORD` cargada en Vercel (la de `.env.local` es otra, solo local; ojo:
+  el panel local escribe en la base de producción).
+  **Falta (El Látigo)**: con el local abierto, ver en `/admin` sus teles `vufw80`
+  (vacuno) y `7au8no` (cerdo y pollo) en verde, cargar su **Fecha de pago** +
+  **Guardar fecha**, y prender `requiere_activacion` por SQL (el panel no lo
+  expone). Supabase `tv-precios` = `etiuhgqersmbntyqobei` (se pausó `emprendeya`
+  por el cupo gratis de 2 proyectos). Spec/plan:
   `docs/superpowers/{specs,plans}/2026-10-19-*`.
   Antes: Parte A en código (17/10/2026), estado en Supabase (`tv-precios`,
   tablas `comercios`/`teles`, función `estado_tele`); etapa 1 (12/10/2026):
@@ -855,6 +883,29 @@ listo para vender en su estado actual.
   `ACTIVACION_SECRET` (obligatoria), `SOPORTE_CONTACTO` (opcional),
   `SUPABASE_*`, `ADMIN_PASSWORD`. Opciones históricas en
   `docs/superpowers/specs/2026-10-12-activacion-pantallas-opciones.md`.
+
+- **Pendientes menores conocidos de la Parte B** (revisión final 21/10, ninguno
+  bloquea):
+  - Si en un Fire TV las cookies quedaran bloqueadas, la pantalla recargaría cada 5 s
+    hasta que se purgue el código (~1 día). Fully acepta cookies: no pasó.
+  - "Nueva tele" con la planilla lenta (>2,5 s) ofrece solo "Todo" sin avisarlo.
+  - Login: la espera de 1 s por contraseña mala no frena intentos en paralelo (con
+    contraseña larga alcanza; si hace falta, límite en Vercel Firewall).
+  - Rollback a la Parte A con un `pagado_hasta` vencido cargado volvería a cortar
+    a los 5 días e ignoraría `dado_de_baja`.
+  - ~~Slugs que empiecen con `api`, `admin` o `activar` no renovarían la cookie~~
+    Resuelto (sesión 28): `npm run alta` y `alta-express` los rechazan.
+  - Menores de código: `ahoraMs` sin uso en `decidirAcceso`, `conCodigo` repetido en
+    las 4 pages, `BotonAccion` de solo ícono sin `aria-label` obligatorio, la base
+    tiene la migración en dos pasos (`panel_parte_b` + `panel_parte_b_purga`) y el
+    repo un solo archivo.
+
+- **Vercel Pro antes de crecer**: el plan Hobby no permite uso comercial (ya se
+  cobran abonos). Unos US$20/mes. Sin código.
+
+- **Ícono de micrófono en la esquina de los Fire TV de El Látigo** ("el micrófono
+  está encendido" al arrancar). No es el permiso de Fully. Sin resolver; próximo
+  paso: ADB para ver qué app lo usa. Ver `docs/manual-nuevo-cliente.md`.
 
 - **Cuenta de Amazon de los Fire TV** (El Ancla + El Látigo comparten una).
   1) Mail y contraseña en el gestor de contraseñas (prioridad: sin acceso, un

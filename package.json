@@ -10,6 +10,8 @@
     "lint": "eslint",
     "test": "node --test \"lib/**/*.test.ts\" \"tenants/**/*.test.ts\"",
     "alta": "node --env-file=.env.local scripts/alta.mts",
+    "alta-express": "node --env-file=.env.local scripts/alta-express.mts",
+    "google-auth": "node --env-file=.env.local scripts/google-auth.mts",
     "activar": "node --env-file=.env.local scripts/activar.mts"
   },
   "dependencies": {

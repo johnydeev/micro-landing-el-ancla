@@ -20,7 +20,6 @@
  * Spec: docs/superpowers/specs/2026-09-20-alta-de-cliente-design.md
  */
 
-import { readFile, writeFile, access } from 'node:fs/promises'
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout, argv, env, exit } from 'node:process'
 import { execSync } from 'node:child_process'
@@ -29,19 +28,17 @@ import path from 'node:path'
 import {
   slugificar,
   SLUG_RE,
+  slugReservado,
   HEX_RE,
   pubhtmlUrl,
   csvUrlBase,
   parsearPestanas,
   elegirGids,
   derivarPaleta,
-  generarTenantTs,
-  insertarEnRegistro,
-  firmaCloudinary,
   envKeyCsv,
-  upsertEnv,
-  pedidoComercio,
 } from '../lib/alta.ts'
+import { subirLogoCloudinary } from '../lib/logo-cloudinary.ts'
+import { existe, subirEnvCsvVercel, escribirArchivosTenant, crearFilaComercio } from '../lib/alta-io.ts'
 
 const flags = new Set(argv.slice(2))
 const FORCE = flags.has('--force')
@@ -92,15 +89,6 @@ function fail(msg: string): never {
   exit(1)
 }
 
-async function existe(p: string): Promise<boolean> {
-  try {
-    await access(p)
-    return true
-  } catch {
-    return false
-  }
-}
-
 async function main() {
   console.log('\nAlta de cliente — cartelería de precios\n')
 
@@ -108,7 +96,12 @@ async function main() {
   const nombre = await preguntar('Nombre del comercio', { validar: (v) => (v ? null : 'No puede estar vacío') })
   const slug = await preguntar('Slug (URL)', {
     def: slugificar(nombre),
-    validar: (v) => (SLUG_RE.test(v) ? null : 'Solo minúsculas, números y guiones'),
+    validar: (v) =>
+      !SLUG_RE.test(v)
+        ? 'Solo minúsculas, números y guiones'
+        : slugReservado(v)
+          ? 'No puede empezar con api, admin o activar'
+          : null,
   })
 
   const tenantPath = path.join('tenants', `${slug}.ts`)
@@ -172,67 +165,34 @@ async function main() {
     if (!(await existe(logoPath))) fail(`No existe el archivo ${logoPath}`)
 
     console.log('→ Subiendo el logo a Cloudinary…')
-    const publicId = `logos/${slug}`
-    const timestamp = Math.floor(Date.now() / 1000)
-    const params = { public_id: publicId, overwrite: true, timestamp }
-    const form = new FormData()
-    form.set('file', new Blob([await readFile(logoPath)]), path.basename(logoPath))
-    form.set('api_key', apiKey)
-    form.set('timestamp', String(timestamp))
-    form.set('public_id', publicId)
-    form.set('overwrite', 'true')
-    form.set('signature', firmaCloudinary(params, apiSecret))
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: form })
-    const body = (await res.json()) as { public_id?: string; error?: { message: string } }
-    if (!res.ok || !body.public_id) fail(`Cloudinary: ${body.error?.message ?? res.status}`)
-    console.log(`  ✓ ${body.public_id}`)
+    const publicId = await subirLogoCloudinary({ cloud, apiKey, apiSecret, slug, ruta: logoPath })
+    console.log(`  ✓ ${publicId}`)
   } else {
     console.log('→ Logo: saltado. Subilo después como logos/' + slug)
   }
 
-  // ---- 4. Archivos del repo ------------------------------------------------
-  const paleta = derivarPaleta(primario, secundario)
-  await writeFile(
-    tenantPath,
-    generarTenantTs({ slug, nombre, eslogan, badgeOferta, whatsapp, instagram, horarios, paleta, gids }),
-    'utf8',
-  )
-  const indexPath = path.join('tenants', 'index.ts')
-  await writeFile(indexPath, insertarEnRegistro(await readFile(indexPath, 'utf8'), slug), 'utf8')
-  console.log(`→ Escrito ${tenantPath} y registrado en ${indexPath}`)
-
-  // ---- 5. Env: .env.local + Vercel -----------------------------------------
+  // ---- 4. Env en Vercel ----------------------------------------------------
+  // Antes de escribir archivos: si Vercel falla, el repo queda sin tocar.
   const key = envKeyCsv(slug)
-  const envLocalPath = '.env.local'
-  const envLocal = (await existe(envLocalPath)) ? await readFile(envLocalPath, 'utf8') : ''
-  await writeFile(envLocalPath, upsertEnv(envLocal, key, csvUrl), 'utf8')
-  console.log(`→ ${key} agregada a .env.local`)
-
   if (SIN_VERCEL) {
     console.log(`→ Vercel: saltado (--sin-vercel). Cargá a mano ${key}`)
   } else {
     const token = env.VERCEL_TOKEN
-    const project = env.VERCEL_PROJECT_ID
-    if (!token || !project) fail('Faltan VERCEL_TOKEN / VERCEL_PROJECT_ID en .env.local (o usá --sin-vercel)')
+    const projectId = env.VERCEL_PROJECT_ID
+    if (!token || !projectId) fail('Faltan VERCEL_TOKEN / VERCEL_PROJECT_ID en .env.local (o usá --sin-vercel)')
     console.log('→ Creando la variable en Vercel…')
-    const team = env.VERCEL_TEAM_ID ? `&teamId=${encodeURIComponent(env.VERCEL_TEAM_ID)}` : ''
-    const res = await fetch(`https://api.vercel.com/v10/projects/${encodeURIComponent(project)}/env?upsert=true${team}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        key,
-        value: csvUrl,
-        type: 'encrypted',
-        target: ['production', 'preview', 'development'],
-        comment: `CSV publicado de ${nombre} (npm run alta)`,
-      }),
-    })
-    const body = (await res.json()) as { error?: { message: string }; failed?: unknown[] }
-    if (!res.ok || (body.failed && body.failed.length > 0)) {
-      fail(`Vercel: ${body.error?.message ?? JSON.stringify(body.failed) ?? res.status}`)
+    try {
+      await subirEnvCsvVercel({ token, projectId, teamId: env.VERCEL_TEAM_ID }, slug, csvUrl, `CSV publicado de ${nombre} (npm run alta)`)
+    } catch (e) {
+      fail(`${(e as Error).message}. No se escribió nada en el repo.`)
     }
     console.log(`  ✓ ${key} en Vercel (production, preview, development)`)
   }
+
+  // ---- 5. Archivos del repo y .env.local ----------------------------------
+  const paleta = derivarPaleta(primario, secundario)
+  await escribirArchivosTenant({ slug, nombre, eslogan, badgeOferta, whatsapp, instagram, horarios, paleta, gids }, csvUrl)
+  console.log(`→ Escrito ${tenantPath}, registrado en tenants/index.ts y ${key} en .env.local`)
 
   // ---- 6. Fila del cliente en Supabase -------------------------------------
   /*
@@ -240,25 +200,12 @@ async function main() {
    * Nace con requiere_activacion = true: el panel /admin ya puede darles de
    * alta con codigo. Si falla algo, no se corta el alta: se avisa y se sigue.
    */
-  const supabaseUrl = env.SUPABASE_URL
-  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY
   if (SIN_SUPABASE) {
     console.log(`→ Supabase: saltado (--sin-supabase). Cargá la fila en comercios a mano (slug ${slug}, requiere_activacion true)`)
-  } else if (!supabaseUrl || !supabaseKey) {
-    console.log(`→ Supabase: faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY. Cargá la fila en comercios a mano (slug ${slug}, requiere_activacion true)`)
   } else {
     console.log('→ Creando la fila en comercios…')
-    const pedido = pedidoComercio(supabaseUrl, supabaseKey, slug)
-    try {
-      const res = await fetch(pedido.url, pedido.init)
-      if (res.ok) {
-        console.log(`  ✓ comercios: ${slug} (requiere_activacion = true; si ya existía, quedó como estaba)`)
-      } else {
-        console.log(`  ✖ Supabase respondió ${res.status}: ${await res.text()}. Cargá la fila en comercios a mano.`)
-      }
-    } catch (e) {
-      console.log(`  ✖ Supabase: ${(e as Error).message}. Cargá la fila en comercios a mano.`)
-    }
+    const { ok, mensaje } = await crearFilaComercio({ url: env.SUPABASE_URL, key: env.SUPABASE_SERVICE_ROLE_KEY }, slug)
+    console.log(`  ${ok ? '✓' : '✖'} ${mensaje}`)
   }
 
   // ---- 7. Tests -----------------------------------------------------------

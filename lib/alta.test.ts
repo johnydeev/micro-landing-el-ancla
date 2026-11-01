@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   slugificar,
   camelCase,
+  slugReservado,
   pubhtmlUrl,
   csvUrlBase,
   parsearPestanas,
@@ -27,6 +28,15 @@ test('camelCase del slug', () => {
   assert.equal(camelCase('carniceria-lopez'), 'carniceriaLopez')
   assert.equal(camelCase('lopez'), 'lopez')
   assert.equal(camelCase('pollo-2'), 'pollo2')
+})
+
+test('slugReservado: prefijos que el proxy no matchea', () => {
+  for (const slug of ['api', 'api-demo', 'admin', 'administracion', 'activar', 'activar-tv']) {
+    assert.equal(slugReservado(slug), true, slug)
+  }
+  for (const slug of ['carniceria', 'el-ancla', 'pizzeria-api']) {
+    assert.equal(slugReservado(slug), false, slug)
+  }
 })
 
 const CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-abc_DEF/pub?output=csv'
