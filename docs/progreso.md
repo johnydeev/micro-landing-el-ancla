@@ -1,6 +1,6 @@
 # Progreso del proyecto — micro-landing-el-ancla
 
-Actualizado al 01/10/2026 (sesión 22, dos comercios en producción).
+Actualizado al 06/11/2026 (sesión 29, dos comercios en producción).
 
 ---
 
@@ -136,6 +136,31 @@ imágenes. Todo lo de imágenes vive en Cloudinary (sesión 21).
 ---
 
 ## Completado ✅
+
+- **Sesión 29 (06/11/2026) — Incidente El Látigo, tele vacuno sin arrancar**:
+  - Síntoma: la tele de vacuno (`vufw80`) no cargaba en el Fire TV. En la PC,
+    `https://tv-precios.vercel.app/el-latigo?rubro=vacuno` andaba bien.
+  - Descartado: página, datos de la planilla, deploy y estado en Supabase. La
+    tele de cerdo y pollo (`7au8no`) seguía conectando cada 10 min; `vufw80`
+    no conectaba desde el 05/11 15:39 (hora AR). En los logs de Vercel no
+    había pedidos de esa tele: el problema estaba antes de llegar al server.
+  - En el aparato: Fully volvió solo a la pantalla de Quick Start (perdió la
+    Start URL) y, al cargarla, quedaba en negro con el "Loading ..." de Fully
+    (no el "Cargando…" de la app). La misma URL abría rápido en el navegador
+    de Downloader del mismo Fire TV: el problema era de Fully.
+  - No alcanzó: forzar detención + borrar caché, ni borrar datos de Fully.
+  - **Arreglo**: desinstalar Fully, reinstalar el APK regular desde
+    fully-kiosk.com y reiniciar el Fire TV. Cargó enseguida.
+  - Causa de fondo: desconocida. Sin cambios en el código ni en la base.
+  - Queda: la tele usa `?rubro=vacuno` sin cookie. Con `requiere_activacion`
+    apagado funciona, pero en `/admin` `vufw80` sigue en rojo (no se registra
+    la conexión). El usuario decidió no prender `requiere_activacion` por ahora.
+  - Hallazgos sin tratar: el Fire TV parece estar en zona UTC (marcaba 17:46
+    cuando eran ~14:46 AR); muchos timeouts de `estado_tele` en los logs
+    (308 en la ventana revisada); posible recarga de seguridad en
+    `app/[tenant]/loading.tsx` (hoy el reload y el watchdog viven en
+    `PantallaRotativa` y no corren mientras se muestra el loading). No se
+    aplicó porque no se confirmó que esa fuera la causa.
 
 - **Sesión 28 (22/10/2026) — Alta express con OAuth de Google**:
   - `npm run alta-express -- cliente.json` copia la planilla modelo, la
@@ -872,7 +897,9 @@ listo para vender en su estado actual.
   **Falta (El Látigo)**: con el local abierto, ver en `/admin` sus teles `vufw80`
   (vacuno) y `7au8no` (cerdo y pollo) en verde, cargar su **Fecha de pago** +
   **Guardar fecha**, y prender `requiere_activacion` por SQL (el panel no lo
-  expone). Supabase `tv-precios` = `etiuhgqersmbntyqobei` (se pausó `emprendeya`
+  expone). Estado al 06/11/2026: la tele de vacuno se reinstaló (sesión 29) y
+  corre con `?rubro=vacuno` sin cookie; para verla en verde hay que activarla
+  con código después de prender `requiere_activacion`. Supabase `tv-precios` = `etiuhgqersmbntyqobei` (se pausó `emprendeya`
   por el cupo gratis de 2 proyectos). Spec/plan:
   `docs/superpowers/{specs,plans}/2026-10-19-*`.
   Antes: Parte A en código (17/10/2026), estado en Supabase (`tv-precios`,
@@ -899,6 +926,12 @@ listo para vender en su estado actual.
     las 4 pages, `BotonAccion` de solo ícono sin `aria-label` obligatorio, la base
     tiene la migración en dos pasos (`panel_parte_b` + `panel_parte_b_purga`) y el
     repo un solo archivo.
+
+- **Revisar después del incidente del 06/11 (sesión 29)**, sin urgencia:
+  zona horaria de los Fire TV de El Látigo (parecen en UTC), configuración de
+  Fully tras la reinstalación (recargas, Launch on Boot, micrófono), prueba de
+  arranque desenchufando el Fire TV, timeouts de `estado_tele` en Vercel y
+  la idea de una recarga de seguridad en `app/[tenant]/loading.tsx`.
 
 - **Vercel Pro antes de crecer**: el plan Hobby no permite uso comercial (ya se
   cobran abonos). Unos US$20/mes. Sin código.

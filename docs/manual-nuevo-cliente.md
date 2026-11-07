@@ -274,6 +274,7 @@ navegador de WhatsApp), o una **Nueva tele** más con su código.
 | No aparece el código en la pantalla bloqueada | Cliente dado de baja | Verificar la vista Bajas y reactivar; plan B con `npm run activar` |
 | La pantalla muestra precios sin bloqueo ni código | Sin fila en `comercios` (no hay bloqueo, por eso no hay código) | Crear la fila con `npm run alta` o en Supabase |
 | El código dice vencido o inválido | Pasaron 15 min o se escribió mal | Recargar la tele (pide uno nuevo) y cargarlo antes |
+| Fully vuelve a Quick Start o queda en negro con "Loading ..." (de Fully, no "Cargando…") y en Vercel no llegan pedidos | Fully trabado en el aparato; causa desconocida (El Látigo, 06/11/2026) | Probar la URL en el navegador de Downloader: si abre, desinstalar Fully, reinstalar el APK regular de fully-kiosk.com, reiniciar y reconfigurar. Borrar caché o datos no alcanzó |
 | Cartel "Permissions required" en cada arranque | Se apretó Cancel | Apretar IGNORE |
 | Ícono de micrófono en la esquina | Sin resolver (no es el permiso de Fully) | Pendiente: ADB para ver qué app lo usa |
 | Bordes cortados, punto de estado invisible | Overscan de la tele | Ajustar a pantalla |
